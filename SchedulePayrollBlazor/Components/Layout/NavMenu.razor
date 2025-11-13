@@ -1,15 +1,16 @@
 @using Microsoft.AspNetCore.Components.Authorization
+@using System.Security.Claims
 @inject SimpleAuthStateProvider Auth
 @inject NavigationManager Nav
 @implements IDisposable
 
 <nav class="side-nav">
     <div class="side-section-header">
-        @if (snapshot.IsAuthenticated)
+        @if (isAuthenticated)
         {
             <div class="side-user">
-                <span class="user-name">@snapshot.DisplayName</span>
-                <span class="user-role">@snapshot.Role</span>
+                <span class="user-name">@displayName</span>
+                <span class="user-role">@roleLabel</span>
             </div>
         }
         else
@@ -21,14 +22,14 @@
         }
     </div>
 
-    @if (!snapshot.IsAuthenticated)
+    @if (!isAuthenticated)
     {
         <div class="side-section">
             <NavLink href="/login" class="side-link" activeClass="active">Login</NavLink>
             <NavLink href="/register" class="side-link" activeClass="active">Register</NavLink>
         </div>
     }
-    else if (snapshot.IsAdmin)
+    else if (isAdmin)
     {
         <div class="side-section">
             <span class="side-section-title">Admin</span>
@@ -50,39 +51,55 @@
         </div>
     }
 
-    @if (snapshot.IsAuthenticated)
+    @if (isAuthenticated)
     {
         <button class="side-logout" @onclick="Logout">Logout</button>
     }
 </nav>
 
 @code {
-    private SimpleAuthStateProvider.AuthUserSnapshot snapshot = SimpleAuthStateProvider.AuthUserSnapshot.Anonymous();
+    private bool isAuthenticated;
+    private bool isAdmin;
+    private string? displayName;
+    private string? roleLabel;
 
     protected override async Task OnInitializedAsync()
     {
-        snapshot = await Auth.GetCurrentUserAsync();
+        await LoadFromAuthStateAsync();
         Auth.AuthenticationStateChanged += OnAuthenticationStateChanged;
+    }
+
+    private async Task LoadFromAuthStateAsync()
+    {
+        var state = await Auth.GetAuthenticationStateAsync();
+        var user = state.User;
+
+        isAuthenticated = user.Identity?.IsAuthenticated ?? false;
+
+        if (!isAuthenticated)
+        {
+            isAdmin = false;
+            displayName = "Guest";
+            roleLabel = "Not signed in";
+            return;
+        }
+
+        isAdmin = user.IsInRole("Admin");
+        displayName = user.Identity?.Name ?? user.FindFirst(ClaimTypes.Email)?.Value ?? "User";
+        roleLabel = isAdmin ? "Admin" : "Employee";
     }
 
     private async void OnAuthenticationStateChanged(Task<AuthenticationState> task)
     {
-        try
-        {
-            await task;
-            snapshot = await Auth.GetCurrentUserAsync();
-            await InvokeAsync(StateHasChanged);
-        }
-        catch
-        {
-            snapshot = SimpleAuthStateProvider.AuthUserSnapshot.Anonymous();
-            await InvokeAsync(StateHasChanged);
-        }
+        var _ = await task;
+        await LoadFromAuthStateAsync();
+        await InvokeAsync(StateHasChanged);
     }
 
     private async Task Logout()
     {
         await Auth.SignOutAsync();
+        await LoadFromAuthStateAsync();
         Nav.NavigateTo("/login", forceLoad: true);
     }
 

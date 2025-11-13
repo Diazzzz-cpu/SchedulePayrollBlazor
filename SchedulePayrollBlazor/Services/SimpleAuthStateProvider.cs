@@ -1,5 +1,3 @@
-using System.Collections.Generic;
-using System.Globalization;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.EntityFrameworkCore;
@@ -12,129 +10,66 @@ public class SimpleAuthStateProvider : AuthenticationStateProvider
 {
     private const string StorageKey = "auth_user_id";
 
-    private readonly IJSRuntime _jsRuntime;
-    private readonly AppDbContext _dbContext;
-    private static readonly ClaimsPrincipal AnonymousPrincipal = new(new ClaimsIdentity());
+    private readonly IJSRuntime _js;
+    private readonly AppDbContext _db;
 
-    private AuthenticationState _cachedState = new AuthenticationState(AnonymousPrincipal);
-    private AuthUserSnapshot _snapshot = AuthUserSnapshot.Anonymous();
-    private bool _isLoaded;
+    private static readonly ClaimsPrincipal Anonymous =
+        new(new ClaimsIdentity());
 
-    public SimpleAuthStateProvider(IJSRuntime jsRuntime, AppDbContext dbContext)
+    public SimpleAuthStateProvider(IJSRuntime js, AppDbContext db)
     {
-        _jsRuntime = jsRuntime;
-        _dbContext = dbContext;
+        _js = js;
+        _db = db;
     }
 
-    public bool IsAuthenticated => _snapshot.IsAuthenticated;
-
-    public bool IsAdmin => _snapshot.IsAdmin;
-
-    public string? CurrentRole => _snapshot.Role;
-
-    public int? CurrentUserId => _snapshot.UserId;
-
-    public int? CurrentEmployeeId => _snapshot.EmployeeId;
-
-    public string? CurrentEmail => _snapshot.Email;
-
-    public string? CurrentDisplayName => _snapshot.DisplayName;
-
-    public override Task<AuthenticationState> GetAuthenticationStateAsync()
-        => LoadAuthenticationStateAsync();
-
-    public async Task<AuthUserSnapshot> GetCurrentUserAsync()
+    public override async Task<AuthenticationState> GetAuthenticationStateAsync()
     {
-        if (!_isLoaded)
+        var storedId = await _js.InvokeAsync<string?>("localStorage.getItem", StorageKey);
+
+        if (!int.TryParse(storedId, out var userId))
+            return new AuthenticationState(Anonymous);
+
+        var user = await _db.Users
+            .Include(u => u.Employee)
+            .FirstOrDefaultAsync(u => u.UserId == userId);
+
+        if (user == null)
         {
-            await LoadAuthenticationStateAsync();
+            await _js.InvokeVoidAsync("localStorage.removeItem", StorageKey);
+            return new AuthenticationState(Anonymous);
         }
 
-        return _snapshot;
+        // Map numeric RoleId to a readable role name
+        var roleName = user.RoleId == 5 ? "Admin" : "Employee";
+
+        var claims = new List<Claim>
+        {
+            new(ClaimTypes.NameIdentifier, user.UserId.ToString()),
+            new(ClaimTypes.Email, user.Email),
+            new(ClaimTypes.Name, $"{user.FirstName} {user.LastName}"),
+            new(ClaimTypes.Role, roleName)
+        };
+
+        //if (user.Employee != null)
+        //{
+            //claims.Add(new Claim("EmployeeId", user.Employee.EmployeeId.ToString()));
+        //}
+
+        var identity = new ClaimsIdentity(claims, "auth");
+        var principal = new ClaimsPrincipal(identity);
+
+        return new AuthenticationState(principal);
     }
 
     public async Task SignInAsync(int userId)
     {
-        await _jsRuntime.InvokeVoidAsync("localStorage.setItem", StorageKey, userId.ToString(CultureInfo.InvariantCulture));
-        NotifyAuthenticationStateChanged(LoadAuthenticationStateAsync(forceReload: true));
+        await _js.InvokeVoidAsync("localStorage.setItem", StorageKey, userId.ToString());
+        NotifyAuthenticationStateChanged(GetAuthenticationStateAsync());
     }
 
     public async Task SignOutAsync()
     {
-        await _jsRuntime.InvokeVoidAsync("localStorage.removeItem", StorageKey);
-        _isLoaded = false;
-        _snapshot = AuthUserSnapshot.Anonymous();
-        _cachedState = new AuthenticationState(AnonymousPrincipal);
-        NotifyAuthenticationStateChanged(Task.FromResult(_cachedState));
-    }
-
-    private async Task<AuthenticationState> LoadAuthenticationStateAsync(bool forceReload = false)
-    {
-        if (!forceReload && _isLoaded)
-        {
-            return _cachedState;
-        }
-
-        var userIdValue = await _jsRuntime.InvokeAsync<string?>("localStorage.getItem", StorageKey);
-        if (!int.TryParse(userIdValue, NumberStyles.Integer, CultureInfo.InvariantCulture, out var userId))
-        {
-            _snapshot = AuthUserSnapshot.Anonymous();
-            _cachedState = new AuthenticationState(AnonymousPrincipal);
-            _isLoaded = true;
-            return _cachedState;
-        }
-
-        var user = await _dbContext.Users
-            .Include(u => u.Employee)
-            .FirstOrDefaultAsync(u => u.Id == userId);
-
-        if (user is null)
-        {
-            await _jsRuntime.InvokeVoidAsync("localStorage.removeItem", StorageKey);
-            _snapshot = AuthUserSnapshot.Anonymous();
-            _cachedState = new AuthenticationState(AnonymousPrincipal);
-            _isLoaded = true;
-            return _cachedState;
-        }
-
-        var employeeId = user.Employee?.Id;
-        var displayName = user.Employee?.FullName;
-        if (string.IsNullOrWhiteSpace(displayName))
-        {
-            displayName = user.Email;
-        }
-
-        var claims = new List<Claim>
-        {
-            new(ClaimTypes.NameIdentifier, (employeeId ?? user.Id).ToString(CultureInfo.InvariantCulture)),
-            new(ClaimTypes.Name, displayName),
-            new(ClaimTypes.Email, user.Email),
-            new(ClaimTypes.Role, user.Role),
-            new("UserId", user.Id.ToString(CultureInfo.InvariantCulture))
-        };
-
-        if (employeeId.HasValue)
-        {
-            claims.Add(new Claim("EmployeeId", employeeId.Value.ToString(CultureInfo.InvariantCulture)));
-        }
-
-        _snapshot = new AuthUserSnapshot(true, user.Id, employeeId, user.Role, user.Email, displayName);
-        var principal = new ClaimsPrincipal(new ClaimsIdentity(claims, "SimpleAuth"));
-        _cachedState = new AuthenticationState(principal);
-        _isLoaded = true;
-        return _cachedState;
-    }
-
-    public readonly record struct AuthUserSnapshot(
-        bool IsAuthenticated,
-        int? UserId,
-        int? EmployeeId,
-        string? Role,
-        string? Email,
-        string? DisplayName)
-    {
-        public bool IsAdmin => string.Equals(Role, "Admin", StringComparison.OrdinalIgnoreCase);
-
-        public static AuthUserSnapshot Anonymous() => new(false, null, null, null, null, null);
+        await _js.InvokeVoidAsync("localStorage.removeItem", StorageKey);
+        NotifyAuthenticationStateChanged(Task.FromResult(new AuthenticationState(Anonymous)));
     }
 }

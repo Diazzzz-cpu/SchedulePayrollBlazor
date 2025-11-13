@@ -20,15 +20,51 @@ public class AppDbContext : DbContext
     {
         base.OnModelCreating(modelBuilder);
 
+        // ===== USERS TABLE =====
         modelBuilder.Entity<User>(entity =>
         {
-            entity.HasIndex(e => e.Email).IsUnique();
-            entity.Property(e => e.Email).HasMaxLength(200).IsRequired();
-            entity.Property(e => e.PasswordHash).IsRequired();
-            entity.Property(e => e.Role).HasMaxLength(32).IsRequired();
-            entity.Property(e => e.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
+            // physical table name in MySQL
+            entity.ToTable("users");
+
+            // primary key
+            entity.HasKey(e => e.UserId);
+
+            // columns mapping to your SQL
+            entity.Property(e => e.UserId)
+                  .HasColumnName("user_id");
+
+            entity.Property(e => e.Email)
+                  .HasColumnName("email")
+                  .HasMaxLength(255)
+                  .IsRequired();
+
+            entity.HasIndex(e => e.Email)
+                  .IsUnique();
+
+            entity.Property(e => e.PasswordHash)
+                  .HasColumnName("password_hash")
+                  .IsRequired();
+
+            entity.Property(e => e.FirstName)
+                  .HasColumnName("first_name")
+                  .HasMaxLength(100)
+                  .IsRequired();
+
+            entity.Property(e => e.LastName)
+                  .HasColumnName("last_name")
+                  .HasMaxLength(100)
+                  .IsRequired();
+
+            entity.Property(e => e.RoleId)
+                  .HasColumnName("role_id")
+                  .IsRequired();
+
+            entity.Property(e => e.CreatedAt)
+                  .HasColumnName("created_at")
+                  .HasDefaultValueSql("CURRENT_TIMESTAMP");
         });
 
+        // ===== EMPLOYEE =====
         modelBuilder.Entity<Employee>(entity =>
         {
             entity.HasIndex(e => e.UserId).IsUnique();
@@ -41,6 +77,7 @@ public class AppDbContext : DbContext
             entity.Property(e => e.StartDate).HasConversion(
                 v => v,
                 v => DateTime.SpecifyKind(v, DateTimeKind.Utc));
+
             entity.Property(e => e.IsActive).HasDefaultValue(true);
 
             entity.HasOne(e => e.User)
@@ -49,6 +86,7 @@ public class AppDbContext : DbContext
                   .OnDelete(DeleteBehavior.Cascade);
         });
 
+        // ===== SCHEDULE =====
         modelBuilder.Entity<Schedule>(entity =>
         {
             entity.Property(e => e.ShiftDate)
@@ -77,6 +115,7 @@ public class AppDbContext : DbContext
                   .OnDelete(DeleteBehavior.Cascade);
         });
 
+        // ===== PAY PERIOD =====
         modelBuilder.Entity<PayPeriod>(entity =>
         {
             entity.Property(e => e.PeriodName).HasMaxLength(120).IsRequired();
@@ -93,6 +132,7 @@ public class AppDbContext : DbContext
                   .HasColumnType("date");
         });
 
+        // ===== PAYROLL RUN =====
         modelBuilder.Entity<PayrollRun>(entity =>
         {
             entity.Property(e => e.Status).HasMaxLength(40).HasDefaultValue("Pending");

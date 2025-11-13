@@ -1,16 +1,40 @@
-namespace SchedulePayrollBlazor.Data.Models;
+using System;
+using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 
-public class User
+namespace SchedulePayrollBlazor.Data.Models
 {
-    public int Id { get; set; }
+    [Table("users")]
+    public class User
+    {
+        [Key]
+        [Column("user_id")]
+        public int UserId { get; set; }
 
-    public string Email { get; set; } = string.Empty;
+        [Required]
+        [Column("email")]
+        public string Email { get; set; } = string.Empty;
 
-    public string PasswordHash { get; set; } = string.Empty;
+        [Required]
+        [Column("password_hash")]
+        public string PasswordHash { get; set; } = string.Empty;
 
-    public string Role { get; set; } = "Employee";
+        [Required]
+        [Column("first_name")]
+        public string FirstName { get; set; } = string.Empty;
 
-    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+        [Required]
+        [Column("last_name")]
+        public string LastName { get; set; } = string.Empty;
 
-    public Employee? Employee { get; set; }
+        [Required]
+        [Column("role_id")]
+        public int RoleId { get; set; }
+
+        [Column("created_at")]
+        public DateTime CreatedAt { get; set; }
+
+        // Navigation
+        public Employee? Employee { get; set; }
+    }
 }

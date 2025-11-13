@@ -1,9 +1,11 @@
 @page "/profile"
 @attribute [Authorize]
+@using System.Security.Claims
+@using Microsoft.EntityFrameworkCore
 @inject SimpleAuthStateProvider AuthProvider
+@inject AuthenticationStateProvider AuthStateProvider
 @inject AppDbContext Db
 @inject NavigationManager Nav
-@using Microsoft.EntityFrameworkCore
 
 @if (profile is null)
 {
@@ -59,16 +61,30 @@ else
 
     protected override async Task OnInitializedAsync()
     {
-        var snapshot = await AuthProvider.GetCurrentUserAsync();
-        if (!snapshot.IsAuthenticated)
+        // Get the current authenticated principal from our auth state provider
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        var userPrincipal = authState.User;
+
+        // Not logged in -> send to login
+        if (!(userPrincipal.Identity?.IsAuthenticated ?? false))
         {
             Nav.NavigateTo("/login", forceLoad: true);
             return;
         }
 
+        // We stored UserId in ClaimTypes.NameIdentifier in SimpleAuthStateProvider
+        var idValue = userPrincipal.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (!int.TryParse(idValue, out var userId))
+        {
+            await AuthProvider.SignOutAsync();
+            Nav.NavigateTo("/login", forceLoad: true);
+            return;
+        }
+
+        // Load user + employee from DB
         var user = await Db.Users
             .Include(u => u.Employee)
-            .FirstOrDefaultAsync(u => u.Id == snapshot.UserId);
+            .FirstOrDefaultAsync(u => u.UserId == userId);
 
         if (user is null)
         {
@@ -77,11 +93,19 @@ else
             return;
         }
 
+        // Determine role label from numeric RoleId
+        var roleLabel = user.RoleId == 5 ? "Admin" : "Employee";
+
+        // Build full name
+        var fullName = $"{user.FirstName} {user.LastName}".Trim();
+        if (string.IsNullOrWhiteSpace(fullName))
+            fullName = user.Email;
+
         profile = new ProfileViewModel
         {
-            FullName = user.Employee?.FullName ?? snapshot.DisplayName ?? user.Email,
+            FullName = fullName,
             Email = user.Email,
-            Role = user.Role,
+            Role = roleLabel,
             CreatedAt = user.CreatedAt,
             Department = user.Employee?.Department ?? string.Empty,
             JobTitle = user.Employee?.JobTitle ?? string.Empty,

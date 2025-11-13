@@ -1,0 +1,24 @@
+﻿<div class="top-row ps-3 navbar navbar-dark">
+    <div class="container-fluid">
+        <a class="navbar-brand" href="">SchedulePayrollBlazor</a>
+    </div>
+</div>
+
+<input type="checkbox" title="Navigation menu" class="navbar-toggler" />
+
+<div class="nav-scrollable" onclick="document.querySelector('.navbar-toggler').click()">
+
+    <nav class="navbar navbar-expand-sm navbar-light bg-light px-3">
+        <a class="navbar-brand" href="/">SchedulePayroll</a>
+        <div class="navbar-nav">
+            <a class="nav-link" href="/schedules">Schedules</a>
+            <a class="nav-link" href="/employees">Employees</a>
+            <a class="nav-link" href="/payroll">Payroll</a>
+            <a class="nav-link" href="/login">Login</a>
+
+            @inject SimpleAuthStateProvider Auth
+            <button class="btn btn-sm btn-outline-secondary ms-2" @onclick="() => Auth.SignOut()">Logout</button>)
+
+        </div>
+    </nav>
+</div>

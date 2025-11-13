@@ -1,0 +1,131 @@
+﻿@page "/schedules/edit/{id:int}"
+@inject AppDbContext Db
+@inject NavigationManager Nav
+@using System.Globalization
+@using Microsoft.EntityFrameworkCore
+
+<h3>Edit Schedule</h3>
+
+@if (vm is null)
+{
+    <p>Loading…</p>
+}
+else
+{
+    <EditForm Model="vm" OnValidSubmit="Save" FormName="EditScheduleForm">
+        <DataAnnotationsValidator />
+        <ValidationSummary />
+
+        <div class="mb-2">
+            <label class="form-label">Employee</label>
+            <select class="form-select" value="@vm.EmployeeId" @onchange="OnEmpChanged">
+                @foreach (var e in employees)
+                {
+                    <option value="@e.EmployeeId">@e.Name (@e.Email)</option>
+                }
+            </select>
+        </div>
+
+        <div class="mb-2">
+            <label class="form-label">Date</label>
+            <input type="date" class="form-control" value="@vm.ShiftDateText"
+                   @onchange="e => vm.ShiftDateText = e?.Value?.ToString() ?? vm.ShiftDateText" />
+        </div>
+
+        <div class="mb-2">
+            <label class="form-label">Start</label>
+            <input type="time" class="form-control" value="@vm.StartTimeText" step="60"
+                   @onchange="e => vm.StartTimeText = e?.Value?.ToString() ?? vm.StartTimeText" />
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">End</label>
+            <input type="time" class="form-control" value="@vm.EndTimeText" step="60"
+                   @onchange="e => vm.EndTimeText = e?.Value?.ToString() ?? vm.EndTimeText" />
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">Source</label>
+            <select class="form-select" value="@vm.Source"
+                    @onchange="e => vm.Source = e?.Value?.ToString() ?? vm.Source">
+                <option>Manual</option>
+                <option>Auto</option>
+            </select>
+        </div>
+
+        @if (!string.IsNullOrWhiteSpace(vm.FormError))
+        {
+            <div class="alert alert-danger">@vm.FormError</div>
+        }
+
+        <button class="btn btn-primary" type="submit">Save</button>
+        <a class="btn btn-secondary ms-2" href="/schedules">Cancel</a>
+    </EditForm>
+}
+
+@code {
+    [Parameter] public int id { get; set; }
+    List<Employee> employees = new();
+    ScheduleVm? vm;
+
+    protected override async Task OnInitializedAsync()
+    {
+        employees = await Db.Set<Employee>().OrderBy(e => e.Name).ToListAsync();
+        var s = await Db.Set<Schedule>().FirstOrDefaultAsync(x => x.ScheduleId == id);
+        if (s is null) { Nav.NavigateTo("/schedules"); return; }
+
+        vm = new ScheduleVm
+        {
+            ScheduleId = s.ScheduleId,
+            EmployeeId = s.EmployeeId,
+            ShiftDateText = s.ShiftDate.ToString("yyyy-MM-dd"),
+            StartTimeText = s.StartTime.ToString("HH\\:mm"),
+            EndTimeText = s.EndTime.ToString("HH\\:mm"),
+            Source = s.Source ?? "Manual"
+        };
+    }
+
+    Task OnEmpChanged(ChangeEventArgs e)
+    {
+        if (int.TryParse(e?.Value?.ToString(), out var i)) vm!.EmployeeId = i;
+        return Task.CompletedTask;
+    }
+
+    async Task Save()
+    {
+        vm!.FormError = null;
+
+        var date = DateOnly.ParseExact(vm.ShiftDateText, "yyyy-MM-dd", CultureInfo.InvariantCulture);
+        var start = TimeOnly.ParseExact(vm.StartTimeText, "HH\\:mm", CultureInfo.InvariantCulture);
+        var end = TimeOnly.ParseExact(vm.EndTimeText, "HH\\:mm", CultureInfo.InvariantCulture);
+
+        if (end <= start) { vm.FormError = "End time must be after start time."; return; }
+
+        var overlap = await Db.Set<Schedule>()
+            .AnyAsync(s => s.EmployeeId == vm.EmployeeId && s.ShiftDate == date &&
+                           s.ScheduleId != vm.ScheduleId &&
+                           !(end <= s.StartTime || start >= s.EndTime));
+        if (overlap) { vm.FormError = "Shift overlaps with an existing schedule."; return; }
+
+        var entity = await Db.Set<Schedule>().FirstAsync(x => x.ScheduleId == vm.ScheduleId);
+        entity.EmployeeId = vm.EmployeeId;
+        entity.ShiftDate = date;
+        entity.StartTime = start;
+        entity.EndTime = end;
+        entity.Source = vm.Source;
+
+        await Db.SaveChangesAsync();
+        Nav.NavigateTo("/schedules", forceLoad: true);
+    }
+
+    public class ScheduleVm
+    {
+        public int ScheduleId { get; set; }
+        public int EmployeeId { get; set; }
+        public string ShiftDateText { get; set; } = DateTime.Today.ToString("yyyy-MM-dd");
+        public string StartTimeText { get; set; } = "08:00";
+        public string EndTimeText { get; set; } = "17:00";
+        public string? Source { get; set; } = "Manual";
+        public string? FormError { get; set; }
+    }
+}

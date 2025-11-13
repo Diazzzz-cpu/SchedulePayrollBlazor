@@ -1,0 +1,40 @@
+﻿@page "/employees"
+@inject AppDbContext Db
+
+<h3>Employees</h3>
+
+@if (employees is null)
+{
+    <p>Loading…</p>
+}
+else
+{
+    <table class="table table-striped">
+        <thead>
+            <tr><th>Name</th><th>Email</th><th>Type</th><th>Hourly</th><th>Monthly</th><th>Role</th></tr>
+        </thead>
+        <tbody>
+            @foreach (var e in employees)
+            {
+                <tr>
+                    <td>@e.Name</td>
+                    <td>@e.Email</td>
+                    <td>@e.EmploymentType</td>
+                    <td>@e.HourlyRate</td>
+                    <td>@e.MonthlyRate</td>
+                    <td>@e.Role?.Name</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    List<Employee>? employees;
+
+    protected override async Task OnInitializedAsync()
+        => employees = await Db.Set<Employee>()
+                               .Include(x => x.Role)   // works if the nav is Role (usual scaffold)
+                               .OrderBy(x => x.Name)
+                               .ToListAsync();
+}

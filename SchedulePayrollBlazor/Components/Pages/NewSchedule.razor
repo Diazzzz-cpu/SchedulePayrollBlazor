@@ -1,0 +1,163 @@
+﻿@page "/schedules/new"
+@inject AppDbContext Db
+@using Microsoft.EntityFrameworkCore
+@using System.Globalization
+
+<h3>New Schedule</h3>
+
+@if (employees is null)
+{
+    <p>Loading…</p>
+}
+else
+{
+    <EditForm Model="vm"
+              OnValidSubmit="HandleValidSubmit"
+              FormName="NewScheduleForm">
+        <DataAnnotationsValidator />
+        <ValidationSummary />
+        @if (!string.IsNullOrWhiteSpace(vm.FormError))
+        {
+            <div class="alert alert-danger">@vm.FormError</div>
+        }
+
+
+        <div class="mb-2">
+            <label class="form-label">Employee</label>
+            <select class="form-select" value="@vm.EmployeeId" @onchange="OnEmpChanged">
+                @foreach (var e in employees)
+                {
+                    <option value="@e.EmployeeId">@e.Name (@e.Email)</option>
+                }
+            </select>
+        </div>
+
+        <div class="mb-2">
+            <label class="form-label">Date</label>
+            <input type="date" class="form-control"
+                   value="@vm.ShiftDateText"
+                   @onchange="OnDateChanged" />
+        </div>
+
+        <div class="mb-2">
+            <label class="form-label">Start Time</label>
+            <input type="time" class="form-control"
+                   value="@vm.StartTimeText"
+                   step="60"
+                   @onchange="OnStartChanged" />
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">End Time</label>
+            <input type="time" class="form-control"
+                   value="@vm.EndTimeText"
+                   step="60"
+                   @onchange="OnEndChanged" />
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">Source</label>
+            <select class="form-select" value="@vm.Source" @onchange="OnSourceChanged">
+                <option>Manual</option>
+                <option>Auto</option>
+            </select>
+        </div>
+
+        <button class="btn btn-primary" type="submit">Save</button>
+        <a class="btn btn-secondary ms-2" href="/schedules">Back</a>
+    </EditForm>
+}
+
+@code {
+    List<Employee>? employees;
+
+    protected override async Task OnInitializedAsync()
+        => employees = await Db.Set<Employee>().OrderBy(e => e.Name).ToListAsync();
+
+    // ----- change handlers (no @bind) -----
+    private Task OnEmpChanged(ChangeEventArgs e)
+    {
+        if (int.TryParse(Convert.ToString(e.Value, CultureInfo.InvariantCulture), out var id))
+            vm.EmployeeId = id;
+        return Task.CompletedTask;
+    }
+
+    private Task OnDateChanged(ChangeEventArgs e)
+    {
+        vm.ShiftDateText = Convert.ToString(e.Value, CultureInfo.InvariantCulture) ?? vm.ShiftDateText;
+        return Task.CompletedTask;
+    }
+
+    private Task OnStartChanged(ChangeEventArgs e)
+    {
+        vm.StartTimeText = Convert.ToString(e.Value, CultureInfo.InvariantCulture) ?? vm.StartTimeText;
+        return Task.CompletedTask;
+    }
+
+    private Task OnEndChanged(ChangeEventArgs e)
+    {
+        vm.EndTimeText = Convert.ToString(e.Value, CultureInfo.InvariantCulture) ?? vm.EndTimeText;
+        return Task.CompletedTask;
+    }
+
+    private Task OnSourceChanged(ChangeEventArgs e)
+    {
+        vm.Source = Convert.ToString(e.Value, CultureInfo.InvariantCulture) ?? vm.Source;
+        return Task.CompletedTask;
+    }
+    // --------------------------------------
+
+    private async Task HandleValidSubmit()
+    {
+        vm.FormError = null; // clear any old error
+
+        // Parse inputs
+        var date  = DateOnly.ParseExact(vm.ShiftDateText, "yyyy-MM-dd", CultureInfo.InvariantCulture);
+        var start = TimeOnly.ParseExact(vm.StartTimeText, "HH\\:mm", CultureInfo.InvariantCulture);
+        var end   = TimeOnly.ParseExact(vm.EndTimeText,   "HH\\:mm", CultureInfo.InvariantCulture);
+
+        // --- VALIDATION happens BEFORE saving ---
+        if (end <= start)
+        {
+            vm.FormError = "End time must be after start time.";
+            return;
+        }
+
+        var overlap = await Db.Set<Schedule>()
+            .AnyAsync(s => s.EmployeeId == vm.EmployeeId && s.ShiftDate == date &&
+                           !(end <= s.StartTime || start >= s.EndTime));
+        if (overlap)
+        {
+            vm.FormError = "Shift overlaps with an existing schedule.";
+            return;
+        }
+
+        // Save
+        var entity = new Schedule
+        {
+            EmployeeId = vm.EmployeeId,
+            ShiftDate  = date,
+            StartTime  = start,
+            EndTime    = end,
+            Source     = vm.Source
+        };
+
+        Db.Add(entity);
+        await Db.SaveChangesAsync();
+
+        nav.NavigateTo("/schedules", forceLoad: true);
+    }
+
+    [Inject] NavigationManager nav { get; set; } = default!;
+
+    public class ScheduleVm
+    {
+        public int EmployeeId { get; set; }
+        public string ShiftDateText { get; set; } = DateTime.Today.ToString("yyyy-MM-dd");
+        public string StartTimeText { get; set; } = "08:00";
+        public string EndTimeText   { get; set; } = "17:00";
+        public string? Source       { get; set; } = "Manual";   // enum('Manual','Auto')
+        public string? FormError    { get; set; }               // <-- ADD THIS
+    }
+    ScheduleVm vm = new();
+}

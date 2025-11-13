@@ -1,0 +1,31 @@
+﻿@page "/login"
+@inject SimpleAuthStateProvider Auth
+@inject NavigationManager Nav
+@inject AppDbContext Db
+@using Microsoft.EntityFrameworkCore
+
+<h3>Login</h3>
+
+<EditForm FormName="LoginForm" OnValidSubmit="SignIn">
+    <div class="card p-3" style="max-width:420px">
+        <input class="form-control mb-2" placeholder="Email" @bind="email" />
+        <input class="form-control mb-2" placeholder="Password" type="password" @bind="password" />
+        <button class="btn btn-primary" type="submit">Sign In</button>
+        @if (!string.IsNullOrWhiteSpace(error))
+        {
+            <div class="text-danger mt-2">@error</div>
+        }
+    </div>
+</EditForm>
+
+@code {
+    string email = "", password = "", error = "";
+
+    private async Task SignIn()
+    {
+        var ok = await Db.Set<Employee>().AnyAsync(e => e.Email == email && e.Password == password);
+        if (!ok) { error = "Invalid credentials."; return; }
+        await Auth.SignIn(email);
+        Nav.NavigateTo("/schedules");
+    }
+}

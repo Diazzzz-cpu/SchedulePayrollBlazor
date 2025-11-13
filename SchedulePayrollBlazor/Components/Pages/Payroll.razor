@@ -1,0 +1,74 @@
+﻿@page "/payroll"
+@inject AppDbContext Db
+
+<h3>Generate Payroll</h3>
+
+<div class="d-flex gap-2 align-items-end mb-3">
+    <div>
+        <label class="form-label">Pay Period</label>
+        <select class="form-select" @bind="selectedId">
+            @foreach (var p in periods)
+            {
+                <option value="@p.PayPeriodId">
+                    @p.PeriodName (@p.StartDate:yyyy-MM-dd → @p.EndDate:yyyy-MM-dd)
+                </option>
+            }
+        </select>
+    </div>
+    <button class="btn btn-primary" @onclick="Generate">Generate</button>
+</div>
+
+<table class="table table-striped">
+    <thead><tr><th>Employee</th><th>Gross</th><th>Deductions</th><th>Net</th><th>Status</th></tr></thead>
+    <tbody>
+        @foreach (var r in runs)
+        {
+            <tr>
+                <td>@r.Employee</td>
+                <td>@r.Gross:N2</td>
+                <td>@r.Deds:N2</td>
+                <td><b>@r.Net:N2</b></td>
+                <td>@r.Status</td>
+            </tr>
+        }
+    </tbody>
+</table>
+
+@code {
+    List<Payperiod> periods = new();   // match scaffolded type name
+    int selectedId;
+
+    class Row { public string Employee { get; set; } = ""; public decimal Gross { get; set; } public decimal Deds { get; set; } public decimal Net { get; set; } public string Status { get; set; } = ""; }
+    List<Row> runs = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        periods = await Db.Set<Payperiod>()
+                          .OrderByDescending(p => p.PayPeriodId)
+                          .ToListAsync();
+        selectedId = periods.FirstOrDefault()?.PayPeriodId ?? 0;
+        await LoadRuns();
+    }
+
+    async Task Generate()
+    {
+        if (selectedId == 0) return;
+        await Db.Database.ExecuteSqlInterpolatedAsync($"CALL sp_GeneratePayrollForPeriod({selectedId})");
+        await LoadRuns();
+    }
+
+    async Task LoadRuns()
+    {
+        runs = await (from pr in Db.Set<Payrollrun>()
+                      join e in Db.Set<Employee>() on pr.EmployeeId equals e.EmployeeId
+                      orderby e.Name
+                      select new Row
+                      {
+                          Employee = e.Name,
+                          Gross = pr.GrossPay ?? 0,
+                          Deds = pr.TotalDeductions ?? 0,
+                          Net = pr.NetPay ?? 0,
+                          Status = pr.Status!
+                      }).ToListAsync();
+    }
+}

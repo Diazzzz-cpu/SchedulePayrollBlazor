@@ -1,5 +1,7 @@
-﻿@page "/employees"
+@page "/employees"
+@attribute [Authorize(Roles = "Admin")]
 @inject AppDbContext Db
+@using Microsoft.EntityFrameworkCore
 
 <h3>Employees</h3>
 
@@ -7,22 +9,39 @@
 {
     <p>Loading…</p>
 }
+else if (employees.Count == 0)
+{
+    <div class="alert alert-info">No employees have been added yet.</div>
+}
 else
 {
     <table class="table table-striped">
         <thead>
-            <tr><th>Name</th><th>Email</th><th>Type</th><th>Hourly</th><th>Monthly</th><th>Role</th></tr>
+            <tr>
+                <th>Name</th>
+                <th>Email</th>
+                <th>Department</th>
+                <th>Job Title</th>
+                <th>Employment Type</th>
+                <th>Start Date</th>
+                <th>Status</th>
+            </tr>
         </thead>
         <tbody>
-            @foreach (var e in employees)
+            @foreach (var employee in employees)
             {
                 <tr>
-                    <td>@e.Name</td>
-                    <td>@e.Email</td>
-                    <td>@e.EmploymentType</td>
-                    <td>@e.HourlyRate</td>
-                    <td>@e.MonthlyRate</td>
-                    <td>@e.Role?.Name</td>
+                    <td>@employee.FullName</td>
+                    <td>@employee.User.Email</td>
+                    <td>@employee.Department</td>
+                    <td>@employee.JobTitle</td>
+                    <td>@employee.EmploymentType</td>
+                    <td>@employee.StartDate.ToString("MMM dd, yyyy")</td>
+                    <td>
+                        <span class="badge @(employee.IsActive ? "badge-success" : "badge-danger")">
+                            @(employee.IsActive ? "Active" : "Inactive")
+                        </span>
+                    </td>
                 </tr>
             }
         </tbody>
@@ -30,11 +49,12 @@ else
 }
 
 @code {
-    List<Employee>? employees;
+    private List<Employee>? employees;
 
     protected override async Task OnInitializedAsync()
-        => employees = await Db.Set<Employee>()
-                               .Include(x => x.Role)   // works if the nav is Role (usual scaffold)
-                               .OrderBy(x => x.Name)
-                               .ToListAsync();
+        => employees = await Db.Employees
+            .Include(e => e.User)
+            .OrderBy(e => e.LastName)
+            .ThenBy(e => e.FirstName)
+            .ToListAsync();
 }

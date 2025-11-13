@@ -1,11 +1,10 @@
-﻿using System;
-using System.Collections.Generic;
+using System;
 
 namespace SchedulePayrollBlazor.Data.Models;
 
-public partial class Schedule
+public class Schedule
 {
-    public int ScheduleId { get; set; }
+    public int Id { get; set; }
 
     public int EmployeeId { get; set; }
 
@@ -15,7 +14,7 @@ public partial class Schedule
 
     public TimeOnly EndTime { get; set; }
 
-    public string? Source { get; set; }
+    public string Source { get; set; } = "Manual";
 
-    public virtual Employee Employee { get; set; } = null!;
+    public Employee Employee { get; set; } = null!;
 }

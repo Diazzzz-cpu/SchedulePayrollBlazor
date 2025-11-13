@@ -1,7 +1,8 @@
-@page "/dashboard"
-@attribute [Authorize]
+@page "/userdashboard"
+@attribute [Authorize(Roles = "Employee")]
 @inject AppDbContext Db
 @inject AuthenticationStateProvider AuthStateProvider
+@inject NavigationManager Nav
 @using Microsoft.EntityFrameworkCore
 @using SchedulePayrollBlazor.Data.Models
 @using System.Security.Claims
@@ -57,13 +58,13 @@
     <div class="dashboard-actions">
         <h3>Quick Actions</h3>
         <div class="action-grid">
-            <a href="/my-schedule" class="action-card">
+            <a href="/myschedule" class="action-card">
                 <div class="action-icon">📅</div>
                 <h4>My Schedule</h4>
                 <p>View your work schedule</p>
             </a>
 
-            <a href="/my-payroll" class="action-card">
+            <a href="/mypayroll" class="action-card">
                 <div class="action-icon">💰</div>
                 <h4>My Payroll</h4>
                 <p>View your payroll information</p>
@@ -120,40 +121,56 @@
         var authState = await AuthStateProvider.GetAuthenticationStateAsync();
         var user = authState.User;
 
-        employeeName = user.FindFirst(ClaimTypes.Name)?.Value ?? "User";
-        var empIdClaim = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-        
-        if (int.TryParse(empIdClaim, out employeeId))
+        if (!user.Identity?.IsAuthenticated ?? true)
         {
-            var today = DateOnly.FromDateTime(DateTime.Today);
-            todaySchedules = await Db.Schedules.CountAsync(s => s.EmployeeId == employeeId && s.ShiftDate == today);
-            
-            var tomorrow = today.AddDays(1);
-            var nextWeek = today.AddDays(7);
-            upcomingSchedules = await Db.Schedules.CountAsync(s => s.EmployeeId == employeeId && s.ShiftDate >= tomorrow && s.ShiftDate <= nextWeek);
-            
-            upcomingShifts = await Db.Schedules
-                .Where(s => s.EmployeeId == employeeId && s.ShiftDate >= today)
-                .OrderBy(s => s.ShiftDate)
-                .ThenBy(s => s.StartTime)
-                .Take(5)
-                .ToListAsync();
-            
-            var lastPayroll = await Db.Payrollruns
-                .Where(p => p.EmployeeId == employeeId)
-                .OrderByDescending(p => p.PayrollRunId)
-                .FirstOrDefaultAsync();
-            
-            lastPayAmount = lastPayroll?.NetPay ?? 0;
-            
-            var startOfWeek = today.AddDays(-(int)DateTime.Today.DayOfWeek);
-            var endOfWeek = startOfWeek.AddDays(7);
-            
-            var weekSchedules = await Db.Schedules
-                .Where(s => s.EmployeeId == employeeId && s.ShiftDate >= startOfWeek && s.ShiftDate < endOfWeek)
-                .ToListAsync();
-            
-            totalHoursThisWeek = weekSchedules.Sum(s => (s.EndTime - s.StartTime).TotalHours);
+            Nav.NavigateTo("/login", forceLoad: true);
+            return;
         }
+
+        var role = user.FindFirst(ClaimTypes.Role)?.Value;
+        if (!string.Equals(role, "Employee", StringComparison.OrdinalIgnoreCase))
+        {
+            Nav.NavigateTo("/login", forceLoad: true);
+            return;
+        }
+
+        employeeName = user.FindFirst(ClaimTypes.Name)?.Value ?? "Team Member";
+        var empIdClaim = user.FindFirst("EmployeeId")?.Value ?? user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+
+        if (!int.TryParse(empIdClaim, out employeeId))
+        {
+            Nav.NavigateTo("/login", forceLoad: true);
+            return;
+        }
+
+        var today = DateOnly.FromDateTime(DateTime.Today);
+        todaySchedules = await Db.Schedules.CountAsync(s => s.EmployeeId == employeeId && s.ShiftDate == today);
+
+        var tomorrow = today.AddDays(1);
+        var nextWeek = today.AddDays(7);
+        upcomingSchedules = await Db.Schedules.CountAsync(s => s.EmployeeId == employeeId && s.ShiftDate >= tomorrow && s.ShiftDate <= nextWeek);
+
+        upcomingShifts = await Db.Schedules
+            .Where(s => s.EmployeeId == employeeId && s.ShiftDate >= today)
+            .OrderBy(s => s.ShiftDate)
+            .ThenBy(s => s.StartTime)
+            .Take(5)
+            .ToListAsync();
+
+        var lastPayroll = await Db.PayrollRuns
+            .Where(p => p.EmployeeId == employeeId)
+            .OrderByDescending(p => p.CreatedAt)
+            .FirstOrDefaultAsync();
+
+        lastPayAmount = lastPayroll?.NetPay ?? 0;
+
+        var startOfWeek = today.AddDays(-(int)DateTime.Today.DayOfWeek);
+        var endOfWeek = startOfWeek.AddDays(7);
+
+        var weekSchedules = await Db.Schedules
+            .Where(s => s.EmployeeId == employeeId && s.ShiftDate >= startOfWeek && s.ShiftDate < endOfWeek)
+            .ToListAsync();
+
+        totalHoursThisWeek = weekSchedules.Sum(s => (s.EndTime - s.StartTime).TotalHours);
     }
 }

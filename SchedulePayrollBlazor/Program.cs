@@ -9,7 +9,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddRazorPages();
 builder.Services.AddServerSideBlazor();
 
-// EF Core – use your existing connection string "Default"
+// EF Core  use your existing connection string "Default"
 builder.Services.AddDbContext<AppDbContext>(options =>
 {
     var cs = builder.Configuration.GetConnectionString("Default");
@@ -20,6 +20,7 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 builder.Services.AddAuthorizationCore();
 builder.Services.AddScoped<AuthenticationStateProvider, SimpleAuthStateProvider>();
 builder.Services.AddScoped<SimpleAuthStateProvider>();
+builder.Services.AddScoped<AuthService>();
 
 var app = builder.Build();
 

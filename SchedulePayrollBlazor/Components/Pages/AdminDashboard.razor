@@ -1,4 +1,4 @@
-@page "/admin/dashboard"
+@page "/admindashboard"
 @attribute [Authorize(Roles = "Admin")]
 @inject AppDbContext Db
 @using Microsoft.EntityFrameworkCore
@@ -7,7 +7,7 @@
 <div class="dashboard-container">
     <div class="dashboard-header">
         <h2>Admin Dashboard</h2>
-        <p>Manage employees, schedules, and payroll</p>
+        <p>Monitor workforce activity and payroll at a glance.</p>
     </div>
 
     <div class="stats-grid">
@@ -27,7 +27,17 @@
             </div>
             <div class="stat-content">
                 <h3>@todaySchedules</h3>
-                <p>Today's Schedules</p>
+                <p>Today's Shifts</p>
+            </div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-icon" style="background: #fff3e0;">
+                <span style="color: #f57c00;">⏭️</span>
+            </div>
+            <div class="stat-content">
+                <h3>@upcomingSchedules</h3>
+                <p>Shifts Next 7 Days</p>
             </div>
         </div>
 
@@ -37,17 +47,7 @@
             </div>
             <div class="stat-content">
                 <h3>@activePayrolls</h3>
-                <p>Active Payrolls</p>
-            </div>
-        </div>
-
-        <div class="stat-card">
-            <div class="stat-icon" style="background: #fff3e0;">
-                <span style="color: #f57c00;">⏰</span>
-            </div>
-            <div class="stat-content">
-                <h3>@upcomingSchedules</h3>
-                <p>Upcoming Schedules</p>
+                <p>Open Payroll Runs</p>
             </div>
         </div>
     </div>
@@ -56,55 +56,56 @@
         <h3>Quick Actions</h3>
         <div class="action-grid">
             <a href="/employees" class="action-card">
-                <div class="action-icon">👥</div>
-                <h4>Manage Employees</h4>
-                <p>View and edit employee information</p>
+                <div class="action-icon">👤</div>
+                <h4>Employees</h4>
+                <p>Review and maintain employee records</p>
             </a>
-
             <a href="/schedules" class="action-card">
-                <div class="action-icon">📅</div>
-                <h4>Manage Schedules</h4>
-                <p>Create and update work schedules</p>
+                <div class="action-icon">📆</div>
+                <h4>Schedules</h4>
+                <p>Plan and edit team schedules</p>
             </a>
-
             <a href="/payroll" class="action-card">
-                <div class="action-icon">💰</div>
-                <h4>Process Payroll</h4>
-                <p>Generate and manage payroll runs</p>
+                <div class="action-icon">💵</div>
+                <h4>Payroll</h4>
+                <p>Track payroll progress</p>
             </a>
-
-            <a href="/schedules/new" class="action-card">
-                <div class="action-icon">➕</div>
-                <h4>Add Schedule</h4>
-                <p>Create a new work schedule</p>
+            <a href="/settings" class="action-card">
+                <div class="action-icon">⚙️</div>
+                <h4>Settings</h4>
+                <p>Manage company configuration</p>
             </a>
         </div>
     </div>
 
     <div class="recent-activity">
-        <h3>Recent Employees</h3>
+        <h3>Recent Hires</h3>
         <div class="table-responsive">
             <table class="table">
                 <thead>
                     <tr>
                         <th>Name</th>
                         <th>Email</th>
-                        <th>Role</th>
+                        <th>Department</th>
+                        <th>Job Title</th>
                         <th>Employment Type</th>
+                        <th>Start Date</th>
                         <th>Status</th>
                     </tr>
                 </thead>
                 <tbody>
-                    @foreach (var emp in recentEmployees)
+                    @foreach (var employee in recentEmployees)
                     {
                         <tr>
-                            <td>@emp.Name</td>
-                            <td>@emp.Email</td>
-                            <td>@emp.Role?.Name</td>
-                            <td>@emp.EmploymentType</td>
+                            <td>@employee.FullName</td>
+                            <td>@employee.User.Email</td>
+                            <td>@employee.Department</td>
+                            <td>@employee.JobTitle</td>
+                            <td>@employee.EmploymentType</td>
+                            <td>@employee.StartDate.ToString("MMM dd, yyyy")</td>
                             <td>
-                                <span class="badge @(emp.Active == true ? "badge-success" : "badge-danger")">
-                                    @(emp.Active == true ? "Active" : "Inactive")
+                                <span class="badge @(employee.IsActive ? "badge-success" : "badge-danger")">
+                                    @(employee.IsActive ? "Active" : "Inactive")
                                 </span>
                             </td>
                         </tr>
@@ -113,32 +114,81 @@
             </table>
         </div>
     </div>
+
+    <div class="recent-activity">
+        <h3>Recent Payroll Activity</h3>
+        @if (recentPayrollRuns.Count == 0)
+        {
+            <div class="alert alert-info">No payroll runs recorded yet.</div>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Employee</th>
+                            <th>Period</th>
+                            <th>Net Pay</th>
+                            <th>Status</th>
+                            <th>Processed</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var run in recentPayrollRuns)
+                        {
+                            <tr>
+                                <td>@run.Employee.FullName</td>
+                                <td>@(run.PayPeriod?.PeriodName ?? "Ad hoc")</td>
+                                <td>$@run.NetPay.ToString("N2")</td>
+                                <td><span class="badge @GetStatusClass(run.Status)">@run.Status</span></td>
+                                <td>@run.CreatedAt.ToLocalTime().ToString("MMM dd, yyyy")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
 </div>
 
 @code {
     private int totalEmployees;
     private int todaySchedules;
-    private int activePayrolls;
     private int upcomingSchedules;
+    private int activePayrolls;
     private List<Employee> recentEmployees = new();
+    private List<PayrollRun> recentPayrollRuns = new();
 
     protected override async Task OnInitializedAsync()
     {
-        totalEmployees = await Db.Employees.CountAsync(e => e.Active == true);
-        
+        totalEmployees = await Db.Employees.CountAsync(e => e.IsActive);
+
         var today = DateOnly.FromDateTime(DateTime.Today);
         todaySchedules = await Db.Schedules.CountAsync(s => s.ShiftDate == today);
-        
-        var tomorrow = today.AddDays(1);
-        var nextWeek = today.AddDays(7);
-        upcomingSchedules = await Db.Schedules.CountAsync(s => s.ShiftDate >= tomorrow && s.ShiftDate <= nextWeek);
-        
-        activePayrolls = await Db.Payrollruns.CountAsync(p => p.Status == "Pending" || p.Status == "Calculated");
-        
+        upcomingSchedules = await Db.Schedules.CountAsync(s => s.ShiftDate > today && s.ShiftDate <= today.AddDays(7));
+        activePayrolls = await Db.PayrollRuns.CountAsync(p => p.Status == "Pending" || p.Status == "Calculated");
+
         recentEmployees = await Db.Employees
-            .Include(e => e.Role)
-            .OrderByDescending(e => e.EmployeeId)
+            .Include(e => e.User)
+            .OrderByDescending(e => e.StartDate)
+            .Take(5)
+            .ToListAsync();
+
+        recentPayrollRuns = await Db.PayrollRuns
+            .Include(p => p.Employee)
+                .ThenInclude(e => e.User)
+            .Include(p => p.PayPeriod)
+            .OrderByDescending(p => p.CreatedAt)
             .Take(5)
             .ToListAsync();
     }
+
+    private static string GetStatusClass(string status) => status switch
+    {
+        "Paid" => "badge-success",
+        "Approved" => "badge-info",
+        "Calculated" => "badge-warning",
+        _ => "badge-secondary"
+    };
 }

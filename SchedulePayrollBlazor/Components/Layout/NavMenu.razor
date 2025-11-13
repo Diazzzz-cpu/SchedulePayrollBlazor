@@ -1,25 +1,93 @@
-﻿@inject SimpleAuthStateProvider Auth
+@using Microsoft.AspNetCore.Components.Authorization
+@inject SimpleAuthStateProvider Auth
+@inject NavigationManager Nav
+@implements IDisposable
 
 <nav class="side-nav">
-    <div class="side-section">
-        <span class="side-section-title">Main</span>
-        <NavLink href="/" class="side-link" activeClass="active">Dashboard</NavLink>
+    <div class="side-section-header">
+        @if (snapshot.IsAuthenticated)
+        {
+            <div class="side-user">
+                <span class="user-name">@snapshot.DisplayName</span>
+                <span class="user-role">@snapshot.Role</span>
+            </div>
+        }
+        else
+        {
+            <div class="side-user">
+                <span class="user-name">Welcome</span>
+                <span class="user-role">Please sign in</span>
+            </div>
+        }
     </div>
 
-    <div class="side-section">
-        <span class="side-section-title">Employee</span>
-        <NavLink href="/myschedule" class="side-link" activeClass="active">My Schedule</NavLink>
-        <NavLink href="/mypayroll" class="side-link" activeClass="active">My Payroll</NavLink>
-    </div>
+    @if (!snapshot.IsAuthenticated)
+    {
+        <div class="side-section">
+            <NavLink href="/login" class="side-link" activeClass="active">Login</NavLink>
+            <NavLink href="/register" class="side-link" activeClass="active">Register</NavLink>
+        </div>
+    }
+    else if (snapshot.IsAdmin)
+    {
+        <div class="side-section">
+            <span class="side-section-title">Admin</span>
+            <NavLink href="/admindashboard" class="side-link" activeClass="active">Dashboard</NavLink>
+            <NavLink href="/employees" class="side-link" activeClass="active">Employees</NavLink>
+            <NavLink href="/schedules" class="side-link" activeClass="active">Schedules</NavLink>
+            <NavLink href="/payroll" class="side-link" activeClass="active">Payroll</NavLink>
+            <NavLink href="/settings" class="side-link" activeClass="active">Settings</NavLink>
+        </div>
+    }
+    else
+    {
+        <div class="side-section">
+            <span class="side-section-title">Employee</span>
+            <NavLink href="/userdashboard" class="side-link" activeClass="active">Dashboard</NavLink>
+            <NavLink href="/myschedule" class="side-link" activeClass="active">My Schedule</NavLink>
+            <NavLink href="/mypayroll" class="side-link" activeClass="active">My Payroll</NavLink>
+            <NavLink href="/profile" class="side-link" activeClass="active">Profile</NavLink>
+        </div>
+    }
 
-    <div class="side-section">
-        <span class="side-section-title">Admin</span>
-        <NavLink href="/schedules" class="side-link" activeClass="active">Schedules</NavLink>
-        <NavLink href="/employees" class="side-link" activeClass="active">Employees</NavLink>
-        <NavLink href="/payroll" class="side-link" activeClass="active">Payroll</NavLink>
-    </div>
-
-    <button class="side-logout" @onclick="() => Auth.SignOut()">
-        Logout
-    </button>
+    @if (snapshot.IsAuthenticated)
+    {
+        <button class="side-logout" @onclick="Logout">Logout</button>
+    }
 </nav>
+
+@code {
+    private SimpleAuthStateProvider.AuthUserSnapshot snapshot = SimpleAuthStateProvider.AuthUserSnapshot.Anonymous();
+
+    protected override async Task OnInitializedAsync()
+    {
+        snapshot = await Auth.GetCurrentUserAsync();
+        Auth.AuthenticationStateChanged += OnAuthenticationStateChanged;
+    }
+
+    private async void OnAuthenticationStateChanged(Task<AuthenticationState> task)
+    {
+        try
+        {
+            await task;
+            snapshot = await Auth.GetCurrentUserAsync();
+            await InvokeAsync(StateHasChanged);
+        }
+        catch
+        {
+            snapshot = SimpleAuthStateProvider.AuthUserSnapshot.Anonymous();
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private async Task Logout()
+    {
+        await Auth.SignOutAsync();
+        Nav.NavigateTo("/login", forceLoad: true);
+    }
+
+    public void Dispose()
+    {
+        Auth.AuthenticationStateChanged -= OnAuthenticationStateChanged;
+    }
+}

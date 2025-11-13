@@ -1,7 +1,8 @@
-@page "/my-schedule"
-@attribute [Authorize]
+@page "/myschedule"
+@attribute [Authorize(Roles = "Employee")]
 @inject AppDbContext Db
 @inject AuthenticationStateProvider AuthStateProvider
+@inject NavigationManager Nav
 @using Microsoft.EntityFrameworkCore
 @using SchedulePayrollBlazor.Data.Models
 @using System.Security.Claims
@@ -74,11 +75,23 @@
     {
         var authState = await AuthStateProvider.GetAuthenticationStateAsync();
         var user = authState.User;
-        var empIdClaim = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-        
+        var role = user.FindFirst(ClaimTypes.Role)?.Value;
+
+        if (!string.Equals(role, "Employee", StringComparison.OrdinalIgnoreCase))
+        {
+            Nav.NavigateTo("/login", forceLoad: true);
+            return;
+        }
+
+        var empIdClaim = user.FindFirst("EmployeeId")?.Value ?? user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+
         if (int.TryParse(empIdClaim, out employeeId))
         {
             await LoadSchedules();
+        }
+        else
+        {
+            Nav.NavigateTo("/login", forceLoad: true);
         }
     }
 
@@ -106,7 +119,7 @@
         {
             var startOfWeek = date.AddDays(-(int)date.DayOfWeek);
             var endOfWeek = startOfWeek.AddDays(7);
-            
+
             schedules = await Db.Schedules
                 .Where(s => s.EmployeeId == employeeId && s.ShiftDate >= startOfWeek && s.ShiftDate < endOfWeek)
                 .OrderBy(s => s.ShiftDate)

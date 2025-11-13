@@ -1,23 +1,29 @@
-﻿@page "/login"
+@page "/"
+@page "/login"
 @inject AuthService AuthService
 @inject NavigationManager Nav
+@using System.ComponentModel.DataAnnotations
 
 <div class="auth-container">
     <div class="auth-card">
         <div class="auth-header">
-            <h2>Welcome Back</h2>
-            <p>Sign in to access your schedule and payroll</p>
+            <h2>Sign in to SchedulePayroll</h2>
+            <p>Access your HR, scheduling, and payroll workspace</p>
         </div>
 
-        <EditForm Model="@model" OnValidSubmit="HandleLogin" FormName="LoginForm">
+        <EditForm Model="model" OnValidSubmit="HandleLogin" FormName="LoginForm">
+            <DataAnnotationsValidator />
+
             <div class="form-group">
                 <label>Email Address</label>
-                <InputText @bind-Value="model.Email" class="form-control" type="email" placeholder="john@example.com" />
+                <InputText @bind-Value="model.Email" class="form-control" type="email" placeholder="you@example.com" />
+                <ValidationMessage For="() => model.Email" />
             </div>
 
             <div class="form-group">
                 <label>Password</label>
                 <InputText @bind-Value="model.Password" class="form-control" type="password" placeholder="••••••••" />
+                <ValidationMessage For="() => model.Password" />
             </div>
 
             @if (!string.IsNullOrWhiteSpace(errorMessage))
@@ -44,33 +50,40 @@
 </div>
 
 @code {
-    private LoginModel model = new();
-    private string errorMessage = "";
-    private bool isLoading = false;
+    private readonly LoginModel model = new();
+    private string errorMessage = string.Empty;
+    private bool isLoading;
 
     private async Task HandleLogin()
     {
-        errorMessage = "";
+        errorMessage = string.Empty;
         isLoading = true;
 
-        var (success, message, employee) = await AuthService.LoginAsync(model.Email, model.Password);
+        var (success, message, role) = await AuthService.LoginAsync(model.Email, model.Password);
 
         isLoading = false;
 
-        if (success && employee != null)
-        {
-            var isAdmin = employee.Role?.Code?.ToUpper() == "ADMIN";
-            Nav.NavigateTo(isAdmin ? "/admin/dashboard" : "/dashboard");
-        }
-        else
+        if (!success)
         {
             errorMessage = message;
+            return;
         }
+
+        var destination = string.Equals(role, "Admin", StringComparison.OrdinalIgnoreCase)
+            ? "/admindashboard"
+            : "/userdashboard";
+
+        Nav.NavigateTo(destination, forceLoad: true);
     }
 
-    public class LoginModel
+    private sealed class LoginModel
     {
-        public string Email { get; set; } = "";
-        public string Password { get; set; } = "";
+        [Required]
+        [EmailAddress]
+        public string Email { get; set; } = string.Empty;
+
+        [Required]
+        [MinLength(6)]
+        public string Password { get; set; } = string.Empty;
     }
 }

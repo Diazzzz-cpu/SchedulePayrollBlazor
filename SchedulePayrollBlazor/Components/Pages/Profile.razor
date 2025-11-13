@@ -1,0 +1,106 @@
+@page "/profile"
+@attribute [Authorize]
+@inject SimpleAuthStateProvider AuthProvider
+@inject AppDbContext Db
+@inject NavigationManager Nav
+@using Microsoft.EntityFrameworkCore
+
+@if (profile is null)
+{
+    <div class="loading">Loading profile...</div>
+}
+else
+{
+    <div class="page-container">
+        <div class="page-header">
+            <h2>Profile</h2>
+            <p>Manage your personal and employment details</p>
+        </div>
+
+        <div class="profile-card">
+            <div class="profile-section">
+                <h4>Account</h4>
+                <dl>
+                    <dt>Name</dt>
+                    <dd>@profile.FullName</dd>
+                    <dt>Email</dt>
+                    <dd>@profile.Email</dd>
+                    <dt>Role</dt>
+                    <dd>@profile.Role</dd>
+                    <dt>Member Since</dt>
+                    <dd>@profile.CreatedAt.ToLocalTime().ToString("MMM dd, yyyy")</dd>
+                </dl>
+            </div>
+
+            @if (!string.IsNullOrWhiteSpace(profile.JobTitle))
+            {
+                <div class="profile-section">
+                    <h4>Employment</h4>
+                    <dl>
+                        <dt>Job Title</dt>
+                        <dd>@profile.JobTitle</dd>
+                        <dt>Department</dt>
+                        <dd>@profile.Department</dd>
+                        <dt>Employment Type</dt>
+                        <dd>@profile.EmploymentType</dd>
+                        <dt>Start Date</dt>
+                        <dd>@profile.StartDate.ToString("MMM dd, yyyy")</dd>
+                        <dt>Location</dt>
+                        <dd>@profile.Location</dd>
+                    </dl>
+                </div>
+            }
+        </div>
+    </div>
+}
+
+@code {
+    private ProfileViewModel? profile;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var snapshot = await AuthProvider.GetCurrentUserAsync();
+        if (!snapshot.IsAuthenticated)
+        {
+            Nav.NavigateTo("/login", forceLoad: true);
+            return;
+        }
+
+        var user = await Db.Users
+            .Include(u => u.Employee)
+            .FirstOrDefaultAsync(u => u.Id == snapshot.UserId);
+
+        if (user is null)
+        {
+            await AuthProvider.SignOutAsync();
+            Nav.NavigateTo("/login", forceLoad: true);
+            return;
+        }
+
+        profile = new ProfileViewModel
+        {
+            FullName = user.Employee?.FullName ?? snapshot.DisplayName ?? user.Email,
+            Email = user.Email,
+            Role = user.Role,
+            CreatedAt = user.CreatedAt,
+            Department = user.Employee?.Department ?? string.Empty,
+            JobTitle = user.Employee?.JobTitle ?? string.Empty,
+            EmploymentType = user.Employee?.EmploymentType ?? string.Empty,
+            StartDate = user.Employee?.StartDate ?? DateTime.MinValue,
+            Location = user.Employee?.Location ?? string.Empty
+        };
+    }
+
+    private sealed class ProfileViewModel
+    {
+        public string FullName { get; set; } = string.Empty;
+        public string Email { get; set; } = string.Empty;
+        public string Role { get; set; } = string.Empty;
+        public DateTime CreatedAt { get; set; }
+        public string Department { get; set; } = string.Empty;
+        public string JobTitle { get; set; } = string.Empty;
+        public string EmploymentType { get; set; } = string.Empty;
+        public DateTime StartDate { get; set; }
+        public string Location { get; set; } = string.Empty;
+    }
+}

@@ -1,289 +1,115 @@
-﻿using System;
-using System.Collections.Generic;
 using Microsoft.EntityFrameworkCore;
-using Pomelo.EntityFrameworkCore.MySql.Scaffolding.Internal;
 using SchedulePayrollBlazor.Data.Models;
 
 namespace SchedulePayrollBlazor.Data;
 
-public partial class AppDbContext : DbContext
+public class AppDbContext : DbContext
 {
-    public AppDbContext()
-    {
-    }
-
     public AppDbContext(DbContextOptions<AppDbContext> options)
         : base(options)
     {
     }
 
-    public virtual DbSet<Employee> Employees { get; set; }
-
-    public virtual DbSet<Employeecomponent> Employeecomponents { get; set; }
-
-    public virtual DbSet<Paycomponent> Paycomponents { get; set; }
-
-    public virtual DbSet<Payperiod> Payperiods { get; set; }
-
-    public virtual DbSet<Payrollline> Payrolllines { get; set; }
-
-    public virtual DbSet<Payrollrun> Payrollruns { get; set; }
-
-    public virtual DbSet<Role> Roles { get; set; }
-
-    public virtual DbSet<Schedule> Schedules { get; set; }
-
-    public virtual DbSet<Timelog> Timelogs { get; set; }
-
-    protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
-#warning To protect potentially sensitive information in your connection string, you should move it out of source code. You can avoid scaffolding the connection string by using the Name= syntax to read it from configuration - see https://go.microsoft.com/fwlink/?linkid=2131148. For more guidance on storing connection strings, see https://go.microsoft.com/fwlink/?LinkId=723263.
-        => optionsBuilder.UseMySql("server=127.0.0.1;port=3306;database=SchedulePayroll_Demo;user id=blazoruser;password=Demo123!;sslmode=None", Microsoft.EntityFrameworkCore.ServerVersion.Parse("8.0.44-mysql"));
+    public DbSet<User> Users => Set<User>();
+    public DbSet<Employee> Employees => Set<Employee>();
+    public DbSet<Schedule> Schedules => Set<Schedule>();
+    public DbSet<PayPeriod> PayPeriods => Set<PayPeriod>();
+    public DbSet<PayrollRun> PayrollRuns => Set<PayrollRun>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
-        modelBuilder
-            .UseCollation("utf8mb4_unicode_ci")
-            .HasCharSet("utf8mb4");
+        base.OnModelCreating(modelBuilder);
+
+        modelBuilder.Entity<User>(entity =>
+        {
+            entity.HasIndex(e => e.Email).IsUnique();
+            entity.Property(e => e.Email).HasMaxLength(200).IsRequired();
+            entity.Property(e => e.PasswordHash).IsRequired();
+            entity.Property(e => e.Role).HasMaxLength(32).IsRequired();
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
+        });
 
         modelBuilder.Entity<Employee>(entity =>
         {
-            entity.HasKey(e => e.EmployeeId).HasName("PRIMARY");
+            entity.HasIndex(e => e.UserId).IsUnique();
+            entity.Property(e => e.FirstName).HasMaxLength(120).IsRequired();
+            entity.Property(e => e.LastName).HasMaxLength(120).IsRequired();
+            entity.Property(e => e.Department).HasMaxLength(120);
+            entity.Property(e => e.JobTitle).HasMaxLength(160);
+            entity.Property(e => e.EmploymentType).HasMaxLength(60).IsRequired().HasDefaultValue("FullTime");
+            entity.Property(e => e.Location).HasMaxLength(160);
+            entity.Property(e => e.StartDate).HasConversion(
+                v => v,
+                v => DateTime.SpecifyKind(v, DateTimeKind.Utc));
+            entity.Property(e => e.IsActive).HasDefaultValue(true);
 
-            entity.ToTable("employee");
-
-            entity.HasIndex(e => e.Email, "Email").IsUnique();
-
-            entity.HasIndex(e => e.RoleId, "Role_ID");
-
-            entity.Property(e => e.EmployeeId).HasColumnName("Employee_ID");
-            entity.Property(e => e.Active).HasDefaultValueSql("'1'");
-            entity.Property(e => e.Email).HasMaxLength(120);
-            entity.Property(e => e.EmploymentClass)
-                .HasDefaultValueSql("'FullTime'")
-                .HasColumnType("enum('FullTime','PartTime')")
-                .HasColumnName("Employment_Class");
-            entity.Property(e => e.EmploymentType)
-                .HasDefaultValueSql("'Hourly'")
-                .HasColumnType("enum('Hourly','Salaried')")
-                .HasColumnName("Employment_Type");
-            entity.Property(e => e.HourlyRate)
-                .HasPrecision(10, 2)
-                .HasColumnName("Hourly_Rate");
-            entity.Property(e => e.MonthlyRate)
-                .HasPrecision(10, 2)
-                .HasColumnName("Monthly_Rate");
-            entity.Property(e => e.Name).HasMaxLength(100);
-            entity.Property(e => e.Password).HasMaxLength(255);
-            entity.Property(e => e.RoleId).HasColumnName("Role_ID");
-
-            entity.HasOne(d => d.Role).WithMany(p => p.Employees)
-                .HasForeignKey(d => d.RoleId)
-                .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("employee_ibfk_1");
-        });
-
-        modelBuilder.Entity<Employeecomponent>(entity =>
-        {
-            entity.HasKey(e => e.EmployeeComponentId).HasName("PRIMARY");
-
-            entity.ToTable("employeecomponent");
-
-            entity.HasIndex(e => e.PayComponentId, "PayComponent_ID");
-
-            entity.HasIndex(e => new { e.EmployeeId, e.PayComponentId }, "uq_emp_pc").IsUnique();
-
-            entity.Property(e => e.EmployeeComponentId).HasColumnName("EmployeeComponent_ID");
-            entity.Property(e => e.Active).HasDefaultValueSql("'1'");
-            entity.Property(e => e.Amount).HasPrecision(10, 2);
-            entity.Property(e => e.EmployeeId).HasColumnName("Employee_ID");
-            entity.Property(e => e.PayComponentId).HasColumnName("PayComponent_ID");
-
-            entity.HasOne(d => d.Employee).WithMany(p => p.Employeecomponents)
-                .HasForeignKey(d => d.EmployeeId)
-                .HasConstraintName("employeecomponent_ibfk_1");
-
-            entity.HasOne(d => d.PayComponent).WithMany(p => p.Employeecomponents)
-                .HasForeignKey(d => d.PayComponentId)
-                .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("employeecomponent_ibfk_2");
-        });
-
-        modelBuilder.Entity<Paycomponent>(entity =>
-        {
-            entity.HasKey(e => e.PayComponentId).HasName("PRIMARY");
-
-            entity.ToTable("paycomponent");
-
-            entity.HasIndex(e => e.Code, "Code").IsUnique();
-
-            entity.Property(e => e.PayComponentId).HasColumnName("PayComponent_ID");
-            entity.Property(e => e.Code).HasMaxLength(30);
-            entity.Property(e => e.DefaultRate)
-                .HasPrecision(10, 4)
-                .HasDefaultValueSql("'0.0000'")
-                .HasColumnName("Default_Rate");
-            entity.Property(e => e.Kind).HasColumnType("enum('Earning','Deduction')");
-            entity.Property(e => e.Name).HasMaxLength(100);
-        });
-
-        modelBuilder.Entity<Payperiod>(entity =>
-        {
-            entity.HasKey(e => e.PayPeriodId).HasName("PRIMARY");
-
-            entity.ToTable("payperiod");
-
-            entity.HasIndex(e => e.PeriodName, "Period_Name").IsUnique();
-
-            entity.Property(e => e.PayPeriodId).HasColumnName("PayPeriod_ID");
-            entity.Property(e => e.EndDate).HasColumnName("End_Date");
-            entity.Property(e => e.PeriodName)
-                .HasMaxLength(60)
-                .HasColumnName("Period_Name");
-            entity.Property(e => e.StartDate).HasColumnName("Start_Date");
-            entity.Property(e => e.Status)
-                .HasDefaultValueSql("'Open'")
-                .HasColumnType("enum('Open','Locked','Paid')");
-        });
-
-        modelBuilder.Entity<Payrollline>(entity =>
-        {
-            entity.HasKey(e => e.PayrollLineId).HasName("PRIMARY");
-
-            entity.ToTable("payrollline");
-
-            entity.HasIndex(e => e.PayComponentId, "PayComponent_ID");
-
-            entity.HasIndex(e => e.PayrollRunId, "idx_line_run");
-
-            entity.Property(e => e.PayrollLineId).HasColumnName("PayrollLine_ID");
-            entity.Property(e => e.Amount).HasPrecision(12, 2);
-            entity.Property(e => e.PayComponentId).HasColumnName("PayComponent_ID");
-            entity.Property(e => e.PayrollRunId).HasColumnName("PayrollRun_ID");
-            entity.Property(e => e.Quantity)
-                .HasPrecision(10, 4)
-                .HasDefaultValueSql("'0.0000'");
-            entity.Property(e => e.Rate)
-                .HasPrecision(12, 6)
-                .HasDefaultValueSql("'0.000000'");
-
-            entity.HasOne(d => d.PayComponent).WithMany(p => p.Payrolllines)
-                .HasForeignKey(d => d.PayComponentId)
-                .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("payrollline_ibfk_2");
-
-            entity.HasOne(d => d.PayrollRun).WithMany(p => p.Payrolllines)
-                .HasForeignKey(d => d.PayrollRunId)
-                .HasConstraintName("payrollline_ibfk_1");
-        });
-
-        modelBuilder.Entity<Payrollrun>(entity =>
-        {
-            entity.HasKey(e => e.PayrollRunId).HasName("PRIMARY");
-
-            entity.ToTable("payrollrun");
-
-            entity.HasIndex(e => e.EmployeeId, "Employee_ID");
-
-            entity.HasIndex(e => new { e.PayPeriodId, e.Status }, "idx_run_period");
-
-            entity.HasIndex(e => new { e.PayPeriodId, e.EmployeeId }, "uq_period_emp").IsUnique();
-
-            entity.Property(e => e.PayrollRunId).HasColumnName("PayrollRun_ID");
-            entity.Property(e => e.EmployeeId).HasColumnName("Employee_ID");
-            entity.Property(e => e.GrossPay)
-                .HasPrecision(12, 2)
-                .HasDefaultValueSql("'0.00'")
-                .HasColumnName("Gross_Pay");
-            entity.Property(e => e.NetPay)
-                .HasPrecision(12, 2)
-                .HasDefaultValueSql("'0.00'")
-                .HasColumnName("Net_Pay");
-            entity.Property(e => e.PayPeriodId).HasColumnName("PayPeriod_ID");
-            entity.Property(e => e.Status)
-                .HasDefaultValueSql("'Pending'")
-                .HasColumnType("enum('Pending','Calculated','Approved','Paid')");
-            entity.Property(e => e.TotalDeductions)
-                .HasPrecision(12, 2)
-                .HasDefaultValueSql("'0.00'")
-                .HasColumnName("Total_Deductions");
-
-            entity.HasOne(d => d.Employee).WithMany(p => p.Payrollruns)
-                .HasForeignKey(d => d.EmployeeId)
-                .HasConstraintName("payrollrun_ibfk_2");
-
-            entity.HasOne(d => d.PayPeriod).WithMany(p => p.Payrollruns)
-                .HasForeignKey(d => d.PayPeriodId)
-                .HasConstraintName("payrollrun_ibfk_1");
-        });
-
-        modelBuilder.Entity<Role>(entity =>
-        {
-            entity.HasKey(e => e.RoleId).HasName("PRIMARY");
-
-            entity.ToTable("role");
-
-            entity.HasIndex(e => e.Code, "Code").IsUnique();
-
-            entity.Property(e => e.RoleId).HasColumnName("Role_ID");
-            entity.Property(e => e.Code).HasMaxLength(40);
-            entity.Property(e => e.Name).HasMaxLength(80);
+            entity.HasOne(e => e.User)
+                  .WithOne(u => u.Employee)
+                  .HasForeignKey<Employee>(e => e.UserId)
+                  .OnDelete(DeleteBehavior.Cascade);
         });
 
         modelBuilder.Entity<Schedule>(entity =>
         {
-            entity.HasKey(e => e.ScheduleId).HasName("PRIMARY");
+            entity.Property(e => e.ShiftDate)
+                  .HasConversion(
+                      v => v.ToDateTime(TimeOnly.MinValue),
+                      v => DateOnly.FromDateTime(v))
+                  .HasColumnType("date");
 
-            entity.ToTable("schedule");
-
-            entity.HasIndex(e => new { e.EmployeeId, e.ShiftDate }, "idx_sched_emp_day");
-
-            entity.HasIndex(e => new { e.EmployeeId, e.ShiftDate, e.StartTime, e.EndTime }, "uq_emp_day_time").IsUnique();
-
-            entity.Property(e => e.ScheduleId).HasColumnName("Schedule_ID");
-            entity.Property(e => e.EmployeeId).HasColumnName("Employee_ID");
-            entity.Property(e => e.EndTime)
-                .HasColumnType("time")
-                .HasColumnName("End_Time");
-            entity.Property(e => e.ShiftDate).HasColumnName("Shift_Date");
-            entity.Property(e => e.Source)
-                .HasDefaultValueSql("'Manual'")
-                .HasColumnType("enum('Manual','Auto')");
             entity.Property(e => e.StartTime)
-                .HasColumnType("time")
-                .HasColumnName("Start_Time");
+                  .HasConversion(
+                      v => v.ToTimeSpan(),
+                      v => TimeOnly.FromTimeSpan(v))
+                  .HasColumnType("time(6)");
 
-            entity.HasOne(d => d.Employee).WithMany(p => p.Schedules)
-                .HasForeignKey(d => d.EmployeeId)
-                .HasConstraintName("schedule_ibfk_1");
+            entity.Property(e => e.EndTime)
+                  .HasConversion(
+                      v => v.ToTimeSpan(),
+                      v => TimeOnly.FromTimeSpan(v))
+                  .HasColumnType("time(6)");
+
+            entity.Property(e => e.Source).HasMaxLength(60).HasDefaultValue("Manual");
+
+            entity.HasOne(e => e.Employee)
+                  .WithMany(e => e.Schedules)
+                  .HasForeignKey(e => e.EmployeeId)
+                  .OnDelete(DeleteBehavior.Cascade);
         });
 
-        modelBuilder.Entity<Timelog>(entity =>
+        modelBuilder.Entity<PayPeriod>(entity =>
         {
-            entity.HasKey(e => e.TimeLogId).HasName("PRIMARY");
-
-            entity.ToTable("timelog");
-
-            entity.HasIndex(e => new { e.EmployeeId, e.ClockIn }, "idx_timelog_emp_day");
-
-            entity.Property(e => e.TimeLogId).HasColumnName("TimeLog_ID");
-            entity.Property(e => e.ClockIn)
-                .HasColumnType("datetime")
-                .HasColumnName("Clock_In");
-            entity.Property(e => e.ClockOut)
-                .HasColumnType("datetime")
-                .HasColumnName("Clock_Out");
-            entity.Property(e => e.EmployeeId).HasColumnName("Employee_ID");
-            entity.Property(e => e.Source)
-                .HasDefaultValueSql("'Web'")
-                .HasColumnType("enum('Web','Kiosk','Admin')");
-
-            entity.HasOne(d => d.Employee).WithMany(p => p.Timelogs)
-                .HasForeignKey(d => d.EmployeeId)
-                .HasConstraintName("timelog_ibfk_1");
+            entity.Property(e => e.PeriodName).HasMaxLength(120).IsRequired();
+            entity.Property(e => e.Status).HasMaxLength(40).HasDefaultValue("Open");
+            entity.Property(e => e.StartDate)
+                  .HasConversion(
+                      v => v.ToDateTime(TimeOnly.MinValue),
+                      v => DateOnly.FromDateTime(v))
+                  .HasColumnType("date");
+            entity.Property(e => e.EndDate)
+                  .HasConversion(
+                      v => v.ToDateTime(TimeOnly.MinValue),
+                      v => DateOnly.FromDateTime(v))
+                  .HasColumnType("date");
         });
 
-        OnModelCreatingPartial(modelBuilder);
-    }
+        modelBuilder.Entity<PayrollRun>(entity =>
+        {
+            entity.Property(e => e.Status).HasMaxLength(40).HasDefaultValue("Pending");
+            entity.Property(e => e.GrossPay).HasColumnType("decimal(12,2)").HasDefaultValue(0);
+            entity.Property(e => e.TotalDeductions).HasColumnType("decimal(12,2)").HasDefaultValue(0);
+            entity.Property(e => e.NetPay).HasColumnType("decimal(12,2)").HasDefaultValue(0);
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
 
-    partial void OnModelCreatingPartial(ModelBuilder modelBuilder);
+            entity.HasOne(e => e.Employee)
+                  .WithMany(e => e.PayrollRuns)
+                  .HasForeignKey(e => e.EmployeeId)
+                  .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.PayPeriod)
+                  .WithMany(p => p.PayrollRuns)
+                  .HasForeignKey(e => e.PayPeriodId)
+                  .OnDelete(DeleteBehavior.SetNull);
+        });
+    }
 }

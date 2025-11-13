@@ -1,37 +1,36 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace SchedulePayrollBlazor.Data.Models;
 
-public partial class Employee
+public class Employee
 {
-    public int EmployeeId { get; set; }
+    public int Id { get; set; }
 
-    public int RoleId { get; set; }
+    public int UserId { get; set; }
 
-    public string Name { get; set; } = null!;
+    public string FirstName { get; set; } = string.Empty;
 
-    public string Email { get; set; } = null!;
+    public string LastName { get; set; } = string.Empty;
 
-    public string Password { get; set; } = null!;
+    public string Department { get; set; } = string.Empty;
 
-    public string EmploymentClass { get; set; } = null!;
+    public string JobTitle { get; set; } = string.Empty;
 
-    public string EmploymentType { get; set; } = null!;
+    public string EmploymentType { get; set; } = "FullTime";
 
-    public decimal HourlyRate { get; set; }
+    public DateTime StartDate { get; set; } = DateTime.UtcNow;
 
-    public decimal MonthlyRate { get; set; }
+    public string Location { get; set; } = string.Empty;
 
-    public bool? Active { get; set; }
+    public bool IsActive { get; set; } = true;
 
-    public virtual ICollection<Employeecomponent> Employeecomponents { get; set; } = new List<Employeecomponent>();
+    public User User { get; set; } = null!;
 
-    public virtual ICollection<Payrollrun> Payrollruns { get; set; } = new List<Payrollrun>();
+    public ICollection<Schedule> Schedules { get; set; } = new List<Schedule>();
 
-    public virtual Role Role { get; set; } = null!;
+    public ICollection<PayrollRun> PayrollRuns { get; set; } = new List<PayrollRun>();
 
-    public virtual ICollection<Schedule> Schedules { get; set; } = new List<Schedule>();
-
-    public virtual ICollection<Timelog> Timelogs { get; set; } = new List<Timelog>();
+    public string FullName => string.Join(" ", new[] { FirstName, LastName }.Where(s => !string.IsNullOrWhiteSpace(s)));
 }

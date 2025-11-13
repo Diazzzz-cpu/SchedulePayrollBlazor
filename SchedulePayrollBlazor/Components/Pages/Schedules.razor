@@ -1,6 +1,7 @@
-﻿@page "/schedules"
+@page "/schedules"
+@attribute [Authorize(Roles = "Admin")]
 @inject AppDbContext Db
-@inject NavigationManager nav
+@inject NavigationManager Nav
 @using Microsoft.EntityFrameworkCore
 @using System.Globalization
 @using SchedulePayrollBlazor.Data.Models
@@ -42,19 +43,18 @@ else
             @foreach (var s in items)
             {
                 <tr>
-                    <td>@s.Employee?.Name</td>
+                    <td>@s.Employee.FullName</td>
                     <td>@s.StartTime.ToString("HH\\:mm")</td>
                     <td>@s.EndTime.ToString("HH\\:mm")</td>
                     <td>@s.Source</td>
                     <td>@s.ShiftDate.ToString("yyyy-MM-dd")</td>
                     <td>
                         <a class="btn btn-sm btn-outline-primary me-1"
-                           href="/schedules/edit/@s.ScheduleId">Edit</a>
+                           href="/schedules/edit/@s.Id">Edit</a>
                         <button class="btn btn-sm btn-outline-danger"
-                                @onclick="() => DeleteSchedule(s.ScheduleId)">
+                                @onclick="() => DeleteSchedule(s.Id)">
                             Delete
                         </button>
-
                     </td>
                 </tr>
             }
@@ -83,26 +83,28 @@ else
             return;
         }
 
-        items = await Db.Set<Schedule>()
-                        .Include(s => s.Employee)
-                        .Where(s => s.ShiftDate == date)
-                        .OrderBy(s => s.StartTime)
-                        .ToListAsync();
+        items = await Db.Schedules
+            .Include(s => s.Employee)
+                .ThenInclude(e => e.User)
+            .Where(s => s.ShiftDate == date)
+            .OrderBy(s => s.StartTime)
+            .ToListAsync();
 
         if (items.Count == 0)
         {
-            items = await Db.Set<Schedule>()
-                            .Include(s => s.Employee)
-                            .OrderByDescending(s => s.ShiftDate)
-                            .ThenBy(s => s.StartTime)
-                            .Take(10)
-                            .ToListAsync();
+            items = await Db.Schedules
+                .Include(s => s.Employee)
+                    .ThenInclude(e => e.User)
+                .OrderByDescending(s => s.ShiftDate)
+                .ThenBy(s => s.StartTime)
+                .Take(10)
+                .ToListAsync();
         }
     }
 
     private async Task DeleteSchedule(int id)
     {
-        var entity = await Db.Set<Schedule>().FindAsync(id);
+        var entity = await Db.Schedules.FindAsync(id);
         if (entity is not null)
         {
             Db.Remove(entity);
@@ -110,5 +112,4 @@ else
             await Load();
         }
     }
-
 }

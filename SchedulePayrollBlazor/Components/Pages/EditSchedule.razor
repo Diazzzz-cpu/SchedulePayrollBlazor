@@ -1,8 +1,10 @@
-﻿@page "/schedules/edit/{id:int}"
+@page "/schedules/edit/{id:int}"
+@attribute [Authorize(Roles = "Admin")]
 @inject AppDbContext Db
 @inject NavigationManager Nav
 @using System.Globalization
 @using Microsoft.EntityFrameworkCore
+@using SchedulePayrollBlazor.Data.Models
 
 <h3>Edit Schedule</h3>
 
@@ -21,7 +23,7 @@ else
             <select class="form-select" value="@vm.EmployeeId" @onchange="OnEmpChanged">
                 @foreach (var e in employees)
                 {
-                    <option value="@e.EmployeeId">@e.Name (@e.Email)</option>
+                    <option value="@e.Id">@e.FullName (@e.User.Email)</option>
                 }
             </select>
         </div>
@@ -65,33 +67,45 @@ else
 
 @code {
     [Parameter] public int id { get; set; }
-    List<Employee> employees = new();
-    ScheduleVm? vm;
+    private List<Employee> employees = new();
+    private ScheduleVm? vm;
 
     protected override async Task OnInitializedAsync()
     {
-        employees = await Db.Set<Employee>().OrderBy(e => e.Name).ToListAsync();
-        var s = await Db.Set<Schedule>().FirstOrDefaultAsync(x => x.ScheduleId == id);
-        if (s is null) { Nav.NavigateTo("/schedules"); return; }
+        employees = await Db.Employees
+            .Include(e => e.User)
+            .OrderBy(e => e.LastName)
+            .ThenBy(e => e.FirstName)
+            .ToListAsync();
+
+        var schedule = await Db.Schedules.FirstOrDefaultAsync(x => x.Id == id);
+        if (schedule is null)
+        {
+            Nav.NavigateTo("/schedules");
+            return;
+        }
 
         vm = new ScheduleVm
         {
-            ScheduleId = s.ScheduleId,
-            EmployeeId = s.EmployeeId,
-            ShiftDateText = s.ShiftDate.ToString("yyyy-MM-dd"),
-            StartTimeText = s.StartTime.ToString("HH\\:mm"),
-            EndTimeText = s.EndTime.ToString("HH\\:mm"),
-            Source = s.Source ?? "Manual"
+            ScheduleId = schedule.Id,
+            EmployeeId = schedule.EmployeeId,
+            ShiftDateText = schedule.ShiftDate.ToString("yyyy-MM-dd"),
+            StartTimeText = schedule.StartTime.ToString("HH\\:mm"),
+            EndTimeText = schedule.EndTime.ToString("HH\\:mm"),
+            Source = schedule.Source ?? "Manual"
         };
     }
 
-    Task OnEmpChanged(ChangeEventArgs e)
+    private Task OnEmpChanged(ChangeEventArgs e)
     {
-        if (int.TryParse(e?.Value?.ToString(), out var i)) vm!.EmployeeId = i;
+        if (int.TryParse(e?.Value?.ToString(), out var employeeId))
+        {
+            vm!.EmployeeId = employeeId;
+        }
         return Task.CompletedTask;
     }
 
-    async Task Save()
+    private async Task Save()
     {
         vm!.FormError = null;
 
@@ -99,15 +113,23 @@ else
         var start = TimeOnly.ParseExact(vm.StartTimeText, "HH\\:mm", CultureInfo.InvariantCulture);
         var end = TimeOnly.ParseExact(vm.EndTimeText, "HH\\:mm", CultureInfo.InvariantCulture);
 
-        if (end <= start) { vm.FormError = "End time must be after start time."; return; }
+        if (end <= start)
+        {
+            vm.FormError = "End time must be after start time.";
+            return;
+        }
 
-        var overlap = await Db.Set<Schedule>()
+        var overlap = await Db.Schedules
             .AnyAsync(s => s.EmployeeId == vm.EmployeeId && s.ShiftDate == date &&
-                           s.ScheduleId != vm.ScheduleId &&
+                           s.Id != vm.ScheduleId &&
                            !(end <= s.StartTime || start >= s.EndTime));
-        if (overlap) { vm.FormError = "Shift overlaps with an existing schedule."; return; }
+        if (overlap)
+        {
+            vm.FormError = "Shift overlaps with an existing schedule.";
+            return;
+        }
 
-        var entity = await Db.Set<Schedule>().FirstAsync(x => x.ScheduleId == vm.ScheduleId);
+        var entity = await Db.Schedules.FirstAsync(x => x.Id == vm.ScheduleId);
         entity.EmployeeId = vm.EmployeeId;
         entity.ShiftDate = date;
         entity.StartTime = start;
@@ -118,7 +140,7 @@ else
         Nav.NavigateTo("/schedules", forceLoad: true);
     }
 
-    public class ScheduleVm
+    private class ScheduleVm
     {
         public int ScheduleId { get; set; }
         public int EmployeeId { get; set; }

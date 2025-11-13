@@ -1,7 +1,8 @@
-@page "/my-payroll"
-@attribute [Authorize]
+@page "/mypayroll"
+@attribute [Authorize(Roles = "Employee")]
 @inject AppDbContext Db
 @inject AuthenticationStateProvider AuthStateProvider
+@inject NavigationManager Nav
 @using Microsoft.EntityFrameworkCore
 @using SchedulePayrollBlazor.Data.Models
 @using System.Security.Claims
@@ -42,7 +43,7 @@
                         <th>Deductions</th>
                         <th>Net Pay</th>
                         <th>Status</th>
-                        <th>Details</th>
+                        <th>Processed</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -57,58 +58,21 @@
                                         @run.PayPeriod.StartDate.ToString("MMM dd") - @run.PayPeriod.EndDate.ToString("MMM dd, yyyy")
                                     </small>
                                 }
+                                else
+                                {
+                                    <div>Ad hoc</div>
+                                }
                             </td>
-                            <td class="text-success">$@run.GrossPay?.ToString("N2")</td>
-                            <td class="text-danger">$@run.TotalDeductions?.ToString("N2")</td>
-                            <td><strong>$@run.NetPay?.ToString("N2")</strong></td>
+                            <td class="text-success">$@run.GrossPay.ToString("N2")</td>
+                            <td class="text-danger">$@run.TotalDeductions.ToString("N2")</td>
+                            <td><strong>$@run.NetPay.ToString("N2")</strong></td>
                             <td>
                                 <span class="badge @GetStatusBadgeClass(run.Status)">
                                     @run.Status
                                 </span>
                             </td>
-                            <td>
-                                <button class="btn btn-sm btn-outline-primary" @onclick="() => ToggleDetails(run.PayrollRunId)">
-                                    @(expandedRunId == run.PayrollRunId ? "Hide" : "View")
-                                </button>
-                            </td>
+                            <td>@run.CreatedAt.ToLocalTime().ToString("MMM dd, yyyy")</td>
                         </tr>
-                        @if (expandedRunId == run.PayrollRunId && run.Payrolllines.Any())
-                        {
-                            <tr>
-                                <td colspan="6">
-                                    <div class="payroll-details">
-                                        <h5>Payroll Details</h5>
-                                        <table class="table table-sm">
-                                            <thead>
-                                                <tr>
-                                                    <th>Component</th>
-                                                    <th>Type</th>
-                                                    <th>Quantity</th>
-                                                    <th>Rate</th>
-                                                    <th>Amount</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                @foreach (var line in run.Payrolllines)
-                                                {
-                                                    <tr>
-                                                        <td>@line.PayComponent?.Name</td>
-                                                        <td>
-                                                            <span class="badge @(line.PayComponent?.Kind == "Earning" ? "badge-success" : "badge-warning")">
-                                                                @line.PayComponent?.Kind
-                                                            </span>
-                                                        </td>
-                                                        <td>@line.Quantity?.ToString("F2")</td>
-                                                        <td>$@line.Rate?.ToString("N2")</td>
-                                                        <td>$@line.Amount.ToString("N2")</td>
-                                                    </tr>
-                                                }
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                </td>
-                            </tr>
-                        }
                     }
                 </tbody>
             </table>
@@ -118,45 +82,45 @@
 
 @code {
     private int employeeId;
-    private List<Payrollrun>? payrollRuns;
+    private List<PayrollRun>? payrollRuns;
     private decimal totalEarnings;
     private decimal lastPaycheck;
-    private int? expandedRunId;
 
     protected override async Task OnInitializedAsync()
     {
         var authState = await AuthStateProvider.GetAuthenticationStateAsync();
         var user = authState.User;
-        var empIdClaim = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-        
-        if (int.TryParse(empIdClaim, out employeeId))
-        {
-            payrollRuns = await Db.Payrollruns
-                .Include(p => p.PayPeriod)
-                .Include(p => p.Payrolllines)
-                    .ThenInclude(l => l.PayComponent)
-                .Where(p => p.EmployeeId == employeeId)
-                .OrderByDescending(p => p.PayrollRunId)
-                .ToListAsync();
+        var role = user.FindFirst(ClaimTypes.Role)?.Value;
 
-            totalEarnings = payrollRuns.Sum(p => p.NetPay ?? 0);
-            lastPaycheck = payrollRuns.FirstOrDefault()?.NetPay ?? 0;
+        if (!string.Equals(role, "Employee", StringComparison.OrdinalIgnoreCase))
+        {
+            Nav.NavigateTo("/login", forceLoad: true);
+            return;
         }
-    }
 
-    private void ToggleDetails(int runId)
-    {
-        expandedRunId = expandedRunId == runId ? null : runId;
-    }
+        var empIdClaim = user.FindFirst("EmployeeId")?.Value ?? user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
 
-    private string GetStatusBadgeClass(string? status)
-    {
-        return status switch
+        if (!int.TryParse(empIdClaim, out employeeId))
         {
-            "Paid" => "badge-success",
-            "Approved" => "badge-info",
-            "Calculated" => "badge-warning",
-            _ => "badge-secondary"
-        };
+            Nav.NavigateTo("/login", forceLoad: true);
+            return;
+        }
+
+        payrollRuns = await Db.PayrollRuns
+            .Include(p => p.PayPeriod)
+            .Where(p => p.EmployeeId == employeeId)
+            .OrderByDescending(p => p.CreatedAt)
+            .ToListAsync();
+
+        totalEarnings = payrollRuns.Sum(p => p.NetPay);
+        lastPaycheck = payrollRuns.FirstOrDefault()?.NetPay ?? 0;
     }
+
+    private static string GetStatusBadgeClass(string status) => status switch
+    {
+        "Paid" => "badge-success",
+        "Approved" => "badge-info",
+        "Calculated" => "badge-warning",
+        _ => "badge-secondary"
+    };
 }

@@ -1,13 +1,20 @@
-﻿@page "/schedules/new"
+@page "/schedules/new"
+@attribute [Authorize(Roles = "Admin")]
 @inject AppDbContext Db
+@inject NavigationManager Nav
 @using Microsoft.EntityFrameworkCore
 @using System.Globalization
+@using SchedulePayrollBlazor.Data.Models
 
 <h3>New Schedule</h3>
 
 @if (employees is null)
 {
     <p>Loading…</p>
+}
+else if (employees.Count == 0)
+{
+    <div class="alert alert-warning">Add employees before creating schedules.</div>
 }
 else
 {
@@ -21,13 +28,12 @@ else
             <div class="alert alert-danger">@vm.FormError</div>
         }
 
-
         <div class="mb-2">
             <label class="form-label">Employee</label>
             <select class="form-select" value="@vm.EmployeeId" @onchange="OnEmpChanged">
                 @foreach (var e in employees)
                 {
-                    <option value="@e.EmployeeId">@e.Name (@e.Email)</option>
+                    <option value="@e.Id">@e.FullName (@e.User.Email)</option>
                 }
             </select>
         </div>
@@ -69,16 +75,22 @@ else
 }
 
 @code {
-    List<Employee>? employees;
+    private List<Employee>? employees;
+    private ScheduleVm vm = new();
 
     protected override async Task OnInitializedAsync()
-        => employees = await Db.Set<Employee>().OrderBy(e => e.Name).ToListAsync();
+        => employees = await Db.Employees
+            .Include(e => e.User)
+            .OrderBy(e => e.LastName)
+            .ThenBy(e => e.FirstName)
+            .ToListAsync();
 
-    // ----- change handlers (no @bind) -----
     private Task OnEmpChanged(ChangeEventArgs e)
     {
         if (int.TryParse(Convert.ToString(e.Value, CultureInfo.InvariantCulture), out var id))
+        {
             vm.EmployeeId = id;
+        }
         return Task.CompletedTask;
     }
 
@@ -105,25 +117,22 @@ else
         vm.Source = Convert.ToString(e.Value, CultureInfo.InvariantCulture) ?? vm.Source;
         return Task.CompletedTask;
     }
-    // --------------------------------------
 
     private async Task HandleValidSubmit()
     {
-        vm.FormError = null; // clear any old error
+        vm.FormError = null;
 
-        // Parse inputs
-        var date  = DateOnly.ParseExact(vm.ShiftDateText, "yyyy-MM-dd", CultureInfo.InvariantCulture);
+        var date = DateOnly.ParseExact(vm.ShiftDateText, "yyyy-MM-dd", CultureInfo.InvariantCulture);
         var start = TimeOnly.ParseExact(vm.StartTimeText, "HH\\:mm", CultureInfo.InvariantCulture);
-        var end   = TimeOnly.ParseExact(vm.EndTimeText,   "HH\\:mm", CultureInfo.InvariantCulture);
+        var end = TimeOnly.ParseExact(vm.EndTimeText, "HH\\:mm", CultureInfo.InvariantCulture);
 
-        // --- VALIDATION happens BEFORE saving ---
         if (end <= start)
         {
             vm.FormError = "End time must be after start time.";
             return;
         }
 
-        var overlap = await Db.Set<Schedule>()
+        var overlap = await Db.Schedules
             .AnyAsync(s => s.EmployeeId == vm.EmployeeId && s.ShiftDate == date &&
                            !(end <= s.StartTime || start >= s.EndTime));
         if (overlap)
@@ -132,32 +141,28 @@ else
             return;
         }
 
-        // Save
         var entity = new Schedule
         {
             EmployeeId = vm.EmployeeId,
-            ShiftDate  = date,
-            StartTime  = start,
-            EndTime    = end,
-            Source     = vm.Source
+            ShiftDate = date,
+            StartTime = start,
+            EndTime = end,
+            Source = vm.Source ?? "Manual"
         };
 
         Db.Add(entity);
         await Db.SaveChangesAsync();
 
-        nav.NavigateTo("/schedules", forceLoad: true);
+        Nav.NavigateTo("/schedules", forceLoad: true);
     }
 
-    [Inject] NavigationManager nav { get; set; } = default!;
-
-    public class ScheduleVm
+    private class ScheduleVm
     {
         public int EmployeeId { get; set; }
         public string ShiftDateText { get; set; } = DateTime.Today.ToString("yyyy-MM-dd");
         public string StartTimeText { get; set; } = "08:00";
-        public string EndTimeText   { get; set; } = "17:00";
-        public string? Source       { get; set; } = "Manual";   // enum('Manual','Auto')
-        public string? FormError    { get; set; }               // <-- ADD THIS
+        public string EndTimeText { get; set; } = "17:00";
+        public string? Source { get; set; } = "Manual";
+        public string? FormError { get; set; }
     }
-    ScheduleVm vm = new();
 }

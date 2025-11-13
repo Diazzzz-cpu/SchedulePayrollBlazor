@@ -1,101 +1,105 @@
+using System;
 using Microsoft.EntityFrameworkCore;
 using SchedulePayrollBlazor.Data;
 using SchedulePayrollBlazor.Data.Models;
-using BCrypt.Net;
+using SchedulePayrollBlazor.Services.Models;
+using SchedulePayrollBlazor.Utilities;
 
 namespace SchedulePayrollBlazor.Services;
 
 public class AuthService
 {
-    private readonly AppDbContext _db;
+    private readonly AppDbContext _dbContext;
     private readonly SimpleAuthStateProvider _authStateProvider;
 
-    public AuthService(AppDbContext db, SimpleAuthStateProvider authStateProvider)
+    public AuthService(AppDbContext dbContext, SimpleAuthStateProvider authStateProvider)
     {
-        _db = db;
+        _dbContext = dbContext;
         _authStateProvider = authStateProvider;
     }
 
-    public async Task<(bool Success, string Message)> RegisterAsync(
-        string name, 
-        string email, 
-        string password, 
-        int roleId,
-        string employmentClass = "FullTime",
-        string employmentType = "Hourly",
-        decimal hourlyRate = 15.00m,
-        decimal monthlyRate = 0m)
+    public async Task<(bool Success, string ErrorMessage)> RegisterAsync(RegisterRequest request)
     {
-        if (string.IsNullOrWhiteSpace(name) || string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(password))
+        var normalizedEmail = request.Email.Trim().ToLowerInvariant();
+        var role = string.Equals(request.Role, "Admin", StringComparison.OrdinalIgnoreCase) ? "Admin" : "Employee";
+        var employmentType = string.IsNullOrWhiteSpace(request.EmploymentType)
+            ? "FullTime"
+            : request.EmploymentType.Trim();
+
+        if (await _dbContext.Users.AnyAsync(u => u.Email == normalizedEmail))
         {
-            return (false, "All fields are required.");
+            return (false, "An account with that email already exists.");
         }
 
-        if (await _db.Employees.AnyAsync(e => e.Email == email))
+        await using var transaction = await _dbContext.Database.BeginTransactionAsync();
+
+        try
         {
-            return (false, "Email already exists.");
+            var user = new User
+            {
+                Email = normalizedEmail,
+                PasswordHash = PasswordHasher.HashPassword(request.Password),
+                Role = role,
+                CreatedAt = DateTime.UtcNow
+            };
+
+            _dbContext.Users.Add(user);
+            await _dbContext.SaveChangesAsync();
+
+            var employee = new Employee
+            {
+                UserId = user.Id,
+                FirstName = request.FirstName.Trim(),
+                LastName = request.LastName.Trim(),
+                Department = (request.Department ?? string.Empty).Trim(),
+                JobTitle = (request.JobTitle ?? string.Empty).Trim(),
+                EmploymentType = employmentType,
+                StartDate = request.StartDate,
+                Location = (request.Location ?? string.Empty).Trim(),
+                IsActive = true
+            };
+
+            _dbContext.Employees.Add(employee);
+            await _dbContext.SaveChangesAsync();
+
+            await transaction.CommitAsync();
+
+            await _authStateProvider.SignInAsync(user.Id);
+
+            return (true, string.Empty);
         }
-
-        var role = await _db.Roles.FindAsync(roleId);
-        if (role == null)
+        catch
         {
-            return (false, "Invalid role selected.");
+            await transaction.RollbackAsync();
+            return (false, "We couldn't complete your registration. Please try again.");
         }
-
-        var hashedPassword = BCrypt.Net.BCrypt.HashPassword(password);
-
-        var employee = new Employee
-        {
-            Name = name,
-            Email = email,
-            Password = hashedPassword,
-            RoleId = roleId,
-            EmploymentClass = employmentClass,
-            EmploymentType = employmentType,
-            HourlyRate = hourlyRate,
-            MonthlyRate = monthlyRate,
-            Active = true
-        };
-
-        _db.Employees.Add(employee);
-        await _db.SaveChangesAsync();
-
-        return (true, "Registration successful!");
     }
 
-    public async Task<(bool Success, string Message, Employee? Employee)> LoginAsync(string email, string password)
+    public async Task<(bool Success, string ErrorMessage, string Role)> LoginAsync(string email, string password)
     {
-        if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(password))
+        var normalizedEmail = email.Trim().ToLowerInvariant();
+
+        var user = await _dbContext.Users
+            .Include(u => u.Employee)
+            .FirstOrDefaultAsync(u => u.Email == normalizedEmail);
+
+        if (user is null)
         {
-            return (false, "Email and password are required.", null);
+            return (false, "Invalid email or password.", string.Empty);
         }
 
-        var employee = await _db.Employees
-            .Include(e => e.Role)
-            .FirstOrDefaultAsync(e => e.Email == email);
-
-        if (employee == null)
+        if (!PasswordHasher.VerifyPassword(password, user.PasswordHash))
         {
-            return (false, "Invalid email or password.", null);
+            return (false, "Invalid email or password.", string.Empty);
         }
 
-        if (!BCrypt.Net.BCrypt.Verify(password, employee.Password))
-        {
-            return (false, "Invalid email or password.", null);
-        }
+        await _authStateProvider.SignInAsync(user.Id);
 
-        if (employee.Active != true)
-        {
-            return (false, "Account is inactive. Please contact administrator.", null);
-        }
-
-        await _authStateProvider.SignIn(email);
-
-        return (true, "Login successful!", employee);
+        return (true, string.Empty, user.Role);
     }
 
-    public async Task<List<Role>> GetRolesAsync()
+    public async Task LogoutAsync()
     {
-        return await _db.Roles.OrderBy(r => r.Name).ToListAsync();
+        await _authStateProvider.SignOutAsync();
     }
 }

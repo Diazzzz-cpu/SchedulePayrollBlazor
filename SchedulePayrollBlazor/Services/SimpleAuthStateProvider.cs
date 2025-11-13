@@ -29,16 +29,19 @@ public class SimpleAuthStateProvider : AuthenticationStateProvider
                            .Include(e => e.Role)
                            .FirstOrDefaultAsync(e => e.Email == email);
 
-        if (emp is null)
+        if (emp is null || emp.Active != true)
             return new AuthenticationState(_anon);
 
-        var identity = new ClaimsIdentity(new[]
+        var claims = new List<Claim>
         {
-            new Claim(ClaimTypes.Name,  emp.Name ?? email),
+            new Claim(ClaimTypes.Name, emp.Name ?? email),
             new Claim(ClaimTypes.Email, email),
-            new Claim(ClaimTypes.Role,  emp.Role?.Name ?? "User")
-        }, "Simple");
+            new Claim(ClaimTypes.NameIdentifier, emp.EmployeeId.ToString()),
+            new Claim(ClaimTypes.Role, emp.Role?.Name ?? "User"),
+            new Claim("RoleCode", emp.Role?.Code ?? "USER")
+        };
 
+        var identity = new ClaimsIdentity(claims, "Simple");
         return new AuthenticationState(new ClaimsPrincipal(identity));
     }
 

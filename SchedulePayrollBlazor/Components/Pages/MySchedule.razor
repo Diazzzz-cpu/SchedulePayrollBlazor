@@ -1,0 +1,117 @@
+@page "/my-schedule"
+@attribute [Authorize]
+@inject AppDbContext Db
+@inject AuthenticationStateProvider AuthStateProvider
+@using Microsoft.EntityFrameworkCore
+@using SchedulePayrollBlazor.Data.Models
+@using System.Security.Claims
+@using System.Globalization
+
+<div class="page-container">
+    <div class="page-header">
+        <h2>My Schedule</h2>
+        <p>View your work schedule</p>
+    </div>
+
+    <div class="filter-section">
+        <div class="d-flex align-items-center gap-3">
+            <div>
+                <label class="form-label">Select Date</label>
+                <input type="date" class="form-control" value="@dateString" @onchange="OnDateChanged" />
+            </div>
+            <div class="align-self-end">
+                <button class="btn btn-secondary" @onclick="LoadSchedules">Load</button>
+            </div>
+        </div>
+    </div>
+
+    @if (schedules == null)
+    {
+        <div class="loading">Loading...</div>
+    }
+    else if (!schedules.Any())
+    {
+        <div class="alert alert-info">No schedules found for the selected date.</div>
+    }
+    else
+    {
+        <div class="schedule-grid">
+            @foreach (var schedule in schedules)
+            {
+                <div class="schedule-card">
+                    <div class="schedule-date">
+                        <div class="date-day">@schedule.ShiftDate.Day</div>
+                        <div class="date-month">@schedule.ShiftDate.ToString("MMM")</div>
+                    </div>
+                    <div class="schedule-details">
+                        <h4>@schedule.ShiftDate.ToString("dddd, MMMM dd, yyyy")</h4>
+                        <div class="schedule-time">
+                            <span class="time-badge">🕐 @schedule.StartTime.ToString("hh\\:mm tt")</span>
+                            <span class="time-separator">→</span>
+                            <span class="time-badge">🕐 @schedule.EndTime.ToString("hh\\:mm tt")</span>
+                        </div>
+                        <div class="schedule-duration">
+                            Duration: @((schedule.EndTime - schedule.StartTime).TotalHours.ToString("F1")) hours
+                        </div>
+                        <div class="schedule-source">
+                            <span class="badge @(schedule.Source == "Manual" ? "badge-primary" : "badge-secondary")">
+                                @schedule.Source
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    private int employeeId;
+    private string dateString = DateTime.Today.ToString("yyyy-MM-dd");
+    private List<Schedule>? schedules;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+        var empIdClaim = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        
+        if (int.TryParse(empIdClaim, out employeeId))
+        {
+            await LoadSchedules();
+        }
+    }
+
+    private Task OnDateChanged(ChangeEventArgs e)
+    {
+        dateString = Convert.ToString(e.Value, CultureInfo.InvariantCulture) ?? dateString;
+        return Task.CompletedTask;
+    }
+
+    private async Task LoadSchedules()
+    {
+        if (!DateOnly.TryParseExact(dateString, "yyyy-MM-dd", CultureInfo.InvariantCulture,
+                                    DateTimeStyles.None, out var date))
+        {
+            schedules = new();
+            return;
+        }
+
+        schedules = await Db.Schedules
+            .Where(s => s.EmployeeId == employeeId && s.ShiftDate == date)
+            .OrderBy(s => s.StartTime)
+            .ToListAsync();
+
+        if (!schedules.Any())
+        {
+            var startOfWeek = date.AddDays(-(int)date.DayOfWeek);
+            var endOfWeek = startOfWeek.AddDays(7);
+            
+            schedules = await Db.Schedules
+                .Where(s => s.EmployeeId == employeeId && s.ShiftDate >= startOfWeek && s.ShiftDate < endOfWeek)
+                .OrderBy(s => s.ShiftDate)
+                .ThenBy(s => s.StartTime)
+                .ToListAsync();
+        }
+    }
+}

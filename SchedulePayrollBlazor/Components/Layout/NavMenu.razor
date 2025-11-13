@@ -1,24 +1,25 @@
-﻿<div class="top-row ps-3 navbar navbar-dark">
-    <div class="container-fluid">
-        <a class="navbar-brand" href="">SchedulePayrollBlazor</a>
+﻿@inject SimpleAuthStateProvider Auth
+
+<nav class="side-nav">
+    <div class="side-section">
+        <span class="side-section-title">Main</span>
+        <NavLink href="/" class="side-link" activeClass="active">Dashboard</NavLink>
     </div>
-</div>
 
-<input type="checkbox" title="Navigation menu" class="navbar-toggler" />
+    <div class="side-section">
+        <span class="side-section-title">Employee</span>
+        <NavLink href="/myschedule" class="side-link" activeClass="active">My Schedule</NavLink>
+        <NavLink href="/mypayroll" class="side-link" activeClass="active">My Payroll</NavLink>
+    </div>
 
-<div class="nav-scrollable" onclick="document.querySelector('.navbar-toggler').click()">
+    <div class="side-section">
+        <span class="side-section-title">Admin</span>
+        <NavLink href="/schedules" class="side-link" activeClass="active">Schedules</NavLink>
+        <NavLink href="/employees" class="side-link" activeClass="active">Employees</NavLink>
+        <NavLink href="/payroll" class="side-link" activeClass="active">Payroll</NavLink>
+    </div>
 
-    <nav class="navbar navbar-expand-sm navbar-light bg-light px-3">
-        <a class="navbar-brand" href="/">SchedulePayroll</a>
-        <div class="navbar-nav">
-            <a class="nav-link" href="/schedules">Schedules</a>
-            <a class="nav-link" href="/employees">Employees</a>
-            <a class="nav-link" href="/payroll">Payroll</a>
-            <a class="nav-link" href="/login">Login</a>
-
-            @inject SimpleAuthStateProvider Auth
-            <button class="btn btn-sm btn-outline-secondary ms-2" @onclick="() => Auth.SignOut()">Logout</button>)
-
-        </div>
-    </nav>
-</div>
+    <button class="side-logout" @onclick="() => Auth.SignOut()">
+        Logout
+    </button>
+</nav>

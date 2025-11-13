@@ -21,6 +21,7 @@ builder.Services.AddAuthorizationCore();
 builder.Services.AddScoped<AuthenticationStateProvider, SimpleAuthStateProvider>();
 builder.Services.AddScoped<SimpleAuthStateProvider>();
 builder.Services.AddScoped<AuthService>();
+builder.Services.AddScoped<AdminUserService>();
 
 var app = builder.Build();
 

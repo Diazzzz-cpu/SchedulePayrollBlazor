@@ -1,0 +1,494 @@
+@page "/admin/users"
+@attribute [Authorize]
+@inject AdminUserService UserService
+@inject NavigationManager Nav
+@inject IJSRuntime JS
+@using System.Security.Claims
+
+<CascadingParameter>
+private Task<AuthenticationState> AuthenticationStateTask { get; set; } = default!;
+
+@if (!isAuthorized)
+{
+    <div class="loading-state">
+        <p>Loading user management…</p>
+    </div>
+}
+else
+{
+    <div class="page-header">
+        <h2>User Management</h2>
+        <p>Provision, edit, and remove workforce accounts.</p>
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(alertMessage))
+    {
+        <div class="alert alert-@alertStyle">@alertMessage</div>
+    }
+
+    @if (!string.IsNullOrWhiteSpace(temporaryPassword))
+    {
+        <div class="alert alert-warning">
+            <strong>Temporary password:</strong> <code>@temporaryPassword</code>
+        </div>
+    }
+
+    <div class="card-grid">
+        <div class="card">
+            <div class="card-header">
+                <h3>Create User</h3>
+                <p>Add a new teammate or administrator.</p>
+            </div>
+            <EditForm Model="createModel" OnValidSubmit="HandleCreateAsync">
+                <DataAnnotationsValidator />
+                <ValidationSummary />
+
+                <div class="form-group">
+                    <label>Email</label>
+                    <InputText @bind-Value="createModel.Email" class="form-control" type="email" />
+                    <ValidationMessage For="() => createModel.Email" />
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>First Name</label>
+                        <InputText @bind-Value="createModel.FirstName" class="form-control" />
+                        <ValidationMessage For="() => createModel.FirstName" />
+                    </div>
+                    <div class="form-group">
+                        <label>Last Name</label>
+                        <InputText @bind-Value="createModel.LastName" class="form-control" />
+                        <ValidationMessage For="() => createModel.LastName" />
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Role</label>
+                    <InputSelect @bind-Value="createModel.Role" class="form-control">
+                        @foreach (var option in roleOptions)
+                        {
+                            <option value="@option">@option</option>
+                        }
+                    </InputSelect>
+                </div>
+
+                <div class="form-divider">Employee Details (optional)</div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Department</label>
+                        <InputText @bind-Value="createModel.Department" class="form-control" />
+                    </div>
+                    <div class="form-group">
+                        <label>Job Title</label>
+                        <InputText @bind-Value="createModel.JobTitle" class="form-control" />
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Employment Type</label>
+                        <InputSelect @bind-Value="createModel.EmploymentType" class="form-control">
+                            @foreach (var option in employmentTypeOptions)
+                            {
+                                <option value="@option">@option</option>
+                            }
+                        </InputSelect>
+                    </div>
+                    <div class="form-group">
+                        <label>Start Date</label>
+                        <InputDate @bind-Value="createModel.StartDate" class="form-control" />
+                    </div>
+                    <div class="form-group">
+                        <label>Location</label>
+                        <InputText @bind-Value="createModel.Location" class="form-control" />
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Initial Password <span class="text-muted">(leave blank to auto-generate)</span></label>
+                    <div class="input-with-button">
+                        <InputText @bind-Value="createModel.Password" class="form-control" type="text" />
+                        <button type="button" class="btn btn-secondary" @onclick="() => createModel.Password = GenerateTemporaryPassword()">Generate</button>
+                    </div>
+                </div>
+
+                <button type="submit" class="btn btn-primary" disabled="@isProcessing">
+                    @if (isProcessing)
+                    {
+                        <span>Creating…</span>
+                    }
+                    else
+                    {
+                        <span>Create User</span>
+                    }
+                </button>
+            </EditForm>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <h3>Existing Users</h3>
+                <p>Review account status and take action.</p>
+            </div>
+
+            @if (isLoading)
+            {
+                <p>Loading users…</p>
+            }
+            else if (users.Count == 0)
+            {
+                <div class="alert alert-info">No users found in the system.</div>
+            }
+            else
+            {
+                <div class="table-responsive">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Email</th>
+                                <th>Name</th>
+                                <th>Role</th>
+                                <th>Department</th>
+                                <th>Job Title</th>
+                                <th>Created</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var user in users)
+                            {
+                                <tr>
+                                    <td>@user.Email</td>
+                                    <td>@user.FirstName @user.LastName</td>
+                                    <td>@FormatRole(user)</td>
+                                    <td>@(string.IsNullOrWhiteSpace(user.Department) ? "—" : user.Department)</td>
+                                    <td>@(string.IsNullOrWhiteSpace(user.JobTitle) ? "—" : user.JobTitle)</td>
+                                    <td>@user.CreatedAt.ToLocalTime().ToString("MMM dd, yyyy")</td>
+                                    <td class="table-actions">
+                                        <button class="btn btn-link" @onclick="() => BeginEdit(user)">Edit</button>
+                                        <button class="btn btn-link text-danger" @onclick="() => ConfirmDeleteAsync(user)">Delete</button>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </div>
+    </div>
+
+    @if (editModel is not null)
+    {
+        <div class="card">
+            <div class="card-header">
+                <h3>Edit User</h3>
+                <p>Update account access or employee details.</p>
+            </div>
+            <EditForm Model="editModel" OnValidSubmit="HandleUpdateAsync">
+                <DataAnnotationsValidator />
+                <ValidationSummary />
+
+                <div class="form-group">
+                    <label>Email</label>
+                    <InputText @bind-Value="editModel.Email" class="form-control" type="email" />
+                    <ValidationMessage For="() => editModel.Email" />
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>First Name</label>
+                        <InputText @bind-Value="editModel.FirstName" class="form-control" />
+                        <ValidationMessage For="() => editModel.FirstName" />
+                    </div>
+                    <div class="form-group">
+                        <label>Last Name</label>
+                        <InputText @bind-Value="editModel.LastName" class="form-control" />
+                        <ValidationMessage For="() => editModel.LastName" />
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Role</label>
+                    <InputSelect @bind-Value="editModel.Role" class="form-control">
+                        @foreach (var option in roleOptions)
+                        {
+                            <option value="@option">@option</option>
+                        }
+                    </InputSelect>
+                </div>
+
+                <div class="form-divider">Employee Details</div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Department</label>
+                        <InputText @bind-Value="editModel.Department" class="form-control" />
+                    </div>
+                    <div class="form-group">
+                        <label>Job Title</label>
+                        <InputText @bind-Value="editModel.JobTitle" class="form-control" />
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Employment Type</label>
+                        <InputSelect @bind-Value="editModel.EmploymentType" class="form-control">
+                            @foreach (var option in employmentTypeOptions)
+                            {
+                                <option value="@option">@option</option>
+                            }
+                        </InputSelect>
+                    </div>
+                    <div class="form-group">
+                        <label>Start Date</label>
+                        <InputDate @bind-Value="editModel.StartDate" class="form-control" />
+                    </div>
+                    <div class="form-group">
+                        <label>Location</label>
+                        <InputText @bind-Value="editModel.Location" class="form-control" />
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Reset Password <span class="text-muted">(optional)</span></label>
+                    <div class="input-with-button">
+                        <InputText @bind-Value="editModel.Password" class="form-control" type="text" />
+                        <button type="button" class="btn btn-secondary" @onclick="() => editModel.Password = GenerateTemporaryPassword()">Generate</button>
+                    </div>
+                    <small class="form-text text-muted">Leave blank to keep the current password.</small>
+                </div>
+
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary" disabled="@isProcessing">Save Changes</button>
+                    <button type="button" class="btn btn-secondary" @onclick="CancelEdit">Cancel</button>
+                </div>
+            </EditForm>
+        </div>
+    }
+}
+
+@code {
+    private readonly string[] roleOptions = new[] { "Employee", "Admin" };
+    private readonly string[] employmentTypeOptions = new[] { "FullTime", "PartTime", "Contract", "Seasonal", "Intern" };
+
+    private List<AdminUserSummary> users = new();
+    private AdminUserFormModel createModel = new();
+    private AdminUserFormModel? editModel;
+
+    private bool isAuthorized;
+    private bool isLoading;
+    private bool isProcessing;
+    private int currentUserId;
+
+    private string? alertMessage;
+    private string alertStyle = "info";
+    private string? temporaryPassword;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthenticationStateTask;
+        var principal = authState.User;
+
+        if (!(principal.Identity?.IsAuthenticated ?? false))
+        {
+            Nav.NavigateTo("/login", forceLoad: true);
+            return;
+        }
+
+        if (!principal.IsInRole("Admin"))
+        {
+            Nav.NavigateTo("/userdashboard", forceLoad: true);
+            return;
+        }
+
+        isAuthorized = true;
+
+        var idValue = principal.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (int.TryParse(idValue, out var parsedId))
+        {
+            currentUserId = parsedId;
+        }
+
+        ResetCreateModel();
+        await LoadUsersAsync();
+    }
+
+    private async Task LoadUsersAsync()
+    {
+        try
+        {
+            isLoading = true;
+            users = await UserService.GetUsersAsync();
+        }
+        catch
+        {
+            alertMessage = "Failed to load users.";
+            alertStyle = "danger";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task HandleCreateAsync()
+    {
+        if (!ValidatePassword(createModel.Password))
+        {
+            alertMessage = "Initial password must be at least 8 characters if provided.";
+            alertStyle = "danger";
+            return;
+        }
+
+        isProcessing = true;
+        alertMessage = null;
+        temporaryPassword = null;
+
+        var (success, errorMessage, generatedPassword) = await UserService.CreateUserAsync(createModel);
+
+        isProcessing = false;
+
+        if (!success)
+        {
+            alertMessage = errorMessage ?? "Unable to create user.";
+            alertStyle = "danger";
+            return;
+        }
+
+        alertMessage = "User created successfully.";
+        alertStyle = "success";
+        var providedPassword = string.IsNullOrWhiteSpace(createModel.Password)
+            ? null
+            : createModel.Password.Trim();
+        temporaryPassword = generatedPassword ?? providedPassword;
+
+        await LoadUsersAsync();
+        ResetCreateModel();
+    }
+
+    private async Task HandleUpdateAsync()
+    {
+        if (editModel is null)
+        {
+            return;
+        }
+
+        if (!ValidatePassword(editModel.Password))
+        {
+            alertMessage = "Temporary password must be at least 8 characters if provided.";
+            alertStyle = "danger";
+            return;
+        }
+
+        isProcessing = true;
+        alertMessage = null;
+        temporaryPassword = null;
+
+        var (success, errorMessage, generatedPassword) = await UserService.UpdateUserAsync(editModel);
+
+        isProcessing = false;
+
+        if (!success)
+        {
+            alertMessage = errorMessage ?? "Unable to update user.";
+            alertStyle = "danger";
+            return;
+        }
+
+        alertMessage = "User updated successfully.";
+        alertStyle = "success";
+        var providedPassword = string.IsNullOrWhiteSpace(editModel.Password)
+            ? null
+            : editModel.Password.Trim();
+        temporaryPassword = generatedPassword ?? providedPassword;
+
+        await LoadUsersAsync();
+        CancelEdit();
+    }
+
+    private async Task ConfirmDeleteAsync(AdminUserSummary user)
+    {
+        if (user.UserId == currentUserId)
+        {
+            alertMessage = "You cannot delete your own signed-in account.";
+            alertStyle = "warning";
+            return;
+        }
+
+        var confirmed = await JS.InvokeAsync<bool>("confirm", $"Are you sure you want to delete {user.Email}?");
+        if (!confirmed)
+        {
+            return;
+        }
+
+        var (success, errorMessage) = await UserService.DeleteUserAsync(user.UserId, currentUserId);
+
+        if (!success)
+        {
+            alertMessage = errorMessage ?? "Unable to delete user.";
+            alertStyle = "danger";
+            return;
+        }
+
+        alertMessage = "User deleted.";
+        alertStyle = "success";
+        temporaryPassword = null;
+
+        await LoadUsersAsync();
+    }
+
+    private void BeginEdit(AdminUserSummary summary)
+    {
+        editModel = new AdminUserFormModel
+        {
+            UserId = summary.UserId,
+            Email = summary.Email,
+            FirstName = summary.FirstName,
+            LastName = summary.LastName,
+            Role = summary.RoleId == 5 ? "Admin" : "Employee",
+            Department = summary.Department ?? string.Empty,
+            JobTitle = summary.JobTitle ?? string.Empty,
+            EmploymentType = string.IsNullOrWhiteSpace(summary.EmploymentType) ? "FullTime" : summary.EmploymentType!,
+            StartDate = summary.StartDate,
+            Location = summary.Location ?? string.Empty,
+            Password = string.Empty
+        };
+    }
+
+    private void CancelEdit()
+    {
+        editModel = null;
+    }
+
+    private void ResetCreateModel()
+    {
+        createModel = new AdminUserFormModel
+        {
+            Role = "Employee",
+            EmploymentType = "FullTime",
+            Department = string.Empty,
+            JobTitle = string.Empty,
+            Location = string.Empty,
+            Password = string.Empty,
+            StartDate = null
+        };
+    }
+
+    private static string FormatRole(AdminUserSummary user)
+        => user.RoleId == 5 ? "Admin" : "Employee";
+
+    private static bool ValidatePassword(string? password)
+    {
+        if (string.IsNullOrWhiteSpace(password))
+        {
+            return true;
+        }
+
+        return password.Length >= 8;
+    }
+
+    private static string GenerateTemporaryPassword()
+        => Guid.NewGuid().ToString("N")[..10];
+}

@@ -26,13 +26,13 @@
     {
         <div class="side-section">
             <NavLink href="/login" class="side-link" activeClass="active">Login</NavLink>
-            <NavLink href="/register" class="side-link" activeClass="active">Register</NavLink>
         </div>
     }
     else if (isAdmin)
     {
         <div class="side-section">
             <span class="side-section-title">Admin</span>
+            <NavLink href="/admin/users" class="side-link" activeClass="active">User Management</NavLink>
             <NavLink href="/admindashboard" class="side-link" activeClass="active">Dashboard</NavLink>
             <NavLink href="/employees" class="side-link" activeClass="active">Employees</NavLink>
             <NavLink href="/schedules" class="side-link" activeClass="active">Schedules</NavLink>

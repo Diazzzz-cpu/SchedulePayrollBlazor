@@ -1,0 +1,159 @@
+@page "/dashboard"
+@attribute [Authorize]
+@inject AppDbContext Db
+@inject AuthenticationStateProvider AuthStateProvider
+@using Microsoft.EntityFrameworkCore
+@using SchedulePayrollBlazor.Data.Models
+@using System.Security.Claims
+
+<div class="dashboard-container">
+    <div class="dashboard-header">
+        <h2>Welcome, @employeeName!</h2>
+        <p>Your schedule and payroll information</p>
+    </div>
+
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="stat-icon" style="background: #e3f2fd;">
+                <span style="color: #1976d2;">📅</span>
+            </div>
+            <div class="stat-content">
+                <h3>@todaySchedules</h3>
+                <p>Today's Shifts</p>
+            </div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-icon" style="background: #f3e5f5;">
+                <span style="color: #7b1fa2;">⏰</span>
+            </div>
+            <div class="stat-content">
+                <h3>@upcomingSchedules</h3>
+                <p>Upcoming Shifts</p>
+            </div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-icon" style="background: #e8f5e9;">
+                <span style="color: #388e3c;">💰</span>
+            </div>
+            <div class="stat-content">
+                <h3>$@lastPayAmount.ToString("N2")</h3>
+                <p>Last Paycheck</p>
+            </div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-icon" style="background: #fff3e0;">
+                <span style="color: #f57c00;">📊</span>
+            </div>
+            <div class="stat-content">
+                <h3>@totalHoursThisWeek</h3>
+                <p>Hours This Week</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="dashboard-actions">
+        <h3>Quick Actions</h3>
+        <div class="action-grid">
+            <a href="/my-schedule" class="action-card">
+                <div class="action-icon">📅</div>
+                <h4>My Schedule</h4>
+                <p>View your work schedule</p>
+            </a>
+
+            <a href="/my-payroll" class="action-card">
+                <div class="action-icon">💰</div>
+                <h4>My Payroll</h4>
+                <p>View your payroll information</p>
+            </a>
+        </div>
+    </div>
+
+    <div class="recent-activity">
+        <h3>Upcoming Shifts</h3>
+        @if (upcomingShifts.Any())
+        {
+            <div class="table-responsive">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Start Time</th>
+                            <th>End Time</th>
+                            <th>Duration</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var shift in upcomingShifts)
+                        {
+                            <tr>
+                                <td>@shift.ShiftDate.ToString("MMM dd, yyyy")</td>
+                                <td>@shift.StartTime.ToString("hh\\:mm tt")</td>
+                                <td>@shift.EndTime.ToString("hh\\:mm tt")</td>
+                                <td>@((shift.EndTime - shift.StartTime).TotalHours.ToString("F1")) hours</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+        else
+        {
+            <div class="alert alert-info">No upcoming shifts scheduled.</div>
+        }
+    </div>
+</div>
+
+@code {
+    private string employeeName = "";
+    private int employeeId;
+    private int todaySchedules;
+    private int upcomingSchedules;
+    private decimal lastPayAmount;
+    private double totalHoursThisWeek;
+    private List<Schedule> upcomingShifts = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+
+        employeeName = user.FindFirst(ClaimTypes.Name)?.Value ?? "User";
+        var empIdClaim = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        
+        if (int.TryParse(empIdClaim, out employeeId))
+        {
+            var today = DateOnly.FromDateTime(DateTime.Today);
+            todaySchedules = await Db.Schedules.CountAsync(s => s.EmployeeId == employeeId && s.ShiftDate == today);
+            
+            var tomorrow = today.AddDays(1);
+            var nextWeek = today.AddDays(7);
+            upcomingSchedules = await Db.Schedules.CountAsync(s => s.EmployeeId == employeeId && s.ShiftDate >= tomorrow && s.ShiftDate <= nextWeek);
+            
+            upcomingShifts = await Db.Schedules
+                .Where(s => s.EmployeeId == employeeId && s.ShiftDate >= today)
+                .OrderBy(s => s.ShiftDate)
+                .ThenBy(s => s.StartTime)
+                .Take(5)
+                .ToListAsync();
+            
+            var lastPayroll = await Db.Payrollruns
+                .Where(p => p.EmployeeId == employeeId)
+                .OrderByDescending(p => p.PayrollRunId)
+                .FirstOrDefaultAsync();
+            
+            lastPayAmount = lastPayroll?.NetPay ?? 0;
+            
+            var startOfWeek = today.AddDays(-(int)DateTime.Today.DayOfWeek);
+            var endOfWeek = startOfWeek.AddDays(7);
+            
+            var weekSchedules = await Db.Schedules
+                .Where(s => s.EmployeeId == employeeId && s.ShiftDate >= startOfWeek && s.ShiftDate < endOfWeek)
+                .ToListAsync();
+            
+            totalHoursThisWeek = weekSchedules.Sum(s => (s.EndTime - s.StartTime).TotalHours);
+        }
+    }
+}

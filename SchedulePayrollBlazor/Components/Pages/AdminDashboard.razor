@@ -1,0 +1,144 @@
+@page "/admin/dashboard"
+@attribute [Authorize(Roles = "Admin")]
+@inject AppDbContext Db
+@using Microsoft.EntityFrameworkCore
+@using SchedulePayrollBlazor.Data.Models
+
+<div class="dashboard-container">
+    <div class="dashboard-header">
+        <h2>Admin Dashboard</h2>
+        <p>Manage employees, schedules, and payroll</p>
+    </div>
+
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="stat-icon" style="background: #e3f2fd;">
+                <span style="color: #1976d2;">👥</span>
+            </div>
+            <div class="stat-content">
+                <h3>@totalEmployees</h3>
+                <p>Total Employees</p>
+            </div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-icon" style="background: #f3e5f5;">
+                <span style="color: #7b1fa2;">📅</span>
+            </div>
+            <div class="stat-content">
+                <h3>@todaySchedules</h3>
+                <p>Today's Schedules</p>
+            </div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-icon" style="background: #e8f5e9;">
+                <span style="color: #388e3c;">💰</span>
+            </div>
+            <div class="stat-content">
+                <h3>@activePayrolls</h3>
+                <p>Active Payrolls</p>
+            </div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-icon" style="background: #fff3e0;">
+                <span style="color: #f57c00;">⏰</span>
+            </div>
+            <div class="stat-content">
+                <h3>@upcomingSchedules</h3>
+                <p>Upcoming Schedules</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="dashboard-actions">
+        <h3>Quick Actions</h3>
+        <div class="action-grid">
+            <a href="/employees" class="action-card">
+                <div class="action-icon">👥</div>
+                <h4>Manage Employees</h4>
+                <p>View and edit employee information</p>
+            </a>
+
+            <a href="/schedules" class="action-card">
+                <div class="action-icon">📅</div>
+                <h4>Manage Schedules</h4>
+                <p>Create and update work schedules</p>
+            </a>
+
+            <a href="/payroll" class="action-card">
+                <div class="action-icon">💰</div>
+                <h4>Process Payroll</h4>
+                <p>Generate and manage payroll runs</p>
+            </a>
+
+            <a href="/schedules/new" class="action-card">
+                <div class="action-icon">➕</div>
+                <h4>Add Schedule</h4>
+                <p>Create a new work schedule</p>
+            </a>
+        </div>
+    </div>
+
+    <div class="recent-activity">
+        <h3>Recent Employees</h3>
+        <div class="table-responsive">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Email</th>
+                        <th>Role</th>
+                        <th>Employment Type</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var emp in recentEmployees)
+                    {
+                        <tr>
+                            <td>@emp.Name</td>
+                            <td>@emp.Email</td>
+                            <td>@emp.Role?.Name</td>
+                            <td>@emp.EmploymentType</td>
+                            <td>
+                                <span class="badge @(emp.Active == true ? "badge-success" : "badge-danger")">
+                                    @(emp.Active == true ? "Active" : "Inactive")
+                                </span>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+@code {
+    private int totalEmployees;
+    private int todaySchedules;
+    private int activePayrolls;
+    private int upcomingSchedules;
+    private List<Employee> recentEmployees = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        totalEmployees = await Db.Employees.CountAsync(e => e.Active == true);
+        
+        var today = DateOnly.FromDateTime(DateTime.Today);
+        todaySchedules = await Db.Schedules.CountAsync(s => s.ShiftDate == today);
+        
+        var tomorrow = today.AddDays(1);
+        var nextWeek = today.AddDays(7);
+        upcomingSchedules = await Db.Schedules.CountAsync(s => s.ShiftDate >= tomorrow && s.ShiftDate <= nextWeek);
+        
+        activePayrolls = await Db.Payrollruns.CountAsync(p => p.Status == "Pending" || p.Status == "Calculated");
+        
+        recentEmployees = await Db.Employees
+            .Include(e => e.Role)
+            .OrderByDescending(e => e.EmployeeId)
+            .Take(5)
+            .ToListAsync();
+    }
+}

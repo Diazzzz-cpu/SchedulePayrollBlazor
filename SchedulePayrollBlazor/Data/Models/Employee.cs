@@ -6,7 +6,7 @@ namespace SchedulePayrollBlazor.Data.Models;
 
 public class Employee
 {
-    public int Id { get; set; }
+    public int EmployeeId { get; set; }
 
     public int UserId { get; set; }
 

@@ -67,18 +67,31 @@ public class AppDbContext : DbContext
         // ===== EMPLOYEE =====
         modelBuilder.Entity<Employee>(entity =>
         {
-            entity.HasIndex(e => e.UserId).IsUnique();
-            entity.Property(e => e.FirstName).HasMaxLength(120).IsRequired();
-            entity.Property(e => e.LastName).HasMaxLength(120).IsRequired();
-            entity.Property(e => e.Department).HasMaxLength(120);
-            entity.Property(e => e.JobTitle).HasMaxLength(160);
-            entity.Property(e => e.EmploymentType).HasMaxLength(60).IsRequired().HasDefaultValue("FullTime");
-            entity.Property(e => e.Location).HasMaxLength(160);
-            entity.Property(e => e.StartDate).HasConversion(
-                v => v,
-                v => DateTime.SpecifyKind(v, DateTimeKind.Utc));
+            // actual table name
+            entity.ToTable("employee");
 
-            entity.Property(e => e.IsActive).HasDefaultValue(true);
+            // PK in C# + DB column name
+            entity.HasKey(e => e.EmployeeId);
+
+            entity.Property(e => e.EmployeeId)
+                  .HasColumnName("employee_id");   // <-- PK column in MySQL
+
+            // FK to users.user_id (1–1 relationship)
+            entity.Property(e => e.UserId)
+                  .HasColumnName("user_id");       // <-- IMPORTANT: map to real column name
+
+            entity.HasIndex(e => e.UserId).IsUnique();
+
+            // these name/HR fields actually live elsewhere or don't exist in the
+            // original employee table, so we tell EF NOT to expect columns for them
+            entity.Ignore(e => e.FirstName);
+            entity.Ignore(e => e.LastName);
+            entity.Ignore(e => e.Department);
+            entity.Ignore(e => e.JobTitle);
+            entity.Ignore(e => e.EmploymentType);
+            entity.Ignore(e => e.Location);
+            entity.Ignore(e => e.StartDate);
+            entity.Ignore(e => e.IsActive);
 
             entity.HasOne(e => e.User)
                   .WithOne(u => u.Employee)
@@ -86,9 +99,14 @@ public class AppDbContext : DbContext
                   .OnDelete(DeleteBehavior.Cascade);
         });
 
+
+
+
         // ===== SCHEDULE =====
         modelBuilder.Entity<Schedule>(entity =>
         {
+            entity.ToTable("schedule");   // 
+
             entity.Property(e => e.ShiftDate)
                   .HasConversion(
                       v => v.ToDateTime(TimeOnly.MinValue),
@@ -118,6 +136,8 @@ public class AppDbContext : DbContext
         // ===== PAY PERIOD =====
         modelBuilder.Entity<PayPeriod>(entity =>
         {
+            entity.ToTable("payperiod");  // 
+
             entity.Property(e => e.PeriodName).HasMaxLength(120).IsRequired();
             entity.Property(e => e.Status).HasMaxLength(40).HasDefaultValue("Open");
             entity.Property(e => e.StartDate)
@@ -135,6 +155,8 @@ public class AppDbContext : DbContext
         // ===== PAYROLL RUN =====
         modelBuilder.Entity<PayrollRun>(entity =>
         {
+            entity.ToTable("payrollrun"); // 
+
             entity.Property(e => e.Status).HasMaxLength(40).HasDefaultValue("Pending");
             entity.Property(e => e.GrossPay).HasColumnType("decimal(12,2)").HasDefaultValue(0);
             entity.Property(e => e.TotalDeductions).HasColumnType("decimal(12,2)").HasDefaultValue(0);

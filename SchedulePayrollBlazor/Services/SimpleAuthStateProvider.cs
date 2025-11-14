@@ -2,6 +2,7 @@ using System.Security.Claims;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.JSInterop;
+using Microsoft.Extensions.DependencyInjection;
 using SchedulePayrollBlazor.Data;
 
 namespace SchedulePayrollBlazor.Services;
@@ -11,15 +12,15 @@ public class SimpleAuthStateProvider : AuthenticationStateProvider
     private const string StorageKey = "auth_user_id";
 
     private readonly IJSRuntime _js;
-    private readonly AppDbContext _db;
+    private readonly IServiceScopeFactory _scopeFactory;
 
     private static readonly ClaimsPrincipal Anonymous =
         new(new ClaimsIdentity());
 
-    public SimpleAuthStateProvider(IJSRuntime js, AppDbContext db)
+    public SimpleAuthStateProvider(IJSRuntime js, IServiceScopeFactory scopeFactory)
     {
         _js = js;
-        _db = db;
+        _scopeFactory = scopeFactory;
     }
 
     public override async Task<AuthenticationState> GetAuthenticationStateAsync()
@@ -29,8 +30,10 @@ public class SimpleAuthStateProvider : AuthenticationStateProvider
         if (!int.TryParse(storedId, out var userId))
             return new AuthenticationState(Anonymous);
 
-        var user = await _db.Users
-            .Include(u => u.Employee)
+        using var scope = _scopeFactory.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var user = await db.Users
             .FirstOrDefaultAsync(u => u.UserId == userId);
 
         if (user == null)
@@ -39,21 +42,18 @@ public class SimpleAuthStateProvider : AuthenticationStateProvider
             return new AuthenticationState(Anonymous);
         }
 
-        // Map numeric RoleId to a readable role name
         var roleName = user.RoleId == 5 ? "Admin" : "Employee";
+        var displayName = $"{user.FirstName} {user.LastName}".Trim();
+        if (string.IsNullOrWhiteSpace(displayName))
+            displayName = user.Email;
 
         var claims = new List<Claim>
         {
             new(ClaimTypes.NameIdentifier, user.UserId.ToString()),
             new(ClaimTypes.Email, user.Email),
-            new(ClaimTypes.Name, $"{user.FirstName} {user.LastName}"),
+            new(ClaimTypes.Name, displayName),
             new(ClaimTypes.Role, roleName)
         };
-
-        //if (user.Employee != null)
-        //{
-            //claims.Add(new Claim("EmployeeId", user.Employee.EmployeeId.ToString()));
-        //}
 
         var identity = new ClaimsIdentity(claims, "auth");
         var principal = new ClaimsPrincipal(identity);

@@ -1,8 +1,9 @@
 @page "/"
 @page "/login"
-@inject AuthService AuthService
-@inject NavigationManager Nav
+
 @using System.ComponentModel.DataAnnotations
+@inject SchedulePayrollBlazor.Services.AuthService AuthService
+@inject NavigationManager Nav
 
 <div class="auth-container">
     <div class="auth-card">
@@ -43,6 +44,9 @@
             </button>
         </EditForm>
 
+        <div class="auth-footer">
+            <p>Only administrators can create employee accounts through the Admin panel.</p>
+        </div>
     </div>
 </div>
 
@@ -56,21 +60,34 @@
         errorMessage = string.Empty;
         isLoading = true;
 
-        var (success, message, role) = await AuthService.LoginAsync(model.Email, model.Password);
-
-        isLoading = false;
-
-        if (!success)
+        try
         {
-            errorMessage = message;
-            return;
+            // IMPORTANT: await and use the injected AuthService instance
+            var (success, message, role) = await AuthService.LoginAsync(model.Email, model.Password);
+
+            if (!success)
+            {
+                errorMessage = string.IsNullOrWhiteSpace(message)
+                    ? "Login failed. Please check your credentials."
+                    : message;
+                return;
+            }
+
+            var destination = string.Equals(role, "Admin", StringComparison.OrdinalIgnoreCase)
+                ? "/admindashboard"
+                : "/userdashboard";
+
+            Nav.NavigateTo(destination, forceLoad: true);
         }
-
-        var destination = string.Equals(role, "Admin", StringComparison.OrdinalIgnoreCase)
-            ? "/admindashboard"
-            : "/userdashboard";
-
-        Nav.NavigateTo(destination, forceLoad: true);
+        catch (Exception ex)
+        {
+            // Show what actually went wrong instead of the generic grey bar
+            errorMessage = $"Unexpected error during login: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
     }
 
     private sealed class LoginModel

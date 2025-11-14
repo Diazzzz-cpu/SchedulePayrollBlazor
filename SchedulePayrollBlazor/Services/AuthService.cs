@@ -21,29 +21,34 @@ public class AuthService
     // return Role as a string so Login.razor can use it directly
     public async Task<(bool Success, string ErrorMessage, string Role)> LoginAsync(string email, string password)
     {
-        email = email.Trim().ToLowerInvariant();
-
-        var user = await _dbContext.Users
-            .Include(u => u.Employee)
-            .FirstOrDefaultAsync(u => u.Email == email);
-
-        if (user is null)
+        try
         {
-            return (false, "Invalid email or password.", string.Empty);
-        }
+            email = email.Trim().ToLowerInvariant();
 
-        if (!PasswordHasher.VerifyPassword(password, user.PasswordHash))
+            var user = await _dbContext.Users
+                .Include(u => u.Employee)
+                .FirstOrDefaultAsync(u => u.Email == email);
+
+            if (user == null)
+                return (false, "Invalid email or password.", string.Empty);
+
+            if (!PasswordHasher.VerifyPassword(password, user.PasswordHash))
+                return (false, "Invalid email or password.", string.Empty);
+
+            // Map numeric RoleId to a readable role name
+            var roleName = user.RoleId == 5 ? "Admin" : "Employee";
+
+            await _authStateProvider.SignInAsync(user.UserId);
+
+            return (true, string.Empty, roleName);
+        }
+        catch (Exception ex)
         {
-            return (false, "Invalid email or password.", string.Empty);
+            // You can also log ex here if you want
+            return (false, $"Login service error: {ex.Message}", string.Empty);
         }
-
-        await _authStateProvider.SignInAsync(user.UserId);
-
-        // map numeric RoleId to a label for the UI
-        string roleName = user.RoleId == AdminRoleId ? "Admin" : "Employee";
-
-        return (true, string.Empty, roleName);
     }
+
 
     public Task LogoutAsync()
     {

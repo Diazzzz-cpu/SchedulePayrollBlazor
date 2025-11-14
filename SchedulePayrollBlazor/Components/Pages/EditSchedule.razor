@@ -23,7 +23,8 @@ else
             <select class="form-select" value="@vm.EmployeeId" @onchange="OnEmpChanged">
                 @foreach (var e in employees)
                 {
-                    <option value="@e.Id">@e.FullName (@e.User.Email)</option>
+                    <!-- BEFORE: value="@e.Id" -->
+                    <option value="@e.EmployeeId">@e.FullName (@e.User.Email)</option>
                 }
             </select>
         </div>
@@ -31,25 +32,26 @@ else
         <div class="mb-2">
             <label class="form-label">Date</label>
             <input type="date" class="form-control" value="@vm.ShiftDateText"
-                   @onchange="e => vm.ShiftDateText = e?.Value?.ToString() ?? vm.ShiftDateText" />
+                   @onchange="OnDateChanged" />
+
         </div>
 
         <div class="mb-2">
             <label class="form-label">Start</label>
             <input type="time" class="form-control" value="@vm.StartTimeText" step="60"
-                   @onchange="e => vm.StartTimeText = e?.Value?.ToString() ?? vm.StartTimeText" />
+                   @onchange="OnStartChanged" />
         </div>
 
         <div class="mb-3">
             <label class="form-label">End</label>
             <input type="time" class="form-control" value="@vm.EndTimeText" step="60"
-                   @onchange="e => vm.EndTimeText = e?.Value?.ToString() ?? vm.EndTimeText" />
+                   @onchange="OnEndChanged" />
         </div>
 
         <div class="mb-3">
             <label class="form-label">Source</label>
             <select class="form-select" value="@vm.Source"
-                    @onchange="e => vm.Source = e?.Value?.ToString() ?? vm.Source">
+                    @onchange="OnSourceChanged">
                 <option>Manual</option>
                 <option>Auto</option>
             </select>
@@ -70,12 +72,37 @@ else
     private List<Employee> employees = new();
     private ScheduleVm? vm;
 
+    private Task OnDateChanged(ChangeEventArgs e)
+    {
+        vm!.ShiftDateText = e?.Value?.ToString() ?? vm.ShiftDateText;
+        return Task.CompletedTask;
+    }
+
+    private Task OnStartChanged(ChangeEventArgs e)
+    {
+        vm!.StartTimeText = e?.Value?.ToString() ?? vm.StartTimeText;
+        return Task.CompletedTask;
+    }
+
+    private Task OnEndChanged(ChangeEventArgs e)
+    {
+        vm!.EndTimeText = e?.Value?.ToString() ?? vm.EndTimeText;
+        return Task.CompletedTask;
+    }
+
+    private Task OnSourceChanged(ChangeEventArgs e)
+    {
+        vm!.Source = e?.Value?.ToString() ?? vm.Source;
+        return Task.CompletedTask;
+    }
+
+
     protected override async Task OnInitializedAsync()
     {
         employees = await Db.Employees
             .Include(e => e.User)
-            .OrderBy(e => e.LastName)
-            .ThenBy(e => e.FirstName)
+            .OrderBy(e => e.User.LastName)
+            .ThenBy(e => e.User.FirstName)
             .ToListAsync();
 
         var schedule = await Db.Schedules.FirstOrDefaultAsync(x => x.Id == id);

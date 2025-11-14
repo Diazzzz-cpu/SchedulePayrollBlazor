@@ -18,7 +18,7 @@ else
             <select class="form-select" @onchange="OnPeriodChanged" value="@selectedPeriodId">
                 @foreach (var period in payPeriods)
                 {
-                    <option value="@period.Id">@period.PeriodName (@period.StartDate:MMM dd → @period.EndDate:MMM dd)</option>
+                    <option value="@period.PayPeriodId">@period.PeriodName (@period.StartDate:MMM dd → @period.EndDate:MMM dd)</option>
                 }
             </select>
         </div>
@@ -72,7 +72,7 @@ else
             .OrderByDescending(p => p.StartDate)
             .ToListAsync();
 
-        selectedPeriodId = payPeriods.FirstOrDefault()?.Id ?? 0;
+        selectedPeriodId = payPeriods.FirstOrDefault()?.PayPeriodId ?? 0;
         await LoadRunsAsync();
     }
 

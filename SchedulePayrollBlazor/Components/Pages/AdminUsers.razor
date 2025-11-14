@@ -448,7 +448,7 @@
                 Email = summary.Email,
                 FirstName = summary.FirstName,
                 LastName = summary.LastName,
-                Role = summary.RoleId == 5 ? "Admin" : "Employee",
+                Role = string.IsNullOrWhiteSpace(summary.RoleName) ? "Employee" : summary.RoleName,
                 Department = summary.Department ?? string.Empty,
                 JobTitle = summary.JobTitle ?? string.Empty,
                 EmploymentType = string.IsNullOrWhiteSpace(summary.EmploymentType) ? "FullTime" : summary.EmploymentType!,
@@ -478,7 +478,18 @@
         }
 
         private static string FormatRole(AdminUserSummary user)
-            => user.RoleId == 5 ? "Admin" : "Employee";
+        {
+            if (!string.IsNullOrWhiteSpace(user.RoleName))
+            {
+                return user.RoleName;
+            }
+
+            return user.RoleId switch
+            {
+                0 => "Employee",
+                _ => $"Role #{user.RoleId}"
+            };
+        }
 
         private static bool ValidatePassword(string? password)
         {

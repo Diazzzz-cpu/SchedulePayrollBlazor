@@ -2,6 +2,7 @@
 @attribute [Authorize(Roles = "Admin")]
 @inject AppDbContext Db
 @using Microsoft.EntityFrameworkCore
+@using SchedulePayrollBlazor.Data.Models
 
 <h3>Employees</h3>
 
@@ -36,14 +37,20 @@ else
                     <td>@employee.Department</td>
                     <td>@employee.JobTitle</td>
                     <td>@employee.EmploymentType</td>
-                    <td>@employee.StartDate.ToString("MMM dd, yyyy")</td>
                     <td>
-                        <span class="badge @(employee.IsActive ? "badge-success" : "badge-danger")">
-                            @(employee.IsActive ? "Active" : "Inactive")
-                        </span>
-                    </td>
-                </tr>
-            }
+                        @(
+                                        employee.StartDate.HasValue
+                                        ? employee.StartDate.Value.ToString("MMM dd, yyyy")
+                                        : "-"
+                                        )
+                </td>
+                <td>
+                    <span class="badge @(employee.IsActive ? "badge-success" : "badge-danger")">
+                        @(employee.IsActive ? "Active" : "Inactive")
+                    </span>
+                </td>
+            </tr>
+                }
         </tbody>
     </table>
 }
@@ -54,7 +61,6 @@ else
     protected override async Task OnInitializedAsync()
         => employees = await Db.Employees
             .Include(e => e.User)
-            .OrderBy(e => e.LastName)
-            .ThenBy(e => e.FirstName)
+            .OrderBy(e => e.FullName)
             .ToListAsync();
 }

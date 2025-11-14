@@ -23,7 +23,6 @@ else
             <select class="form-select" value="@vm.EmployeeId" @onchange="OnEmpChanged">
                 @foreach (var e in employees)
                 {
-                    <!-- BEFORE: value="@e.Id" -->
                     <option value="@e.EmployeeId">@e.FullName (@e.User.Email)</option>
                 }
             </select>
@@ -33,7 +32,6 @@ else
             <label class="form-label">Date</label>
             <input type="date" class="form-control" value="@vm.ShiftDateText"
                    @onchange="OnDateChanged" />
-
         </div>
 
         <div class="mb-2">
@@ -96,7 +94,6 @@ else
         return Task.CompletedTask;
     }
 
-
     protected override async Task OnInitializedAsync()
     {
         employees = await Db.Employees
@@ -117,8 +114,8 @@ else
             ScheduleId = schedule.ScheduleId,
             EmployeeId = schedule.EmployeeId,
             ShiftDateText = schedule.ShiftDate.ToString("yyyy-MM-dd"),
-            StartTimeText = schedule.StartTime.ToString("HH\\:mm"),
-            EndTimeText = schedule.EndTime.ToString("HH\\:mm"),
+            StartTimeText = schedule.StartTime.ToString("hh\\:mm"),
+            EndTimeText = schedule.EndTime.ToString("hh\\:mm"),
             Source = schedule.Source ?? "Manual"
         };
     }
@@ -136,9 +133,10 @@ else
     {
         vm!.FormError = null;
 
-        var date = DateOnly.ParseExact(vm.ShiftDateText, "yyyy-MM-dd", CultureInfo.InvariantCulture);
-        var start = TimeOnly.ParseExact(vm.StartTimeText, "HH\\:mm", CultureInfo.InvariantCulture);
-        var end = TimeOnly.ParseExact(vm.EndTimeText, "HH\\:mm", CultureInfo.InvariantCulture);
+        // PARSE AS DateTime + TimeSpan TO MATCH Schedule MODEL
+        var date = DateTime.ParseExact(vm.ShiftDateText, "yyyy-MM-dd", CultureInfo.InvariantCulture);
+        var start = TimeSpan.ParseExact(vm.StartTimeText, "hh\\:mm", CultureInfo.InvariantCulture);
+        var end = TimeSpan.ParseExact(vm.EndTimeText, "hh\\:mm", CultureInfo.InvariantCulture);
 
         if (end <= start)
         {
@@ -146,10 +144,14 @@ else
             return;
         }
 
+        // Compare DateTime to DateTime, TimeSpan to TimeSpan
         var overlap = await Db.Schedules
-            .AnyAsync(s => s.EmployeeId == vm.EmployeeId && s.ShiftDate == date &&
-                           s.ScheduleId != vm.ScheduleId &&
-                           !(end <= s.StartTime || start >= s.EndTime));
+            .AnyAsync(s =>
+                s.EmployeeId == vm.EmployeeId
+                && s.ShiftDate.Date == date.Date
+                && s.ScheduleId != vm.ScheduleId
+                && !(end <= s.StartTime || start >= s.EndTime));
+
         if (overlap)
         {
             vm.FormError = "Shift overlaps with an existing schedule.";

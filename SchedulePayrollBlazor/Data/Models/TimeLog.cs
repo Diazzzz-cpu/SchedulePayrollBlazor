@@ -1,31 +1,26 @@
-using System;
+﻿using System;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
 namespace SchedulePayrollBlazor.Data.Models;
 
-[Table("schedules")]
-public class Schedule
+[Table("time_logs")]
+public class TimeLog
 {
     [Key]
-    [Column("schedule_id")]
-    public int ScheduleId { get; set; }
+    [Column("time_log_id")]
+    public int TimeLogId { get; set; }
 
     [Required]
     [Column("employee_id")]
     public int EmployeeId { get; set; }
 
     [Required]
-    [Column("shift_date")]
-    public DateTime ShiftDate { get; set; }
+    [Column("clock_in")]
+    public DateTime ClockIn { get; set; }
 
-    [Required]
-    [Column("start_time")]
-    public TimeSpan StartTime { get; set; }
-
-    [Required]
-    [Column("end_time")]
-    public TimeSpan EndTime { get; set; }
+    [Column("clock_out")]
+    public DateTime? ClockOut { get; set; }
 
     [Column("source")]
     public string? Source { get; set; }

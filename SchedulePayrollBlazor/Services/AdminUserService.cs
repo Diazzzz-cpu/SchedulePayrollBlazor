@@ -31,9 +31,15 @@ public class AdminUserService
                 Email = u.Email,
                 FirstName = u.FirstName,
                 LastName = u.LastName,
+
+                // match User model: RoleId (not RoleID)
                 RoleId = u.RoleId,
-                RoleName = u.Role != null ? u.Role.RoleName : string.Empty,
+
+                // match Role model: Name (not RoleName)
+                RoleName = u.Role != null ? u.Role.Name : string.Empty,
+
                 CreatedAt = u.CreatedAt,
+
                 Department = u.Employee != null ? u.Employee.Department : null,
                 JobTitle = u.Employee != null ? u.Employee.JobTitle : null,
                 EmploymentType = u.Employee != null ? u.Employee.EmploymentType : null,
@@ -87,8 +93,10 @@ public class AdminUserService
                 var employee = new Employee
                 {
                     UserId = user.UserId,
-                    FirstName = user.FirstName,
-                    LastName = user.LastName,
+
+                    // store full name in Employee
+                    FullName = $"{user.FirstName} {user.LastName}".Trim(),
+
                     Department = model.Department?.Trim() ?? string.Empty,
                     JobTitle = model.JobTitle?.Trim() ?? string.Empty,
                     EmploymentType = string.IsNullOrWhiteSpace(model.EmploymentType)
@@ -162,8 +170,7 @@ public class AdminUserService
                 user.Employee = new Employee
                 {
                     UserId = user.UserId,
-                    FirstName = user.FirstName,
-                    LastName = user.LastName,
+                    FullName = $"{user.FirstName} {user.LastName}".Trim(),
                     Department = model.Department?.Trim() ?? string.Empty,
                     JobTitle = model.JobTitle?.Trim() ?? string.Empty,
                     EmploymentType = string.IsNullOrWhiteSpace(model.EmploymentType)
@@ -176,8 +183,7 @@ public class AdminUserService
             }
             else
             {
-                user.Employee.FirstName = user.FirstName;
-                user.Employee.LastName = user.LastName;
+                user.Employee.FullName = $"{user.FirstName} {user.LastName}".Trim();
                 user.Employee.Department = model.Department?.Trim() ?? string.Empty;
                 user.Employee.JobTitle = model.JobTitle?.Trim() ?? string.Empty;
                 user.Employee.EmploymentType = string.IsNullOrWhiteSpace(model.EmploymentType)
@@ -222,8 +228,8 @@ public class AdminUserService
         return model.IsEmployeeRole
                || !string.IsNullOrWhiteSpace(model.Department)
                || !string.IsNullOrWhiteSpace(model.JobTitle)
-                || model.StartDate.HasValue
-                || !string.IsNullOrWhiteSpace(model.Location);
+               || model.StartDate.HasValue
+               || !string.IsNullOrWhiteSpace(model.Location);
     }
 
     private static string GenerateTemporaryPassword()
@@ -240,7 +246,7 @@ public class AdminUserService
         var lower = normalized.ToLowerInvariant();
 
         var role = await _dbContext.Roles
-            .FirstOrDefaultAsync(r => r.RoleName == normalized || r.RoleName.ToLower() == lower);
+            .FirstOrDefaultAsync(r => r.Name == normalized || r.Name.ToLower() == lower);
 
         if (role is not null)
         {
@@ -249,7 +255,8 @@ public class AdminUserService
 
         role = new Role
         {
-            RoleName = normalized
+            Code = normalized.ToUpperInvariant(),
+            Name = normalized
         };
 
         _dbContext.Roles.Add(role);

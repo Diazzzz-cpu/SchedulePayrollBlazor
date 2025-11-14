@@ -91,8 +91,8 @@
                         {
                             <tr>
                                 <td>@shift.ShiftDate.ToString("MMM dd, yyyy")</td>
-                                <td>@shift.StartTime.ToString("hh\\:mm tt")</td>
-                                <td>@shift.EndTime.ToString("hh\\:mm tt")</td>
+                                <td>@( (DateTime.Today + shift.StartTime).ToString("hh\\:mm") )</td>
+                                <td>@( (DateTime.Today + shift.EndTime).ToString("hh\\:mm") )</td>
                                 <td>@((shift.EndTime - shift.StartTime).TotalHours.ToString("F1")) hours</td>
                             </tr>
                         }
@@ -143,15 +143,23 @@
             return;
         }
 
-        var today = DateOnly.FromDateTime(DateTime.Today);
-        todaySchedules = await Db.Schedules.CountAsync(s => s.EmployeeId == employeeId && s.ShiftDate == today);
+        // Use DateTime consistently
+        var today = DateTime.Today.Date;
+
+        todaySchedules = await Db.Schedules
+            .CountAsync(s => s.EmployeeId == employeeId && s.ShiftDate.Date == today);
 
         var tomorrow = today.AddDays(1);
         var nextWeek = today.AddDays(7);
-        upcomingSchedules = await Db.Schedules.CountAsync(s => s.EmployeeId == employeeId && s.ShiftDate >= tomorrow && s.ShiftDate <= nextWeek);
+
+        upcomingSchedules = await Db.Schedules
+            .CountAsync(s =>
+                s.EmployeeId == employeeId &&
+                s.ShiftDate.Date >= tomorrow &&
+                s.ShiftDate.Date <= nextWeek);
 
         upcomingShifts = await Db.Schedules
-            .Where(s => s.EmployeeId == employeeId && s.ShiftDate >= today)
+            .Where(s => s.EmployeeId == employeeId && s.ShiftDate.Date >= today)
             .OrderBy(s => s.ShiftDate)
             .ThenBy(s => s.StartTime)
             .Take(5)
@@ -164,11 +172,15 @@
 
         lastPayAmount = lastPayroll?.NetPay ?? 0;
 
+        // Start/end of current week (Sunday-based)
         var startOfWeek = today.AddDays(-(int)DateTime.Today.DayOfWeek);
         var endOfWeek = startOfWeek.AddDays(7);
 
         var weekSchedules = await Db.Schedules
-            .Where(s => s.EmployeeId == employeeId && s.ShiftDate >= startOfWeek && s.ShiftDate < endOfWeek)
+            .Where(s =>
+                s.EmployeeId == employeeId &&
+                s.ShiftDate.Date >= startOfWeek &&
+                s.ShiftDate.Date < endOfWeek)
             .ToListAsync();
 
         totalHoursThisWeek = weekSchedules.Sum(s => (s.EndTime - s.StartTime).TotalHours);

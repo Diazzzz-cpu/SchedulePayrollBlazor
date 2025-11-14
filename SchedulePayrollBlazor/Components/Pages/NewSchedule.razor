@@ -33,7 +33,6 @@ else
             <select class="form-select" value="@vm.EmployeeId" @onchange="OnEmpChanged">
                 @foreach (var e in employees)
                 {
-                    <!-- BEFORE: value="@e.Id" -->
                     <option value="@e.EmployeeId">@e.FullName (@e.User.Email)</option>
                 }
             </select>
@@ -123,9 +122,10 @@ else
     {
         vm.FormError = null;
 
-        var date = DateOnly.ParseExact(vm.ShiftDateText, "yyyy-MM-dd", CultureInfo.InvariantCulture);
-        var start = TimeOnly.ParseExact(vm.StartTimeText, "HH\\:mm", CultureInfo.InvariantCulture);
-        var end = TimeOnly.ParseExact(vm.EndTimeText, "HH\\:mm", CultureInfo.InvariantCulture);
+        // Convert to DateTime + TimeSpan (your model's correct types)
+        var date = DateTime.ParseExact(vm.ShiftDateText, "yyyy-MM-dd", CultureInfo.InvariantCulture);
+        var start = TimeSpan.ParseExact(vm.StartTimeText, "hh\\:mm", CultureInfo.InvariantCulture);
+        var end = TimeSpan.ParseExact(vm.EndTimeText, "hh\\:mm", CultureInfo.InvariantCulture);
 
         if (end <= start)
         {
@@ -134,8 +134,11 @@ else
         }
 
         var overlap = await Db.Schedules
-            .AnyAsync(s => s.EmployeeId == vm.EmployeeId && s.ShiftDate == date &&
-                           !(end <= s.StartTime || start >= s.EndTime));
+            .AnyAsync(s =>
+                s.EmployeeId == vm.EmployeeId &&
+                s.ShiftDate.Date == date.Date &&
+                !(end <= s.StartTime || start >= s.EndTime));
+
         if (overlap)
         {
             vm.FormError = "Shift overlaps with an existing schedule.";

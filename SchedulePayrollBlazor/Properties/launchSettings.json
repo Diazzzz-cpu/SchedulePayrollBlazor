@@ -10,9 +10,6 @@
         "ASPNETCORE_ENVIRONMENT": "Development"
       }
     },
-    "ConnectionStrings": {
-      "Default": "Server=localhost;Database=schedulepayroll_demo;User=root;Password=yourpassword;SslMode=None;"
-    },
     "https": {
       "commandName": "Project",
       "dotnetRunMessages": true,
@@ -23,4 +20,4 @@
       }
     }
   }
-  }
+}

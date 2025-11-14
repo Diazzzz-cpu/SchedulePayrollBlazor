@@ -47,9 +47,9 @@
                     <div class="schedule-details">
                         <h4>@schedule.ShiftDate.ToString("dddd, MMMM dd, yyyy")</h4>
                         <div class="schedule-time">
-                            <span class="time-badge">🕐 @schedule.StartTime.ToString("hh\\:mm tt")</span>
+                            <span class="time-badge">🕐 @(DateTime.Today.Add(schedule.StartTime).ToString("hh\\:mm tt"))</span>
                             <span class="time-separator">→</span>
-                            <span class="time-badge">🕐 @schedule.EndTime.ToString("hh\\:mm tt")</span>
+                            <span class="time-badge">🕐 @(DateTime.Today.Add(schedule.EndTime).ToString("hh\\:mm tt"))</span>
                         </div>
                         <div class="schedule-duration">
                             Duration: @((schedule.EndTime - schedule.StartTime).TotalHours.ToString("F1")) hours
@@ -103,25 +103,33 @@
 
     private async Task LoadSchedules()
     {
-        if (!DateOnly.TryParseExact(dateString, "yyyy-MM-dd", CultureInfo.InvariantCulture,
-                                    DateTimeStyles.None, out var date))
+        // Try to parse the date as DateTime
+        if (!DateTime.TryParseExact(dateString, "yyyy-MM-dd",
+                CultureInfo.InvariantCulture, DateTimeStyles.None, out var date))
         {
             schedules = new();
             return;
         }
 
+        var selectedDate = date.Date;
+
+        // Get schedules for the chosen day
         schedules = await Db.Schedules
-            .Where(s => s.EmployeeId == employeeId && s.ShiftDate == date)
+            .Where(s => s.EmployeeId == employeeId && s.ShiftDate.Date == selectedDate)
             .OrderBy(s => s.StartTime)
             .ToListAsync();
 
+        // If no schedules for the day, show the entire week
         if (!schedules.Any())
         {
-            var startOfWeek = date.AddDays(-(int)date.DayOfWeek);
+            var startOfWeek = selectedDate.AddDays(-(int)selectedDate.DayOfWeek);
             var endOfWeek = startOfWeek.AddDays(7);
 
             schedules = await Db.Schedules
-                .Where(s => s.EmployeeId == employeeId && s.ShiftDate >= startOfWeek && s.ShiftDate < endOfWeek)
+                .Where(s =>
+                    s.EmployeeId == employeeId &&
+                    s.ShiftDate.Date >= startOfWeek &&
+                    s.ShiftDate.Date < endOfWeek)
                 .OrderBy(s => s.ShiftDate)
                 .ThenBy(s => s.StartTime)
                 .ToListAsync();

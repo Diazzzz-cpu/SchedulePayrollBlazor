@@ -26,6 +26,7 @@ public class SimpleAuthStateProvider : AuthenticationStateProvider
 
     public override async Task<AuthenticationState> GetAuthenticationStateAsync()
     {
+        // Read userId from browser localStorage
         var storedId = await _jsRuntime.InvokeAsync<string?>("localStorage.getItem", StorageKey);
         if (!int.TryParse(storedId, out var userId))
         {
@@ -44,9 +45,17 @@ public class SimpleAuthStateProvider : AuthenticationStateProvider
             return new AuthenticationState(AnonymousPrincipal);
         }
 
-        var roleName = NormalizeRoleName(user.Role?.RoleName);
+        // Role model now uses Name instead of RoleName
+        var roleName = NormalizeRoleName(user.Role?.Name);
 
-        var displayName = user.FullName;
+        // Build display name:
+        // 1) Employee.FullName if present
+        // 2) User.FirstName + User.LastName
+        // 3) Fallback to email
+        string displayName =
+            user.Employee?.FullName ??
+            $"{user.FirstName} {user.LastName}".Trim();
+
         if (string.IsNullOrWhiteSpace(displayName))
         {
             displayName = user.Email;
@@ -82,6 +91,7 @@ public class SimpleAuthStateProvider : AuthenticationStateProvider
         await _jsRuntime.InvokeVoidAsync("localStorage.removeItem", StorageKey);
         NotifyAuthenticationStateChanged(Task.FromResult(new AuthenticationState(AnonymousPrincipal)));
     }
+
     private static string NormalizeRoleName(string? roleName)
     {
         if (string.IsNullOrWhiteSpace(roleName))

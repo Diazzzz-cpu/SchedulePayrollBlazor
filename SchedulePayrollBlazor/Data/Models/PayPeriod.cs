@@ -5,24 +5,28 @@ using System.ComponentModel.DataAnnotations.Schema;
 
 namespace SchedulePayrollBlazor.Data.Models;
 
-[Table("payperiod")]
+[Table("pay_periods")]
 public class PayPeriod
 {
     [Key]
-    [Column("payperiod_id")]
+    [Column("pay_period_id")]
     public int PayPeriodId { get; set; }
 
+    [Required]
     [Column("period_name")]
     public string PeriodName { get; set; } = string.Empty;
 
+    [Required]
     [Column("start_date")]
-    public DateOnly StartDate { get; set; }
+    public DateTime StartDate { get; set; }
 
+    [Required]
     [Column("end_date")]
-    public DateOnly EndDate { get; set; }
+    public DateTime EndDate { get; set; }
 
+    [Required]
     [Column("status")]
-    public string Status { get; set; } = "Open";
+    public string Status { get; set; } = string.Empty;
 
     public ICollection<PayrollRun> PayrollRuns { get; set; } = new List<PayrollRun>();
 }

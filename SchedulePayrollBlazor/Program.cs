@@ -6,7 +6,12 @@ using SchedulePayrollBlazor.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// OPTIONAL but helps avoid the “Some services are not able to be constructed”
+// Ensure appsettings.json + environment-specific settings are loaded
+builder.Configuration
+    .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
+    .AddJsonFile($"appsettings.{builder.Environment.EnvironmentName}.json", optional: true);
+
+// OPTIONAL but helps avoid “Some services are not able to be constructed”
 // AggregateException at builder.Build(), by turning off eager validation.
 builder.Host.UseDefaultServiceProvider(options =>
 {
@@ -21,11 +26,11 @@ builder.Services.AddServerSideBlazor();
 // 2. Connection string + DbContext setup
 var connectionString = builder.Configuration.GetConnectionString("Default")
     ?? throw new InvalidOperationException(
-        "Missing MySQL connection string 'Default' in appsettings(.Development).json.");
+        "Missing MySQL connection string 'Default' in appsettings.json (ConnectionStrings section).");
 
 void ConfigureDbOptions(DbContextOptionsBuilder options)
 {
-    // This is safe – it just auto-detects based on your MySQL server.
+    // Auto-detect server version based on your MySQL instance.
     options.UseMySql(connectionString, ServerVersion.AutoDetect(connectionString));
 }
 
@@ -65,11 +70,14 @@ app.UseRouting();
 app.MapBlazorHub();
 app.MapFallbackToPage("/_Host");
 
-// Seed / ensure admin user
+// --------------------------------
+// Seed database (ensure admin, etc.)
+// --------------------------------
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     await DatabaseSeeder.EnsureSeedDataAsync(db);
 }
 
+// Run the app
 await app.RunAsync();

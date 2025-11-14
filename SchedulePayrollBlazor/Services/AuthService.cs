@@ -43,7 +43,8 @@ public class AuthService
 
             await _authStateProvider.SignInAsync(user.UserId);
 
-            var roleName = NormalizeRoleName(user.Role?.RoleName);
+            var roleName = NormalizeRoleName(user.Role?.Name);
+
 
             return (true, string.Empty, roleName);
         }

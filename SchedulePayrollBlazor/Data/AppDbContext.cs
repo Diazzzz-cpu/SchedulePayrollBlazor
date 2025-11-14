@@ -10,112 +10,64 @@ public class AppDbContext : DbContext
     {
     }
 
-    // ===== DB SETS =====
     public DbSet<Role> Roles => Set<Role>();
     public DbSet<User> Users => Set<User>();
     public DbSet<Employee> Employees => Set<Employee>();
-    public DbSet<Schedule> Schedules => Set<Schedule>();
+    public DbSet<EmployeeProfile> EmployeeProfiles => Set<EmployeeProfile>();
+    public DbSet<PayComponent> PayComponents => Set<PayComponent>();
+    public DbSet<EmployeeComponent> EmployeeComponents => Set<EmployeeComponent>();
     public DbSet<PayPeriod> PayPeriods => Set<PayPeriod>();
     public DbSet<PayrollRun> PayrollRuns => Set<PayrollRun>();
+    public DbSet<PayrollLine> PayrollLines => Set<PayrollLine>();
+    public DbSet<Schedule> Schedules => Set<Schedule>();
+    public DbSet<TimeLog> TimeLogs => Set<TimeLog>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
 
-        // ===== ROLE TABLE (role) =====
+        // ROLES
         modelBuilder.Entity<Role>(entity =>
         {
-            entity.ToTable("role");
-
+            entity.ToTable("roles");
             entity.HasKey(r => r.RoleId);
 
-            entity.Property(r => r.RoleId)
-                  .HasColumnName("role_id");
-
-            entity.Property(r => r.RoleName)
-                  .HasColumnName("role_name")
-                  .HasMaxLength(100)
-                  .IsRequired();
+            entity.Property(r => r.RoleId).HasColumnName("role_id");
+            entity.Property(r => r.Code).HasColumnName("code").HasMaxLength(50).IsRequired();
+            entity.Property(r => r.Name).HasColumnName("name").HasMaxLength(100).IsRequired();
         });
 
-        // ===== USERS TABLE (users) =====
+        // USERS
         modelBuilder.Entity<User>(entity =>
         {
             entity.ToTable("users");
+            entity.HasKey(u => u.UserId);
 
-            entity.HasKey(e => e.UserId);
+            entity.Property(u => u.UserId).HasColumnName("user_id");
+            entity.Property(u => u.Email).HasColumnName("email").HasMaxLength(255).IsRequired();
+            entity.Property(u => u.PasswordHash).HasColumnName("password_hash").IsRequired();
+            entity.Property(u => u.FirstName).HasColumnName("first_name").HasMaxLength(100).IsRequired();
+            entity.Property(u => u.LastName).HasColumnName("last_name").HasMaxLength(100).IsRequired();
+            entity.Property(u => u.RoleId).HasColumnName("role_id").IsRequired();
+            entity.Property(u => u.CreatedAt)
+      .HasColumnName("created_at");
 
-            entity.Property(e => e.UserId)
-                  .HasColumnName("user_id");
+            entity.HasIndex(u => u.Email).IsUnique();
 
-            entity.Property(e => e.Email)
-                  .HasColumnName("email")
-                  .HasMaxLength(255)
-                  .IsRequired();
-
-            entity.HasIndex(e => e.Email)
-                  .IsUnique();
-
-            entity.Property(e => e.PasswordHash)
-                  .HasColumnName("password_hash")
-                  .IsRequired();
-
-            entity.Property(e => e.FirstName)
-                  .HasColumnName("first_name")
-                  .HasMaxLength(100)
-                  .IsRequired();
-
-            entity.Property(e => e.LastName)
-                  .HasColumnName("last_name")
-                  .HasMaxLength(100)
-                  .IsRequired();
-
-            entity.Property(e => e.RoleId)
-                  .HasColumnName("role_id")
-                  .IsRequired();
-
-            entity.Property(e => e.CreatedAt)
-                  .HasColumnName("created_at")
-                  .HasDefaultValueSql("CURRENT_TIMESTAMP");
-
-            // Configure FK to role using the explicit navigation property so EF
-            // does not create a duplicate shadow FK (RoleId1).
-            entity.HasOne(e => e.Role)
-                  .WithMany()
-                  .HasForeignKey(e => e.RoleId)
+            entity.HasOne(u => u.Role)
+                  .WithMany(r => r.Users)
+                  .HasForeignKey(u => u.RoleId)
                   .OnDelete(DeleteBehavior.Restrict);
         });
 
-        // ===== EMPLOYEE TABLE (employee) =====
+        // EMPLOYEES
         modelBuilder.Entity<Employee>(entity =>
         {
-            entity.ToTable("employee");
-
+            entity.ToTable("employees");
             entity.HasKey(e => e.EmployeeId);
 
-            entity.Property(e => e.EmployeeId)
-                  .HasColumnName("employee_id");
-
-            entity.Property(e => e.UserId)
-                  .HasColumnName("user_id");
-
-            entity.HasIndex(e => e.UserId).IsUnique();
-
-            entity.Property(e => e.FirstName).HasMaxLength(120).IsRequired();
-            entity.Property(e => e.LastName).HasMaxLength(120).IsRequired();
-            entity.Property(e => e.Department).HasMaxLength(120);
-            entity.Property(e => e.JobTitle).HasMaxLength(160);
-            entity.Property(e => e.EmploymentType)
-                  .HasMaxLength(60)
-                  .IsRequired()
-                  .HasDefaultValue("FullTime");
-            entity.Property(e => e.Location).HasMaxLength(160);
-            entity.Property(e => e.StartDate)
-                  .HasConversion(
-                      v => v,
-                      v => DateTime.SpecifyKind(v, DateTimeKind.Utc));
-
-            entity.Property(e => e.IsActive).HasDefaultValue(true);
+            entity.Property(e => e.EmployeeId).HasColumnName("employee_id");
+            entity.Property(e => e.UserId).HasColumnName("user_id").IsRequired();
 
             entity.HasOne(e => e.User)
                   .WithOne(u => u.Employee)
@@ -123,107 +75,158 @@ public class AppDbContext : DbContext
                   .OnDelete(DeleteBehavior.Cascade);
         });
 
-        // ===== SCHEDULE TABLE (schedule) =====
-        modelBuilder.Entity<Schedule>(entity =>
+        // EMPLOYEE PROFILE
+        modelBuilder.Entity<EmployeeProfile>(entity =>
         {
-            entity.ToTable("schedule");
+            entity.ToTable("employee_profiles");
+            entity.HasKey(p => p.EmployeeId);
 
-            // use your real PK property here
-            entity.HasKey(s => s.ScheduleId);
+            entity.Property(p => p.EmployeeId).HasColumnName("employee_id");
+            entity.Property(p => p.UserId).HasColumnName("user_id");
+            entity.Property(p => p.Phone).HasColumnName("phone").HasMaxLength(50);
+            entity.Property(p => p.BirthDate).HasColumnName("birthdate");
+            entity.Property(p => p.Address).HasColumnName("address").HasMaxLength(255);
+            entity.Property(p => p.HireDate).HasColumnName("hire_date");
+            entity.Property(p => p.Status).HasColumnName("status").HasMaxLength(50);
 
-            entity.Property(s => s.ScheduleId)
-                  .HasColumnName("schedule_id");
-
-            entity.Property(e => e.ShiftDate)
-                  .HasConversion(
-                      v => v.ToDateTime(TimeOnly.MinValue),
-                      v => DateOnly.FromDateTime(v))
-                  .HasColumnType("date");
-
-            entity.Property(e => e.StartTime)
-                  .HasConversion(
-                      v => v.ToTimeSpan(),
-                      v => TimeOnly.FromTimeSpan(v))
-                  .HasColumnType("time(6)");
-
-            entity.Property(e => e.EndTime)
-                  .HasConversion(
-                      v => v.ToTimeSpan(),
-                      v => TimeOnly.FromTimeSpan(v))
-                  .HasColumnType("time(6)");
-
-            entity.Property(e => e.Source)
-                  .HasMaxLength(60)
-                  .HasDefaultValue("Manual");
-
-            entity.Property(e => e.EmployeeId)
-                  .HasColumnName("employee_id");
-
-            entity.HasOne(e => e.Employee)
-                  .WithMany(e => e.Schedules)
-                  .HasForeignKey(e => e.EmployeeId)
+            entity.HasOne(p => p.Employee)
+                  .WithOne(e => e.Profile)
+                  .HasForeignKey<EmployeeProfile>(p => p.EmployeeId)
                   .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(p => p.User)
+                  .WithMany()
+                  .HasForeignKey(p => p.UserId)
+                  .OnDelete(DeleteBehavior.Restrict);
         });
 
+        // PAY COMPONENTS
+        modelBuilder.Entity<PayComponent>(entity =>
+        {
+            entity.ToTable("pay_components");
+            entity.HasKey(pc => pc.PayComponentId);
 
-        // ===== PAYPERIOD TABLE (payperiod) =====
+            entity.Property(pc => pc.PayComponentId).HasColumnName("pay_component_id");
+            entity.Property(pc => pc.Code).HasColumnName("code").HasMaxLength(50).IsRequired();
+            entity.Property(pc => pc.Name).HasColumnName("name").HasMaxLength(100).IsRequired();
+            entity.Property(pc => pc.Kind).HasColumnName("kind").HasMaxLength(50).IsRequired();
+            entity.Property(pc => pc.DefaultRate).HasColumnName("default_rate").HasColumnType("decimal(18,2)");
+        });
+
+        // EMPLOYEE COMPONENTS
+        modelBuilder.Entity<EmployeeComponent>(entity =>
+        {
+            entity.ToTable("employee_components");
+            entity.HasKey(ec => ec.EmployeeComponentId);
+
+            entity.Property(ec => ec.EmployeeComponentId).HasColumnName("employee_component_id");
+            entity.Property(ec => ec.EmployeeId).HasColumnName("employee_id").IsRequired();
+            entity.Property(ec => ec.PayComponentId).HasColumnName("pay_component_id").IsRequired();
+            entity.Property(ec => ec.Amount).HasColumnName("amount").HasColumnType("decimal(18,2)").IsRequired();
+            entity.Property(ec => ec.Active).HasColumnName("active").IsRequired();
+
+            entity.HasOne(ec => ec.Employee)
+                  .WithMany(e => e.EmployeeComponents)
+                  .HasForeignKey(ec => ec.EmployeeId)
+                  .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(ec => ec.PayComponent)
+                  .WithMany(pc => pc.EmployeeComponents)
+                  .HasForeignKey(ec => ec.PayComponentId)
+                  .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        // PAY PERIODS
         modelBuilder.Entity<PayPeriod>(entity =>
         {
-            entity.ToTable("payperiod");
+            entity.ToTable("pay_periods");
+            entity.HasKey(pp => pp.PayPeriodId);
 
-            entity.HasKey(p => p.PayPeriodId);
-
-            entity.Property(p => p.PayPeriodId)
-                  .HasColumnName("payperiod_id");
-
-            entity.Property(e => e.PeriodName).HasMaxLength(120).IsRequired();
-            entity.Property(e => e.Status).HasMaxLength(40).HasDefaultValue("Open");
-
-            entity.Property(e => e.StartDate)
-                  .HasConversion(
-                      v => v.ToDateTime(TimeOnly.MinValue),
-                      v => DateOnly.FromDateTime(v))
-                  .HasColumnType("date");
-
-            entity.Property(e => e.EndDate)
-                  .HasConversion(
-                      v => v.ToDateTime(TimeOnly.MinValue),
-                      v => DateOnly.FromDateTime(v))
-                  .HasColumnType("date");
+            entity.Property(pp => pp.PayPeriodId).HasColumnName("pay_period_id");
+            entity.Property(pp => pp.PeriodName).HasColumnName("period_name").HasMaxLength(100).IsRequired();
+            entity.Property(pp => pp.StartDate).HasColumnName("start_date").IsRequired();
+            entity.Property(pp => pp.EndDate).HasColumnName("end_date").IsRequired();
+            entity.Property(pp => pp.Status).HasColumnName("status").HasMaxLength(50).IsRequired();
         });
 
-
-        // ===== PAYROLLRUN TABLE (payrollrun) =====
+        // PAYROLL RUNS
         modelBuilder.Entity<PayrollRun>(entity =>
         {
-            entity.ToTable("payrollrun");
+            entity.ToTable("payroll_runs");
+            entity.HasKey(pr => pr.PayrollRunId);
 
-            entity.HasKey(p => p.PayrollRunId);
+            entity.Property(pr => pr.PayrollRunId).HasColumnName("payroll_run_id");
+            entity.Property(pr => pr.PayPeriodId).HasColumnName("pay_period_id").IsRequired();
+            entity.Property(pr => pr.EmployeeId).HasColumnName("employee_id").IsRequired();
+            entity.Property(pr => pr.Status).HasColumnName("status").HasMaxLength(50).IsRequired();
+            entity.Property(pr => pr.GrossPay).HasColumnName("gross_pay").HasColumnType("decimal(18,2)").IsRequired();
+            entity.Property(pr => pr.TotalDeductions).HasColumnName("total_deductions").HasColumnType("decimal(18,2)").IsRequired();
+            entity.Property(pr => pr.NetPay).HasColumnName("net_pay").HasColumnType("decimal(18,2)").IsRequired();
 
-            entity.Property(p => p.PayrollRunId)
-                  .HasColumnName("payrollrun_id");
+            entity.HasOne(pr => pr.PayPeriod)
+                  .WithMany(pp => pp.PayrollRuns)
+                  .HasForeignKey(pr => pr.PayPeriodId);
 
-            entity.Property(e => e.Status).HasMaxLength(40).HasDefaultValue("Pending");
-            entity.Property(e => e.GrossPay).HasColumnType("decimal(12,2)").HasDefaultValue(0);
-            entity.Property(e => e.TotalDeductions).HasColumnType("decimal(12,2)").HasDefaultValue(0);
-            entity.Property(e => e.NetPay).HasColumnType("decimal(12,2)").HasDefaultValue(0);
-            entity.Property(e => e.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
-
-            entity.Property(e => e.EmployeeId)
-                  .HasColumnName("employee_id");
-
-            entity.Property(e => e.PayPeriodId)
-                  .HasColumnName("payperiod_id");
-
-            entity.HasOne(e => e.Employee)
+            entity.HasOne(pr => pr.Employee)
                   .WithMany(e => e.PayrollRuns)
-                  .HasForeignKey(e => e.EmployeeId)
-                  .OnDelete(DeleteBehavior.Cascade);
+                  .HasForeignKey(pr => pr.EmployeeId);
+        });
 
-            entity.HasOne(e => e.PayPeriod)
-                  .WithMany(p => p.PayrollRuns)
-                  .HasForeignKey(e => e.PayPeriodId)
-                  .OnDelete(DeleteBehavior.SetNull);
+        // PAYROLL LINES
+        modelBuilder.Entity<PayrollLine>(entity =>
+        {
+            entity.ToTable("payroll_lines");
+            entity.HasKey(pl => pl.PayrollLineId);
+
+            entity.Property(pl => pl.PayrollLineId).HasColumnName("payroll_line_id");
+            entity.Property(pl => pl.PayrollRunId).HasColumnName("payroll_run_id").IsRequired();
+            entity.Property(pl => pl.PayComponentId).HasColumnName("pay_component_id").IsRequired();
+            entity.Property(pl => pl.Quantity).HasColumnName("quantity").HasColumnType("decimal(18,2)").IsRequired();
+            entity.Property(pl => pl.Rate).HasColumnName("rate").HasColumnType("decimal(18,2)").IsRequired();
+            entity.Property(pl => pl.Amount).HasColumnName("amount").HasColumnType("decimal(18,2)").IsRequired();
+
+            entity.HasOne(pl => pl.PayrollRun)
+                  .WithMany(pr => pr.PayrollLines)
+                  .HasForeignKey(pl => pl.PayrollRunId);
+
+            entity.HasOne(pl => pl.PayComponent)
+                  .WithMany(pc => pc.PayrollLines)
+                  .HasForeignKey(pl => pl.PayComponentId);
+        });
+
+        // SCHEDULES
+        modelBuilder.Entity<Schedule>(entity =>
+        {
+            entity.ToTable("schedules");
+            entity.HasKey(s => s.ScheduleId);
+
+            entity.Property(s => s.ScheduleId).HasColumnName("schedule_id");
+            entity.Property(s => s.EmployeeId).HasColumnName("employee_id").IsRequired();
+            entity.Property(s => s.ShiftDate).HasColumnName("shift_date").IsRequired();
+            entity.Property(s => s.StartTime).HasColumnName("start_time").IsRequired();
+            entity.Property(s => s.EndTime).HasColumnName("end_time").IsRequired();
+            entity.Property(s => s.Source).HasColumnName("source").HasMaxLength(50);
+
+            entity.HasOne(s => s.Employee)
+                  .WithMany(e => e.Schedules)
+                  .HasForeignKey(s => s.EmployeeId);
+        });
+
+        // TIME LOGS
+        modelBuilder.Entity<TimeLog>(entity =>
+        {
+            entity.ToTable("time_logs");
+            entity.HasKey(t => t.TimeLogId);
+
+            entity.Property(t => t.TimeLogId).HasColumnName("time_log_id");
+            entity.Property(t => t.EmployeeId).HasColumnName("employee_id").IsRequired();
+            entity.Property(t => t.ClockIn).HasColumnName("clock_in").IsRequired();
+            entity.Property(t => t.ClockOut).HasColumnName("clock_out");
+            entity.Property(t => t.Source).HasColumnName("source").HasMaxLength(50);
+
+            entity.HasOne(t => t.Employee)
+                  .WithMany(e => e.TimeLogs)
+                  .HasForeignKey(t => t.EmployeeId);
         });
     }
 }

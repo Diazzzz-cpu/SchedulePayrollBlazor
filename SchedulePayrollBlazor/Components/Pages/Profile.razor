@@ -25,10 +25,13 @@ else
                 <dl>
                     <dt>Name</dt>
                     <dd>@profile.FullName</dd>
+
                     <dt>Email</dt>
                     <dd>@profile.Email</dd>
+
                     <dt>Role</dt>
                     <dd>@profile.Role</dd>
+
                     <dt>Member Since</dt>
                     <dd>@profile.CreatedAt.ToLocalTime().ToString("MMM dd, yyyy")</dd>
                 </dl>
@@ -41,17 +44,27 @@ else
                     <dl>
                         <dt>Job Title</dt>
                         <dd>@profile.JobTitle</dd>
+
                         <dt>Department</dt>
                         <dd>@profile.Department</dd>
+
                         <dt>Employment Type</dt>
                         <dd>@profile.EmploymentType</dd>
+
                         <dt>Start Date</dt>
-                        <dd>@profile.StartDate.ToString("MMM dd, yyyy")</dd>
+                        <dd>
+                            @(
+                                                profile.StartDate.HasValue
+                                                ? profile.StartDate.Value.ToString("MMM dd, yyyy")
+                                                : "-"
+                                                )
+                    </dd>
+
                         <dt>Location</dt>
                         <dd>@profile.Location</dd>
                     </dl>
                 </div>
-            }
+                }
         </div>
     </div>
 }
@@ -61,18 +74,15 @@ else
 
     protected override async Task OnInitializedAsync()
     {
-        // Get the current authenticated principal from our auth state provider
         var authState = await AuthStateProvider.GetAuthenticationStateAsync();
         var userPrincipal = authState.User;
 
-        // Not logged in -> send to login
         if (!(userPrincipal.Identity?.IsAuthenticated ?? false))
         {
             Nav.NavigateTo("/login", forceLoad: true);
             return;
         }
 
-        // We stored UserId in ClaimTypes.NameIdentifier in SimpleAuthStateProvider
         var idValue = userPrincipal.FindFirst(ClaimTypes.NameIdentifier)?.Value;
         if (!int.TryParse(idValue, out var userId))
         {
@@ -81,7 +91,6 @@ else
             return;
         }
 
-        // Load user + employee from DB
         var user = await Db.Users
             .Include(u => u.Employee)
             .Include(u => u.Role)
@@ -94,13 +103,16 @@ else
             return;
         }
 
-        // Determine role label from numeric RoleId
-        var roleLabel = string.IsNullOrWhiteSpace(user.Role?.RoleName)
+        // role: use Role.Name
+        var roleLabel = string.IsNullOrWhiteSpace(user.Role?.Name)
             ? "Employee"
-            : user.Role!.RoleName;
+            : user.Role!.Name;
 
-        // Build full name
-        var fullName = $"{user.FirstName} {user.LastName}".Trim();
+        // name: prefer Employee.FullName if available
+        string fullName =
+            user.Employee?.FullName ??
+            $"{user.FirstName} {user.LastName}".Trim();
+
         if (string.IsNullOrWhiteSpace(fullName))
             fullName = user.Email;
 
@@ -110,10 +122,11 @@ else
             Email = user.Email,
             Role = roleLabel,
             CreatedAt = user.CreatedAt,
+
             Department = user.Employee?.Department ?? string.Empty,
             JobTitle = user.Employee?.JobTitle ?? string.Empty,
             EmploymentType = user.Employee?.EmploymentType ?? string.Empty,
-            StartDate = user.Employee?.StartDate ?? DateTime.MinValue,
+            StartDate = user.Employee?.StartDate,
             Location = user.Employee?.Location ?? string.Empty
         };
     }
@@ -127,7 +140,10 @@ else
         public string Department { get; set; } = string.Empty;
         public string JobTitle { get; set; } = string.Empty;
         public string EmploymentType { get; set; } = string.Empty;
-        public DateTime StartDate { get; set; }
+
+        // Nullable to safely handle "no start date"
+        public DateTime? StartDate { get; set; }
+
         public string Location { get; set; } = string.Empty;
     }
 }

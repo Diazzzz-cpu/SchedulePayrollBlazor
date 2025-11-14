@@ -44,8 +44,8 @@ else
             {
                 <tr>
                     <td>@s.Employee.FullName</td>
-                    <td>@s.StartTime.ToString("HH\\:mm")</td>
-                    <td>@s.EndTime.ToString("HH\\:mm")</td>
+                    <td>@s.StartTime.ToString("hh\\:mm")</td>
+                    <td>@s.EndTime.ToString("hh\\:mm")</td>
                     <td>@s.Source</td>
                     <td>@s.ShiftDate.ToString("yyyy-MM-dd")</td>
                     <td>
@@ -76,17 +76,24 @@ else
 
     private async Task Load()
     {
-        if (!DateOnly.TryParseExact(dateString, "yyyy-MM-dd", CultureInfo.InvariantCulture,
-                                    DateTimeStyles.None, out var date))
+        // Parse as DateTime, not DateOnly
+        if (!DateTime.TryParseExact(
+                dateString,
+                "yyyy-MM-dd",
+                CultureInfo.InvariantCulture,
+                DateTimeStyles.None,
+                out var date))
         {
             items = new();
             return;
         }
 
+        var selectedDate = date.Date;
+
         items = await Db.Schedules
             .Include(s => s.Employee)
                 .ThenInclude(e => e.User)
-            .Where(s => s.ShiftDate == date)
+            .Where(s => s.ShiftDate.Date == selectedDate)
             .OrderBy(s => s.StartTime)
             .ToListAsync();
 

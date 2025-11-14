@@ -109,6 +109,8 @@ public class SimpleAuthStateProvider : AuthenticationStateProvider
             return "Employee";
         }
 
-        return roleName;
+        // Default to employee so that only the recognized roles are used in
+        // authorization checks.
+        return "Employee";
     }
 }

@@ -45,7 +45,6 @@ public class AuthService
 
             var roleName = NormalizeRoleName(user.Role?.Name);
 
-
             return (true, string.Empty, roleName);
         }
         catch (Exception ex)
@@ -76,6 +75,8 @@ public class AuthService
             return "Employee";
         }
 
-        return roleName;
+        // Default to the employee role for any other values to keep
+        // authorization checks consistent across the app.
+        return "Employee";
     }
 }

@@ -1,0 +1,21 @@
+@inject NavigationManager Nav
+
+@if (!hasNavigated)
+{
+    <p>Redirecting to the sign in page...</p>
+}
+
+@code {
+    private bool hasNavigated;
+
+    protected override void OnInitialized()
+    {
+        var relativePath = Nav.ToBaseRelativePath(Nav.Uri);
+
+        if (!relativePath.StartsWith("login", StringComparison.OrdinalIgnoreCase))
+        {
+            hasNavigated = true;
+            Nav.NavigateTo("/login", forceLoad: true);
+        }
+    }
+}

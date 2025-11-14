@@ -1,14 +1,30 @@
-﻿@inherits LayoutComponentBase
+@inherits LayoutComponentBase
 
 <div class="app-shell">
-    <aside class="app-sidebar">
-        <div class="app-brand">
-            <span class="app-title">SchedulePayrollBlazor</span>
-            <span class="app-subtitle">Scheduler & Payroll</span>
-        </div>
+    <AuthorizeView>
+        <Authorized>
+            <aside class="app-sidebar">
+                <div class="app-brand">
+                    <span class="app-title">SchedulePayrollBlazor</span>
+                    <span class="app-subtitle">Scheduler & Payroll</span>
+                </div>
 
-        <NavMenu />
-    </aside>
+                <NavMenu />
+            </aside>
+        </Authorized>
+        <NotAuthorized>
+            <aside class="app-sidebar guest-sidebar">
+                <div class="app-brand">
+                    <span class="app-title">SchedulePayrollBlazor</span>
+                    <span class="app-subtitle">Please sign in</span>
+                </div>
+
+                <nav class="side-nav">
+                    <NavLink href="/login" class="side-link" activeClass="active">Login</NavLink>
+                </nav>
+            </aside>
+        </NotAuthorized>
+    </AuthorizeView>
 
     <main class="app-main">
         <header class="app-topbar">

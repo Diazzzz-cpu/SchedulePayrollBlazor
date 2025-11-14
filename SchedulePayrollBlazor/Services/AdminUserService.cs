@@ -85,7 +85,7 @@ public class AdminUserService
 
         try
         {
-            _dbContext.Users.Add(user);
+            await _dbContext.Users.AddAsync(user);
             await _dbContext.SaveChangesAsync();
 
             if (ShouldCreateEmployee(model))
@@ -107,7 +107,7 @@ public class AdminUserService
                     IsActive = true
                 };
 
-                _dbContext.Employees.Add(employee);
+                await _dbContext.Employees.AddAsync(employee);
                 await _dbContext.SaveChangesAsync();
             }
 
@@ -259,7 +259,7 @@ public class AdminUserService
             Name = normalized
         };
 
-        _dbContext.Roles.Add(role);
+        await _dbContext.Roles.AddAsync(role);
         await _dbContext.SaveChangesAsync();
 
         return role;

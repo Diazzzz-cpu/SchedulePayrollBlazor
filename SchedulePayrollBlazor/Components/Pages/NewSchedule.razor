@@ -79,11 +79,18 @@ else
     private ScheduleVm vm = new();
 
     protected override async Task OnInitializedAsync()
-        => employees = await Db.Employees
+    {
+        employees = await Db.Employees
             .Include(e => e.User)
             .OrderBy(e => e.User.LastName)
             .ThenBy(e => e.User.FirstName)
             .ToListAsync();
+
+        if (employees.Count > 0 && vm.EmployeeId == 0)
+        {
+            vm.EmployeeId = employees[0].EmployeeId;
+        }
+    }
 
     private Task OnEmpChanged(ChangeEventArgs e)
     {
@@ -122,10 +129,29 @@ else
     {
         vm.FormError = null;
 
-        // Convert to DateTime + TimeSpan (your model's correct types)
-        var date = DateTime.ParseExact(vm.ShiftDateText, "yyyy-MM-dd", CultureInfo.InvariantCulture);
-        var start = TimeSpan.ParseExact(vm.StartTimeText, "hh\\:mm", CultureInfo.InvariantCulture);
-        var end = TimeSpan.ParseExact(vm.EndTimeText, "hh\\:mm", CultureInfo.InvariantCulture);
+        if (vm.EmployeeId == 0 || employees?.Any(e => e.EmployeeId == vm.EmployeeId) != true)
+        {
+            vm.FormError = "Select a valid employee.";
+            return;
+        }
+
+        if (!DateTime.TryParseExact(vm.ShiftDateText, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var date))
+        {
+            vm.FormError = "Enter a valid shift date.";
+            return;
+        }
+
+        if (!TimeSpan.TryParseExact(vm.StartTimeText, "hh\\:mm", CultureInfo.InvariantCulture, out var start))
+        {
+            vm.FormError = "Enter a valid start time.";
+            return;
+        }
+
+        if (!TimeSpan.TryParseExact(vm.EndTimeText, "hh\\:mm", CultureInfo.InvariantCulture, out var end))
+        {
+            vm.FormError = "Enter a valid end time.";
+            return;
+        }
 
         if (end <= start)
         {
@@ -154,7 +180,7 @@ else
             Source = vm.Source ?? "Manual"
         };
 
-        Db.Add(entity);
+        await Db.Schedules.AddAsync(entity);
         await Db.SaveChangesAsync();
 
         Nav.NavigateTo("/schedules", forceLoad: true);

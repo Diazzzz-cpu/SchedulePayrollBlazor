@@ -78,8 +78,9 @@ public class AppDbContext : DbContext
                   .HasColumnName("created_at")
                   .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
-            // (optional) FK to role if you want EF to know about it
-            entity.HasOne<Role>()
+            // Configure FK to role using the explicit navigation property so EF
+            // does not create a duplicate shadow FK (RoleId1).
+            entity.HasOne(e => e.Role)
                   .WithMany()
                   .HasForeignKey(e => e.RoleId)
                   .OnDelete(DeleteBehavior.Restrict);

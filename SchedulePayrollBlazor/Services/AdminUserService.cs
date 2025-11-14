@@ -12,9 +12,6 @@ namespace SchedulePayrollBlazor.Services;
 
 public class AdminUserService
 {
-    private const int AdminRoleId = 5;
-    private const int DefaultEmployeeRoleId = 1;
-
     private readonly AppDbContext _dbContext;
 
     public AdminUserService(AppDbContext dbContext)
@@ -26,6 +23,7 @@ public class AdminUserService
     {
         return await _dbContext.Users
             .Include(u => u.Employee)
+            .Include(u => u.Role)
             .OrderBy(u => u.Email)
             .Select(u => new AdminUserSummary
             {
@@ -34,6 +32,7 @@ public class AdminUserService
                 FirstName = u.FirstName,
                 LastName = u.LastName,
                 RoleId = u.RoleId,
+                RoleName = u.Role != null ? u.Role.RoleName : string.Empty,
                 CreatedAt = u.CreatedAt,
                 Department = u.Employee != null ? u.Employee.Department : null,
                 JobTitle = u.Employee != null ? u.Employee.JobTitle : null,
@@ -49,12 +48,12 @@ public class AdminUserService
         ArgumentNullException.ThrowIfNull(model);
 
         var email = model.Email.Trim().ToLowerInvariant();
-        if (await _dbContext.Users.AnyAsync(u => u.Email == email))
+        if (await _dbContext.Users.AnyAsync(u => u.Email.ToLower() == email))
         {
             return (false, "A user with this email already exists.", null);
         }
 
-        var roleId = ResolveRoleId(model.Role);
+        var role = await EnsureRoleAsync(model.Role);
         var password = string.IsNullOrWhiteSpace(model.Password)
             ? null
             : model.Password.Trim();
@@ -72,7 +71,7 @@ public class AdminUserService
             PasswordHash = PasswordHasher.HashPassword(password),
             FirstName = model.FirstName.Trim(),
             LastName = model.LastName.Trim(),
-            RoleId = roleId,
+            RoleId = role.RoleId,
             CreatedAt = DateTime.UtcNow
         };
 
@@ -135,19 +134,19 @@ public class AdminUserService
         }
 
         var emailExists = await _dbContext.Users
-            .AnyAsync(u => u.Email == email && u.UserId != user.UserId);
+            .AnyAsync(u => u.Email.ToLower() == email && u.UserId != user.UserId);
 
         if (emailExists)
         {
             return (false, "Another user with this email already exists.", null);
         }
 
-        var roleId = ResolveRoleId(model.Role);
+        var role = await EnsureRoleAsync(model.Role);
 
         user.Email = email;
         user.FirstName = model.FirstName.Trim();
         user.LastName = model.LastName.Trim();
-        user.RoleId = roleId;
+        user.RoleId = role.RoleId;
 
         if (!string.IsNullOrWhiteSpace(model.Password))
         {
@@ -218,24 +217,44 @@ public class AdminUserService
         return (true, null);
     }
 
-    private static int ResolveRoleId(string role)
-    {
-        return string.Equals(role, "Admin", StringComparison.OrdinalIgnoreCase)
-            ? AdminRoleId
-            : DefaultEmployeeRoleId;
-    }
-
     private static bool ShouldCreateEmployee(AdminUserFormModel model)
     {
         return model.IsEmployeeRole
                || !string.IsNullOrWhiteSpace(model.Department)
                || !string.IsNullOrWhiteSpace(model.JobTitle)
-               || model.StartDate.HasValue
-               || !string.IsNullOrWhiteSpace(model.Location);
+                || model.StartDate.HasValue
+                || !string.IsNullOrWhiteSpace(model.Location);
     }
 
     private static string GenerateTemporaryPassword()
     {
         return Guid.NewGuid().ToString("N")[..10];
+    }
+
+    private async Task<Role> EnsureRoleAsync(string roleName)
+    {
+        var normalized = string.IsNullOrWhiteSpace(roleName)
+            ? "Employee"
+            : roleName.Trim();
+
+        var lower = normalized.ToLowerInvariant();
+
+        var role = await _dbContext.Roles
+            .FirstOrDefaultAsync(r => r.RoleName == normalized || r.RoleName.ToLower() == lower);
+
+        if (role is not null)
+        {
+            return role;
+        }
+
+        role = new Role
+        {
+            RoleName = normalized
+        };
+
+        _dbContext.Roles.Add(role);
+        await _dbContext.SaveChangesAsync();
+
+        return role;
     }
 }

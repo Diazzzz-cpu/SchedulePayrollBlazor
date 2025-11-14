@@ -84,6 +84,7 @@ else
         // Load user + employee from DB
         var user = await Db.Users
             .Include(u => u.Employee)
+            .Include(u => u.Role)
             .FirstOrDefaultAsync(u => u.UserId == userId);
 
         if (user is null)
@@ -94,7 +95,9 @@ else
         }
 
         // Determine role label from numeric RoleId
-        var roleLabel = user.RoleId == 5 ? "Admin" : "Employee";
+        var roleLabel = string.IsNullOrWhiteSpace(user.Role?.RoleName)
+            ? "Employee"
+            : user.Role!.RoleName;
 
         // Build full name
         var fullName = $"{user.FirstName} {user.LastName}".Trim();

@@ -50,9 +50,9 @@ else
                     <td>@s.ShiftDate.ToString("yyyy-MM-dd")</td>
                     <td>
                         <a class="btn btn-sm btn-outline-primary me-1"
-                           href="/schedules/edit/@s.Id">Edit</a>
+                           href="/schedules/edit/@s.ScheduleId">Edit</a>
                         <button class="btn btn-sm btn-outline-danger"
-                                @onclick="() => DeleteSchedule(s.Id)">
+                                @onclick="() => DeleteSchedule(s.ScheduleId)">
                             Delete
                         </button>
                     </td>
@@ -102,9 +102,9 @@ else
         }
     }
 
-    private async Task DeleteSchedule(int id)
+    private async Task DeleteSchedule(int scheduleId)
     {
-        var entity = await Db.Schedules.FindAsync(id);
+        var entity = await Db.Schedules.FindAsync(scheduleId);
         if (entity is not null)
         {
             Db.Remove(entity);

@@ -54,6 +54,7 @@ public class AdminUserSummary
     public string FirstName { get; set; } = string.Empty;
     public string LastName { get; set; } = string.Empty;
     public int RoleId { get; set; }
+    public string RoleName { get; set; } = string.Empty;
     public DateTime CreatedAt { get; set; }
     public string? Department { get; set; }
     public string? JobTitle { get; set; }

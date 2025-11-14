@@ -1,8 +1,10 @@
+using System;
+using System.Collections.Generic;
 using System.Security.Claims;
+using System.Threading.Tasks;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.JSInterop;
-using Microsoft.Extensions.DependencyInjection;
 using SchedulePayrollBlazor.Data;
 
 namespace SchedulePayrollBlazor.Services;
@@ -11,41 +13,44 @@ public class SimpleAuthStateProvider : AuthenticationStateProvider
 {
     private const string StorageKey = "auth_user_id";
 
-    private readonly IJSRuntime _js;
-    private readonly IServiceScopeFactory _scopeFactory;
+    private readonly IJSRuntime _jsRuntime;
+    private readonly IDbContextFactory<AppDbContext> _dbContextFactory;
 
-    private static readonly ClaimsPrincipal Anonymous =
-        new(new ClaimsIdentity());
+    private static readonly ClaimsPrincipal AnonymousPrincipal = new(new ClaimsIdentity());
 
-    public SimpleAuthStateProvider(IJSRuntime js, IServiceScopeFactory scopeFactory)
+    public SimpleAuthStateProvider(IJSRuntime jsRuntime, IDbContextFactory<AppDbContext> dbContextFactory)
     {
-        _js = js;
-        _scopeFactory = scopeFactory;
+        _jsRuntime = jsRuntime;
+        _dbContextFactory = dbContextFactory;
     }
 
     public override async Task<AuthenticationState> GetAuthenticationStateAsync()
     {
-        var storedId = await _js.InvokeAsync<string?>("localStorage.getItem", StorageKey);
-
+        var storedId = await _jsRuntime.InvokeAsync<string?>("localStorage.getItem", StorageKey);
         if (!int.TryParse(storedId, out var userId))
-            return new AuthenticationState(Anonymous);
-
-        using var scope = _scopeFactory.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-
-        var user = await db.Users
-            .FirstOrDefaultAsync(u => u.UserId == userId);
-
-        if (user == null)
         {
-            await _js.InvokeVoidAsync("localStorage.removeItem", StorageKey);
-            return new AuthenticationState(Anonymous);
+            return new AuthenticationState(AnonymousPrincipal);
         }
 
-        var roleName = user.RoleId == 5 ? "Admin" : "Employee";
-        var displayName = $"{user.FirstName} {user.LastName}".Trim();
+        await using var dbContext = await _dbContextFactory.CreateDbContextAsync();
+        var user = await dbContext.Users
+            .Include(u => u.Role)
+            .Include(u => u.Employee)
+            .FirstOrDefaultAsync(u => u.UserId == userId);
+
+        if (user is null)
+        {
+            await _jsRuntime.InvokeVoidAsync("localStorage.removeItem", StorageKey);
+            return new AuthenticationState(AnonymousPrincipal);
+        }
+
+        var roleName = NormalizeRoleName(user.Role?.RoleName);
+
+        var displayName = user.FullName;
         if (string.IsNullOrWhiteSpace(displayName))
+        {
             displayName = user.Email;
+        }
 
         var claims = new List<Claim>
         {
@@ -55,7 +60,12 @@ public class SimpleAuthStateProvider : AuthenticationStateProvider
             new(ClaimTypes.Role, roleName)
         };
 
-        var identity = new ClaimsIdentity(claims, "auth");
+        if (user.Employee is not null)
+        {
+            claims.Add(new Claim("EmployeeId", user.Employee.EmployeeId.ToString()));
+        }
+
+        var identity = new ClaimsIdentity(claims, authenticationType: "server-auth");
         var principal = new ClaimsPrincipal(identity);
 
         return new AuthenticationState(principal);
@@ -63,13 +73,32 @@ public class SimpleAuthStateProvider : AuthenticationStateProvider
 
     public async Task SignInAsync(int userId)
     {
-        await _js.InvokeVoidAsync("localStorage.setItem", StorageKey, userId.ToString());
+        await _jsRuntime.InvokeVoidAsync("localStorage.setItem", StorageKey, userId.ToString());
         NotifyAuthenticationStateChanged(GetAuthenticationStateAsync());
     }
 
     public async Task SignOutAsync()
     {
-        await _js.InvokeVoidAsync("localStorage.removeItem", StorageKey);
-        NotifyAuthenticationStateChanged(Task.FromResult(new AuthenticationState(Anonymous)));
+        await _jsRuntime.InvokeVoidAsync("localStorage.removeItem", StorageKey);
+        NotifyAuthenticationStateChanged(Task.FromResult(new AuthenticationState(AnonymousPrincipal)));
+    }
+    private static string NormalizeRoleName(string? roleName)
+    {
+        if (string.IsNullOrWhiteSpace(roleName))
+        {
+            return "Employee";
+        }
+
+        if (roleName.Equals("admin", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Admin";
+        }
+
+        if (roleName.Equals("employee", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Employee";
+        }
+
+        return roleName;
     }
 }

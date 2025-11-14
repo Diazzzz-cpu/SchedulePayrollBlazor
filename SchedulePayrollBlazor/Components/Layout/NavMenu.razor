@@ -1,4 +1,5 @@
 @using Microsoft.AspNetCore.Components.Authorization
+@using System
 @using System.Security.Claims
 @inject SimpleAuthStateProvider Auth
 @inject NavigationManager Nav
@@ -84,9 +85,10 @@
             return;
         }
 
-        isAdmin = user.IsInRole("Admin");
+        var roleValue = user.FindFirst(ClaimTypes.Role)?.Value;
+        roleLabel = string.IsNullOrWhiteSpace(roleValue) ? "Employee" : roleValue;
+        isAdmin = string.Equals(roleLabel, "Admin", StringComparison.OrdinalIgnoreCase);
         displayName = user.Identity?.Name ?? user.FindFirst(ClaimTypes.Email)?.Value ?? "User";
-        roleLabel = isAdmin ? "Admin" : "Employee";
     }
 
     private async void OnAuthenticationStateChanged(Task<AuthenticationState> task)

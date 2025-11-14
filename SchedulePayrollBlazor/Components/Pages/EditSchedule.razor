@@ -133,10 +133,29 @@ else
     {
         vm!.FormError = null;
 
-        // PARSE AS DateTime + TimeSpan TO MATCH Schedule MODEL
-        var date = DateTime.ParseExact(vm.ShiftDateText, "yyyy-MM-dd", CultureInfo.InvariantCulture);
-        var start = TimeSpan.ParseExact(vm.StartTimeText, "hh\\:mm", CultureInfo.InvariantCulture);
-        var end = TimeSpan.ParseExact(vm.EndTimeText, "hh\\:mm", CultureInfo.InvariantCulture);
+        if (vm.EmployeeId == 0 || employees.All(e => e.EmployeeId != vm.EmployeeId))
+        {
+            vm.FormError = "Select a valid employee.";
+            return;
+        }
+
+        if (!DateTime.TryParseExact(vm.ShiftDateText, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var date))
+        {
+            vm.FormError = "Enter a valid shift date.";
+            return;
+        }
+
+        if (!TimeSpan.TryParseExact(vm.StartTimeText, "hh\\:mm", CultureInfo.InvariantCulture, out var start))
+        {
+            vm.FormError = "Enter a valid start time.";
+            return;
+        }
+
+        if (!TimeSpan.TryParseExact(vm.EndTimeText, "hh\\:mm", CultureInfo.InvariantCulture, out var end))
+        {
+            vm.FormError = "Enter a valid end time.";
+            return;
+        }
 
         if (end <= start)
         {
@@ -158,12 +177,17 @@ else
             return;
         }
 
-        var entity = await Db.Schedules.FirstAsync(x => x.ScheduleId == vm.ScheduleId);
+        var entity = await Db.Schedules.FindAsync(vm.ScheduleId);
+        if (entity is null)
+        {
+            vm.FormError = "The schedule could not be found. Refresh the list and try again.";
+            return;
+        }
         entity.EmployeeId = vm.EmployeeId;
         entity.ShiftDate = date;
         entity.StartTime = start;
         entity.EndTime = end;
-        entity.Source = vm.Source;
+        entity.Source = string.IsNullOrWhiteSpace(vm.Source) ? "Manual" : vm.Source;
 
         await Db.SaveChangesAsync();
         Nav.NavigateTo("/schedules", forceLoad: true);

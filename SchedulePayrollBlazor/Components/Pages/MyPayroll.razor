@@ -4,84 +4,112 @@
 @inject AuthenticationStateProvider AuthStateProvider
 @inject NavigationManager Nav
 @using Microsoft.EntityFrameworkCore
-@using SchedulePayrollBlazor.Data.Models
 @using System.Security.Claims
+@using System.Linq
 
-<div class="page">
-    <header class="page-header">
+<div class="ps-page">
+    <div class="ps-page-header">
         <div>
-            <h1 class="page-title">My Payroll</h1>
-            <p class="page-subtitle">Track your pay history and earnings.</p>
+            <h2>My payroll</h2>
+            <p class="ps-subtitle">Review your payslips and track earnings in PHP.</p>
         </div>
-    </header>
+    </div>
 
-    @if (payrollRuns == null)
+    @if (entries is null)
     {
-        <div class="content-card">
-            <div class="loading">Loading...</div>
+        <div class="ps-card">
+            <div class="loading">Loading…</div>
         </div>
     }
-    else if (!payrollRuns.Any())
+    else if (entries.Count == 0)
     {
-        <div class="content-card">
-            <div class="alert alert-info">No payroll records found.</div>
+        <div class="ps-card">
+            <div class="text-muted">No payroll records are available yet. Once a payroll period is processed, it will appear here.</div>
         </div>
     }
     else
     {
-        <section class="summary-grid">
-            <div class="summary-card">
-                <h4>Total Earnings (All Time)</h4>
-                <h2>$@totalEarnings.ToString("N2")</h2>
+        <section class="ps-card">
+            <div class="ps-card-header">
+                <h3>Earnings summary</h3>
+                <p class="ps-subtitle">Overview of total and most recent payouts.</p>
             </div>
-            <div class="summary-card">
-                <h4>Last Paycheck</h4>
-                <h2>$@lastPaycheck.ToString("N2")</h2>
+            <div class="ps-summary-grid">
+                <div class="ps-summary-card">
+                    <h4>Total net pay (all time)</h4>
+                    <p class="ps-summary-value">₱@totalNet.ToString("N2")</p>
+                </div>
+                <div class="ps-summary-card">
+                    <h4>Last payout</h4>
+                    <p class="ps-summary-value">₱@lastNet.ToString("N2")</p>
+                </div>
+                <div class="ps-summary-card">
+                    <h4>Average net pay</h4>
+                    <p class="ps-summary-value">₱@averageNet.ToString("N2")</p>
+                </div>
             </div>
         </section>
 
-        <section class="content-card">
-            <div class="card-header">
-                <h3>Pay History</h3>
-                <p>Your most recent payroll runs.</p>
+        <section class="ps-card">
+            <div class="ps-card-header">
+                <h3>Payroll history</h3>
+                <p class="ps-subtitle">Detailed breakdown per period.</p>
             </div>
-            <div class="table-responsive">
-                <table>
+            <div class="ps-table-container">
+                <table class="ps-table">
                     <thead>
                         <tr>
-                            <th>Pay Period</th>
-                            <th>Gross Pay</th>
+                            <th>Payroll period</th>
+                            <th>Total hours</th>
+                            <th>Base pay</th>
                             <th>Deductions</th>
-                            <th>Net Pay</th>
-                            <th>Status</th>
+                            <th>Bonuses</th>
+                            <th>Net pay</th>
                             <th>Processed</th>
                         </tr>
                     </thead>
                     <tbody>
-                        @foreach (var run in payrollRuns)
+                        @foreach (var entry in entries)
                         {
                             <tr>
                                 <td>
-                                    @if (run.PayPeriod != null)
-                                    {
-                                        <div>@run.PayPeriod.PeriodName</div>
-                                        <small class="text-muted">
-                                            @run.PayPeriod.StartDate.ToString("MMM dd") - @run.PayPeriod.EndDate.ToString("MMM dd, yyyy")
-                                        </small>
-                                    }
-                                    else
-                                    {
-                                        <div>Ad hoc</div>
-                                    }
+                                    <div class="fw-semibold">@(entry.PayrollPeriod?.Name ?? "Payroll period")</div>
+                                    <div class="text-muted">
+                                        @if (entry.PayrollPeriod is not null)
+                                        {
+                                            <span>@entry.PayrollPeriod.StartDate.ToString("MMM dd, yyyy") – @entry.PayrollPeriod.EndDate.ToString("MMM dd, yyyy")</span>
+                                        }
+                                        else
+                                        {
+                                            <span>—</span>
+                                        }
+                                    </div>
                                 </td>
-                                <td class="text-success">$@run.GrossPay.ToString("N2")</td>
-                                <td class="text-danger">$@run.TotalDeductions.ToString("N2")</td>
-                                <td><strong>$@run.NetPay.ToString("N2")</strong></td>
-                                <td>
-                                    <span class="badge @GetStatusBadgeClass(run.Status)">@run.Status</span>
-                                </td>
-                                <td>@run.CreatedAt.ToLocalTime().ToString("MMM dd, yyyy")</td>
+                                <td>@string.Format("{0:N2} hrs", entry.TotalHoursWorked)</td>
+                                <td>₱@entry.BasePay:N2</td>
+                                <td class="text-danger">₱@entry.TotalDeductions:N2</td>
+                                <td class="text-success">₱@entry.TotalBonuses:N2</td>
+                                <td><strong>₱@entry.NetPay:N2</strong></td>
+                                <td>@entry.CalculatedAt.ToLocalTime().ToString("MMM dd, yyyy HH:mm")</td>
                             </tr>
+                            @if (entry.Adjustments is not null && entry.Adjustments.Count > 0)
+                            {
+                                <tr class="ps-table-row-detail">
+                                    <td colspan="7">
+                                        <strong>Adjustments applied:</strong>
+                                        <ul class="adjustment-list">
+                                            @foreach (var adjustment in entry.Adjustments.OrderByDescending(a => a.Type))
+                                            {
+                                                <li>
+                                                    <span class="badge @(IsBonus(adjustment) ? "badge-success" : "badge-danger")">@adjustment.Type</span>
+                                                    <span class="adjustment-label">@adjustment.Label</span>
+                                                    <span class="adjustment-amount">₱@adjustment.Amount:N2</span>
+                                                </li>
+                                            }
+                                        </ul>
+                                    </td>
+                                </tr>
+                            }
                         }
                     </tbody>
                 </table>
@@ -91,46 +119,43 @@
 </div>
 
 @code {
-    private int employeeId;
-    private List<PayrollRun>? payrollRuns;
-    private decimal totalEarnings;
-    private decimal lastPaycheck;
+    private List<PayrollEntry>? entries;
+    private decimal totalNet;
+    private decimal lastNet;
+    private decimal averageNet;
 
     protected override async Task OnInitializedAsync()
     {
         var authState = await AuthStateProvider.GetAuthenticationStateAsync();
         var user = authState.User;
-        var role = user.FindFirst(ClaimTypes.Role)?.Value;
 
+        var role = user.FindFirst(ClaimTypes.Role)?.Value;
         if (!string.Equals(role, "Employee", StringComparison.OrdinalIgnoreCase))
         {
             Nav.NavigateTo("/login", forceLoad: true);
             return;
         }
 
-        var empIdClaim = user.FindFirst("EmployeeId")?.Value ?? user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-
-        if (!int.TryParse(empIdClaim, out employeeId))
+        var employeeIdClaim = user.FindFirst("EmployeeId")?.Value ?? user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (!int.TryParse(employeeIdClaim, out var employeeId))
         {
             Nav.NavigateTo("/login", forceLoad: true);
             return;
         }
 
-        payrollRuns = await Db.PayrollRuns
-            .Include(p => p.PayPeriod)
-            .Where(p => p.EmployeeId == employeeId)
-            .OrderByDescending(p => p.CreatedAt)
+        entries = await Db.PayrollEntries
+            .Include(e => e.PayrollPeriod)
+            .Include(e => e.Adjustments)
+            .Where(e => e.EmployeeId == employeeId)
+            .OrderByDescending(e => e.PayrollPeriod.EndDate)
+            .ThenByDescending(e => e.CalculatedAt)
             .ToListAsync();
 
-        totalEarnings = payrollRuns.Sum(p => p.NetPay);
-        lastPaycheck = payrollRuns.FirstOrDefault()?.NetPay ?? 0;
+        totalNet = entries.Sum(e => e.NetPay);
+        lastNet = entries.FirstOrDefault()?.NetPay ?? 0m;
+        averageNet = entries.Count == 0 ? 0m : entries.Average(e => e.NetPay);
     }
 
-    private static string GetStatusBadgeClass(string status) => status switch
-    {
-        "Paid" => "badge-success",
-        "Approved" => "badge-info",
-        "Calculated" => "badge-warning",
-        _ => "badge-secondary"
-    };
+    private static bool IsBonus(PayrollAdjustment adjustment)
+        => string.Equals(adjustment.Type, "Bonus", StringComparison.OrdinalIgnoreCase);
 }

@@ -1,0 +1,263 @@
+@page "/admin/pay-structure"
+@attribute [Authorize(Roles = "Admin")]
+@inject AppDbContext Db
+@inject IPayrollService PayrollService
+@using Microsoft.EntityFrameworkCore
+@using System.ComponentModel.DataAnnotations
+@using System.Linq
+
+<div class="ps-page">
+    <div class="ps-page-header">
+        <div>
+            <h2>Employee pay structure</h2>
+            <p class="ps-subtitle">Configure compensation for each team member.</p>
+        </div>
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(alertMessage))
+    {
+        <div class="ps-alert @(alertIsError ? "ps-alert-danger" : "ps-alert-success")" role="status">
+            <div>@alertMessage</div>
+            <button type="button" class="ps-alert-close" @onclick="() => alertMessage = string.Empty" aria-label="Dismiss message">&times;</button>
+        </div>
+    }
+
+    @if (rows is null)
+    {
+        <div class="ps-card">
+            <div class="loading">Loading…</div>
+        </div>
+    }
+    else if (rows.Count == 0)
+    {
+        <div class="ps-card">
+            <div class="text-muted">No employees available. Add employees to configure compensation.</div>
+        </div>
+    }
+    else
+    {
+        <section class="ps-card">
+            <div class="ps-card-header">
+                <h3>Pay structure overview</h3>
+                <p class="ps-subtitle">Toggle between hourly and fixed compensation and update the corresponding rates.</p>
+            </div>
+            <div class="ps-table-container">
+                <table class="ps-table">
+                    <thead>
+                        <tr>
+                            <th>Employee</th>
+                            <th>Structure</th>
+                            <th>Hourly rate (PHP)</th>
+                            <th>Fixed monthly salary (PHP)</th>
+                            <th class="text-end">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var row in rows)
+                        {
+                            <tr>
+                                <td>
+                                    <div class="fw-semibold">@row.Employee.FullName</div>
+                                    <div class="text-muted">@row.Employee.User?.Email</div>
+                                </td>
+                                <td>@FormatStructure(row.Compensation)</td>
+                                <td>@FormatCurrency(row.Compensation?.HourlyRate)</td>
+                                <td>@FormatCurrency(row.Compensation?.FixedMonthlySalary)</td>
+                                <td class="ps-table-actions">
+                                    <button type="button" class="ps-button ps-button-ghost" @onclick="() => BeginEdit(row)">@(row.IsEditing ? "Cancel" : "Edit")</button>
+                                </td>
+                            </tr>
+                            @if (row.IsEditing && row.EditModel is not null)
+                            {
+                                <tr class="ps-table-row-detail">
+                                    <td colspan="5">
+                                        <EditForm Model="row.EditModel" OnValidSubmit="() => SaveAsync(row)">
+                                            <DataAnnotationsValidator />
+                                            <ValidationSummary />
+
+                                            <div class="ps-form-grid">
+                                                <div class="form-group">
+                                                    <label>Structure</label>
+                                                    <InputRadioGroup @bind-Value="row.EditModel.IsHourly">
+                                                        <div class="form-check">
+                                                            <InputRadio class="form-check-input" id="hourly-@row.Employee.EmployeeId" Value="true" />
+                                                            <label class="form-check-label" for="hourly-@row.Employee.EmployeeId">Hourly</label>
+                                                        </div>
+                                                        <div class="form-check">
+                                                            <InputRadio class="form-check-input" id="fixed-@row.Employee.EmployeeId" Value="false" />
+                                                            <label class="form-check-label" for="fixed-@row.Employee.EmployeeId">Fixed monthly</label>
+                                                        </div>
+                                                    </InputRadioGroup>
+                                                </div>
+
+                                                <div class="form-group">
+                                                    <label for="hourly-amount-@row.Employee.EmployeeId">Hourly rate</label>
+                                                    <InputNumber id="hourly-amount-@row.Employee.EmployeeId" class="form-control" @bind-Value="row.EditModel.HourlyRate" disabled="@(!row.EditModel.IsHourly)" step="0.25" />
+                                                    <ValidationMessage For="() => row.EditModel.HourlyRate" />
+                                                </div>
+
+                                                <div class="form-group">
+                                                    <label for="salary-amount-@row.Employee.EmployeeId">Fixed monthly salary</label>
+                                                    <InputNumber id="salary-amount-@row.Employee.EmployeeId" class="form-control" @bind-Value="row.EditModel.FixedMonthlySalary" disabled="@(row.EditModel.IsHourly)" step="0.01" />
+                                                    <ValidationMessage For="() => row.EditModel.FixedMonthlySalary" />
+                                                </div>
+                                            </div>
+
+                                            <div class="ps-form-actions">
+                                                <button type="submit" class="btn btn-primary">Save compensation</button>
+                                                <button type="button" class="btn btn-outline-secondary" @onclick="() => CancelEdit(row)">Close</button>
+                                            </div>
+                                        </EditForm>
+                                    </td>
+                                </tr>
+                            }
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    }
+</div>
+
+@code {
+    private List<EmployeeCompensationRow>? rows;
+    private string? alertMessage;
+    private bool alertIsError;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var employees = await Db.Employees
+            .Include(e => e.User)
+            .OrderBy(e => e.FullName)
+            .ToListAsync();
+
+        var compensations = await Db.EmployeeCompensations.ToDictionaryAsync(ec => ec.EmployeeId);
+
+        rows = employees
+            .Select(employee => new EmployeeCompensationRow
+            {
+                Employee = employee,
+                Compensation = compensations.TryGetValue(employee.EmployeeId, out var comp) ? comp : null
+            })
+            .ToList();
+    }
+
+    private static string FormatStructure(EmployeeCompensation? compensation)
+    {
+        if (compensation is null)
+        {
+            return "Not set";
+        }
+
+        return compensation.IsHourly ? "Hourly" : "Fixed";
+    }
+
+    private static string FormatCurrency(decimal? value)
+    {
+        return value.HasValue && value.Value > 0
+            ? $"₱{value.Value:N2}"
+            : "—";
+    }
+
+    private void BeginEdit(EmployeeCompensationRow row)
+    {
+        if (!row.IsEditing)
+        {
+            row.EditModel = CompensationEditModel.From(row.Compensation ?? new EmployeeCompensation
+            {
+                EmployeeId = row.Employee.EmployeeId,
+                IsHourly = true,
+                HourlyRate = 0m,
+                FixedMonthlySalary = 0m
+            });
+            row.IsEditing = true;
+        }
+        else
+        {
+            CancelEdit(row);
+        }
+    }
+
+    private void CancelEdit(EmployeeCompensationRow row)
+    {
+        row.IsEditing = false;
+        row.EditModel = null;
+    }
+
+    private async Task SaveAsync(EmployeeCompensationRow row)
+    {
+        if (row.EditModel is null)
+        {
+            return;
+        }
+
+        try
+        {
+            var model = row.EditModel;
+            var compensation = new EmployeeCompensation
+            {
+                EmployeeId = row.Employee.EmployeeId,
+                IsHourly = model.IsHourly,
+                HourlyRate = model.IsHourly ? model.HourlyRate : null,
+                FixedMonthlySalary = model.IsHourly ? null : model.FixedMonthlySalary
+            };
+
+            await PayrollService.UpsertCompensationAsync(compensation);
+
+            row.Compensation = compensation;
+            row.IsEditing = false;
+            row.EditModel = null;
+
+            alertIsError = false;
+            alertMessage = $"Updated compensation for {row.Employee.FullName}.";
+        }
+        catch (Exception ex)
+        {
+            alertIsError = true;
+            alertMessage = ex.Message;
+        }
+    }
+
+    private sealed class EmployeeCompensationRow
+    {
+        public required Employee Employee { get; init; }
+        public EmployeeCompensation? Compensation { get; set; }
+        public bool IsEditing { get; set; }
+        public CompensationEditModel? EditModel { get; set; }
+    }
+
+    private sealed class CompensationEditModel : IValidatableObject
+    {
+        public bool IsHourly { get; set; }
+        public decimal? HourlyRate { get; set; }
+        public decimal? FixedMonthlySalary { get; set; }
+
+        public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
+        {
+            if (IsHourly)
+            {
+                if (!HourlyRate.HasValue || HourlyRate.Value <= 0)
+                {
+                    yield return new ValidationResult("Hourly rate must be greater than 0.", new[] { nameof(HourlyRate) });
+                }
+            }
+            else
+            {
+                if (!FixedMonthlySalary.HasValue || FixedMonthlySalary.Value <= 0)
+                {
+                    yield return new ValidationResult("Fixed monthly salary must be greater than 0.", new[] { nameof(FixedMonthlySalary) });
+                }
+            }
+        }
+
+        public static CompensationEditModel From(EmployeeCompensation compensation)
+        {
+            return new CompensationEditModel
+            {
+                IsHourly = compensation.IsHourly,
+                HourlyRate = compensation.HourlyRate,
+                FixedMonthlySalary = compensation.FixedMonthlySalary
+            };
+        }
+    }
+}

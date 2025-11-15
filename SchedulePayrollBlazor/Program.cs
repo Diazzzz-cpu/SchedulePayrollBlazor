@@ -56,6 +56,7 @@ builder.Services.AddScoped<AuthService>();
 builder.Services.AddScoped<AdminUserService>();
 builder.Services.AddScoped<IEmployeeService, EmployeeService>();
 builder.Services.AddScoped<IShiftService, ShiftService>();
+builder.Services.AddScoped<IPayrollService, PayrollService>();
 builder.Services.AddScoped<IPasswordHasher<User>, PasswordHasher<User>>();
 
 // --------------------------------

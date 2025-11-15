@@ -88,8 +88,14 @@ public class Employee
     public ICollection<EmployeeComponent> EmployeeComponents { get; set; }
         = new List<EmployeeComponent>();
 
+    public EmployeeCompensation? Compensation { get; set; }
+        = default;
+
     public ICollection<PayrollRun> PayrollRuns { get; set; }
         = new List<PayrollRun>();
+
+    public ICollection<PayrollEntry> PayrollEntries { get; set; }
+        = new List<PayrollEntry>();
 
     public ICollection<Schedule> Schedules { get; set; }
         = new List<Schedule>();

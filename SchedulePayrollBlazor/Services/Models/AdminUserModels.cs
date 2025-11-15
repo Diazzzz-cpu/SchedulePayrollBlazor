@@ -61,4 +61,5 @@ public class AdminUserSummary
     public string? EmploymentType { get; set; }
     public DateTime? StartDate { get; set; }
     public string? Location { get; set; }
+    public bool? IsEmployeeActive { get; set; }
 }

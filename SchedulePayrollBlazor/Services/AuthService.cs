@@ -29,6 +29,7 @@ public class AuthService
 
             var user = await _dbContext.Users
                 .Include(u => u.Role)
+                .Include(u => u.Employee)
                 .FirstOrDefaultAsync(u => u.Email.ToLower() == email);
 
             if (user == null)
@@ -37,6 +38,11 @@ public class AuthService
             }
 
             if (!PasswordHasher.VerifyPassword(password, user.PasswordHash))
+            {
+                return (false, "Invalid email or password.", string.Empty);
+            }
+
+            if (user.Employee is not null && !user.Employee.IsActive)
             {
                 return (false, "Invalid email or password.", string.Empty);
             }

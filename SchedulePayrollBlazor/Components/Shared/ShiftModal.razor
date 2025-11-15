@@ -77,13 +77,13 @@
                     <div class="shift-modal-footer">
                         @if (OnDelete.HasDelegate && _formModel.Id.HasValue)
                         {
-                            <button type="button" class="ps-button ps-button-danger" @onclick="DeleteAsync" disabled="_isSubmitting || IsBusy">
+                            <button type="button" class="ps-button ps-button-danger" @onclick="DeleteAsync" disabled="@(_isSubmitting || IsBusy)">
                                 Delete shift
                             </button>
                         }
                         <div class="shift-modal-footer-actions">
-                            <button type="button" class="ps-button ps-button-ghost" @onclick="CancelAsync" disabled="_isSubmitting || IsBusy">Cancel</button>
-                            <button type="submit" class="ps-button ps-button-primary" disabled="_isSubmitting || IsBusy">Save shift</button>
+                            <button type="button" class="ps-button ps-button-ghost" @onclick="CancelAsync" disabled="@(_isSubmitting || IsBusy)">Cancel</button>
+                            <button type="submit" class="ps-button ps-button-primary" disabled="@(_isSubmitting || IsBusy)">Save shift</button>
                         </div>
                     </div>
                 </EditForm>

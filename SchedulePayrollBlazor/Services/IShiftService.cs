@@ -15,6 +15,10 @@ public interface IShiftService
 
     Task<Shift?> GetShiftByIdAsync(int id);
 
+    Task<int?> ResolveEmployeeIdForUserAsync(string? userIdClaim, string? email);
+
+    Task<IReadOnlyList<Shift>> GetShiftsForEmployeeAsync(int employeeId, DateTime startInclusive, DateTime endExclusive);
+
     Task<Shift> InsertShiftAsync(Shift shift);
 
     /// <summary>

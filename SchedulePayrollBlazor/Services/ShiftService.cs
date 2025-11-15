@@ -64,6 +64,64 @@ public class ShiftService : IShiftService
             .FirstOrDefaultAsync(s => s.Id == id);
     }
 
+    public async Task<int?> ResolveEmployeeIdForUserAsync(string? userIdClaim, string? email)
+    {
+        if (int.TryParse(userIdClaim, out var userId) && userId > 0)
+        {
+            var employeeId = await _db.Users
+                .AsNoTracking()
+                .Where(u => u.UserId == userId)
+                .Select(u => u.Employee != null ? (int?)u.Employee.EmployeeId : null)
+                .FirstOrDefaultAsync();
+
+            if (employeeId.HasValue)
+            {
+                return employeeId.Value;
+            }
+        }
+
+        if (!string.IsNullOrWhiteSpace(email))
+        {
+            var normalizedEmail = email.Trim();
+            var employeeId = await _db.Users
+                .AsNoTracking()
+                .Where(u => u.Email == normalizedEmail)
+                .Select(u => u.Employee != null ? (int?)u.Employee.EmployeeId : null)
+                .FirstOrDefaultAsync();
+
+            if (employeeId.HasValue)
+            {
+                return employeeId.Value;
+            }
+        }
+
+        return null;
+    }
+
+    public async Task<IReadOnlyList<Shift>> GetShiftsForEmployeeAsync(int employeeId, DateTime startInclusive, DateTime endExclusive)
+    {
+        if (employeeId <= 0)
+        {
+            return Array.Empty<Shift>();
+        }
+
+        try
+        {
+            return await _db.Shifts
+                .AsNoTracking()
+                .Where(s =>
+                    s.EmployeeId == employeeId &&
+                    s.Start >= startInclusive &&
+                    s.Start < endExclusive)
+                .OrderBy(s => s.Start)
+                .ToListAsync();
+        }
+        catch
+        {
+            return Array.Empty<Shift>();
+        }
+    }
+
     public async Task<Shift> InsertShiftAsync(Shift shift)
     {
         ArgumentNullException.ThrowIfNull(shift);

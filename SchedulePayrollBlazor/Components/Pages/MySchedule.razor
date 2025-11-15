@@ -1,154 +1,281 @@
-@page "/myschedule"
-@attribute [Authorize(Roles = "Employee")]
-@inject AppDbContext Db
-@inject AuthenticationStateProvider AuthStateProvider
-@inject NavigationManager Nav
-@using Microsoft.EntityFrameworkCore
-@using SchedulePayrollBlazor.Data.Models
-@using System.Security.Claims
+@page "/my-schedule"
+@attribute [Authorize]
 @using System.Globalization
+@using System.Security.Claims
+@using SchedulePayrollBlazor.Data.Models
+@inject IShiftService ShiftService
+@inject AuthenticationStateProvider AuthStateProvider
 
-<div class="ps-page">
-    <div class="ps-page-header">
-        <div>
-            <h2>My schedule</h2>
-            <p class="ps-subtitle">View your upcoming shifts and plan ahead.</p>
+<div class="ps-schedule-page">
+    <div class="ps-schedule-header-bar">
+        <div class="ps-schedule-heading">
+            <h1 class="ps-schedule-title">My schedule</h1>
+            <p class="ps-schedule-subtitle">Review your upcoming shifts and stay prepared for the week ahead.</p>
         </div>
     </div>
 
-    <section class="ps-card">
-        <div class="ps-card-header">
-            <h3>Select date</h3>
-            <p class="ps-subtitle">Choose a day to focus your view.</p>
-        </div>
-        <div class="row g-3 align-items-end">
-            <div class="col-sm-4 col-12">
-                <label for="my-schedule-date" class="form-label">Date</label>
-                <input id="my-schedule-date" class="form-control" type="date" value="@dateString" @onchange="OnDateChanged" />
-            </div>
-            <div class="col-auto">
-                <button class="btn btn-outline-secondary" type="button" @onclick="LoadShifts">Load</button>
+    <div class="ps-tabs" role="tablist">
+        <button type="button" class="ps-tab ps-tab-active" aria-current="page">My schedule</button>
+        <button type="button" class="ps-tab" disabled>Shift history</button>
+    </div>
+
+    <div class="ps-filter-row">
+        <div class="ps-filter-group">
+            <div class="ps-filter-field">
+                <span class="ps-filter-label">Date:</span>
+                <input type="month" class="ps-filter-control" value="@MonthInputValue" @onchange="OnMonthChanged" />
             </div>
         </div>
-    </section>
+    </div>
 
-    @if (shifts == null)
-    {
-        <div class="ps-card">
-            <div class="loading">Loading...</div>
-        </div>
-    }
-    else if (!shifts.Any())
-    {
-        <div class="ps-card">
-            <div class="text-muted">No shifts found for the selected date.</div>
-        </div>
-    }
-    else
-    {
-        <section class="ps-card">
-            <div class="ps-card-header">
-                <h3>Upcoming shifts</h3>
-                <p class="ps-subtitle">Shifts for the selected day or week.</p>
+    <div class="ps-schedule-card">
+        <div class="ps-schedule-header">
+            <div class="ps-schedule-nav-buttons">
+                <button type="button" class="ps-button ps-button-ghost ps-icon-button" @onclick="GoToPreviousWeek" disabled="@_isLoading" aria-label="Previous week">
+                    ‹
+                </button>
             </div>
-            <div class="table-responsive">
-                <table class="table table-striped table-hover align-middle">
-                    <thead>
-                        <tr>
-                            <th scope="col">Date</th>
-                            <th scope="col">Start</th>
-                            <th scope="col">End</th>
-                            <th scope="col">Duration</th>
-                            <th scope="col">Group</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @foreach (var shift in shifts)
-                        {
-                            <tr>
-                                <td>@shift.Start.ToString("dddd, MMM dd")</td>
-                                <td>@shift.Start.ToString("hh:mm tt", CultureInfo.InvariantCulture)</td>
-                                <td>@shift.End.ToString("hh:mm tt", CultureInfo.InvariantCulture)</td>
-                                <td>@((shift.End - shift.Start).TotalHours.ToString("F1")) hrs</td>
-                                <td>@(string.IsNullOrWhiteSpace(shift.GroupName) ? "Unassigned" : shift.GroupName)</td>
-                            </tr>
-                        }
-                    </tbody>
-                </table>
+            <div class="ps-schedule-week-label">@GetWeekRangeLabel()</div>
+            <div class="ps-schedule-nav-buttons">
+                <button type="button" class="ps-button ps-button-ghost ps-icon-button" @onclick="GoToNextWeek" disabled="@_isLoading" aria-label="Next week">
+                    ›
+                </button>
             </div>
-        </section>
-    }
-</div>
+        </div>
 
-@code {
-    private int employeeId;
-    private string dateString = DateTime.Today.ToString("yyyy-MM-dd");
-    private List<Shift>? shifts;
-
-    protected override async Task OnInitializedAsync()
-    {
-        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
-        var user = authState.User;
-        var role = user.FindFirst(ClaimTypes.Role)?.Value;
-
-        if (!string.Equals(role, "Employee", StringComparison.OrdinalIgnoreCase))
+        @if (_isLoading && !_shifts.Any())
         {
-            Nav.NavigateTo("/login", forceLoad: true);
-            return;
+            <div class="ps-schedule-loading">Loading shifts...</div>
         }
-
-        var empIdClaim = user.FindFirst("EmployeeId")?.Value ?? user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-
-        if (int.TryParse(empIdClaim, out employeeId))
+        else if (!string.IsNullOrEmpty(_errorMessage))
         {
-            await LoadShifts();
+            <div class="ps-alert ps-alert-danger" role="alert">@_errorMessage</div>
         }
         else
         {
-            Nav.NavigateTo("/login", forceLoad: true);
+            <div class="ps-schedule-grid">
+                @foreach (var day in GetWeekDays())
+                {
+                    var dayShifts = _shifts
+                        .Where(s => s.Start.Date == day.Date)
+                        .OrderBy(s => s.Start)
+                        .ToList();
+
+                    <div class="ps-schedule-column">
+                        <div class="ps-schedule-column-header">
+                            <div class="ps-schedule-day-name">@day.ToString("ddd", CultureInfo.InvariantCulture)</div>
+                            <div class="ps-schedule-day-date">@day.ToString("dd", CultureInfo.InvariantCulture)</div>
+                        </div>
+                        <div class="ps-schedule-column-body">
+                            @if (_isLoading && dayShifts.Count == 0)
+                            {
+                                <div class="ps-schedule-loading">Loading shifts...</div>
+                            }
+                            else if (dayShifts.Count == 0)
+                            {
+                                <div class="ps-schedule-empty">No shifts</div>
+                            }
+                            else
+                            {
+                                foreach (var shift in dayShifts)
+                                {
+                                    <div class="ps-shift-card">
+                                        <div class="ps-shift-accent"></div>
+                                        <div class="ps-shift-body">
+                                            <div class="ps-shift-employee">@ResolveEmployeeLabel(shift)</div>
+                                            <div class="ps-shift-time">@shift.Start.ToString("hh:mm tt", CultureInfo.InvariantCulture) – @shift.End.ToString("hh:mm tt", CultureInfo.InvariantCulture)</div>
+                                            @if (!string.IsNullOrWhiteSpace(shift.GroupName))
+                                            {
+                                                <div class="ps-shift-more">@shift.GroupName</div>
+                                            }
+                                        </div>
+                                    </div>
+                                }
+                            }
+                        </div>
+                    </div>
+                }
+            </div>
+
+            @if (!_isLoading && !_shifts.Any())
+            {
+                <div class="ps-schedule-empty">No shifts scheduled for this week.</div>
+            }
+        }
+    </div>
+</div>
+
+@code {
+    private readonly List<Shift> _shifts = new();
+    private bool _isLoading;
+    private string? _errorMessage;
+    private int _employeeId;
+    private string? _employeeName;
+    private DateTime _weekStart;
+    private DateTime _selectedMonth;
+
+    private string MonthInputValue => _selectedMonth.ToString("yyyy-MM", CultureInfo.InvariantCulture);
+
+    protected override async Task OnInitializedAsync()
+    {
+        var today = DateTime.Today;
+        _weekStart = StartOfWeek(today);
+        _selectedMonth = new DateTime(today.Year, today.Month, 1);
+
+        await LoadEmployeeAsync();
+
+        if (_employeeId > 0 && string.IsNullOrEmpty(_errorMessage))
+        {
+            await RefreshShiftsAsync();
         }
     }
 
-    private Task OnDateChanged(ChangeEventArgs e)
+    private async Task LoadEmployeeAsync()
     {
-        dateString = Convert.ToString(e.Value, CultureInfo.InvariantCulture) ?? dateString;
-        return Task.CompletedTask;
+        _isLoading = true;
+        _errorMessage = null;
+        _employeeId = 0;
+
+        try
+        {
+            var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+            var user = authState.User;
+
+            if (!(user.Identity?.IsAuthenticated ?? false))
+            {
+                _errorMessage = "You must be logged in to view your schedule.";
+                return;
+            }
+
+            var displayName = user.Identity?.Name ?? user.FindFirst(ClaimTypes.Email)?.Value;
+            _employeeName = string.IsNullOrWhiteSpace(displayName) ? null : displayName.Trim();
+
+            var employeeIdClaim = user.FindFirst("EmployeeId")?.Value;
+            if (int.TryParse(employeeIdClaim, out var parsedEmployeeId))
+            {
+                _employeeId = parsedEmployeeId;
+                return;
+            }
+
+            var userIdClaim = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            var email = user.FindFirst(ClaimTypes.Email)?.Value;
+
+            var resolvedEmployeeId = await ShiftService.ResolveEmployeeIdForUserAsync(userIdClaim, email);
+            if (resolvedEmployeeId.HasValue)
+            {
+                _employeeId = resolvedEmployeeId.Value;
+            }
+            else
+            {
+                _errorMessage = "We couldn't find your employee record.";
+            }
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = ex.Message;
+        }
+        finally
+        {
+            _isLoading = false;
+        }
     }
 
-    private async Task LoadShifts()
+    private async Task RefreshShiftsAsync()
     {
-        if (!DateTime.TryParseExact(dateString, "yyyy-MM-dd",
-                CultureInfo.InvariantCulture, DateTimeStyles.None, out var date))
+        if (_employeeId <= 0)
         {
-            shifts = new();
+            _shifts.Clear();
             return;
         }
 
-        var selectedDate = date.Date;
+        _isLoading = true;
+        _errorMessage = null;
 
-        shifts = await Db.Shifts
-            .Where(s => s.EmployeeId == employeeId && s.Start.Date == selectedDate)
-            .OrderBy(s => s.Start)
-            .ToListAsync();
-
-        if (!shifts.Any())
+        try
         {
-            var startOfWeek = GetWeekStart(selectedDate);
-            var endOfWeek = startOfWeek.AddDays(7);
+            var weekEnd = _weekStart.AddDays(7);
+            var result = await ShiftService.GetShiftsForEmployeeAsync(_employeeId, _weekStart, weekEnd);
 
-            shifts = await Db.Shifts
-                .Where(s =>
-                    s.EmployeeId == employeeId &&
-                    s.Start >= startOfWeek &&
-                    s.Start < endOfWeek)
-                .OrderBy(s => s.Start)
-                .ToListAsync();
+            _shifts.Clear();
+            if (result is not null)
+            {
+                _shifts.AddRange(result);
+            }
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = ex.Message;
+        }
+        finally
+        {
+            _isLoading = false;
         }
     }
 
-    private static DateTime GetWeekStart(DateTime date)
+    private async Task OnMonthChanged(ChangeEventArgs e)
+    {
+        var value = Convert.ToString(e.Value, CultureInfo.InvariantCulture);
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return;
+        }
+
+        if (DateTime.TryParseExact(value + "-01", "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var selected))
+        {
+            _selectedMonth = new DateTime(selected.Year, selected.Month, 1);
+            _weekStart = StartOfWeek(_selectedMonth);
+            await RefreshShiftsAsync();
+        }
+    }
+
+    private async Task GoToPreviousWeek()
+    {
+        _weekStart = _weekStart.AddDays(-7);
+        _selectedMonth = new DateTime(_weekStart.Year, _weekStart.Month, 1);
+        await RefreshShiftsAsync();
+    }
+
+    private async Task GoToNextWeek()
+    {
+        _weekStart = _weekStart.AddDays(7);
+        _selectedMonth = new DateTime(_weekStart.Year, _weekStart.Month, 1);
+        await RefreshShiftsAsync();
+    }
+
+    private IEnumerable<DateTime> GetWeekDays()
+    {
+        for (var i = 0; i < 7; i++)
+        {
+            yield return _weekStart.AddDays(i);
+        }
+    }
+
+    private string GetWeekRangeLabel()
+    {
+        var end = _weekStart.AddDays(6);
+        if (_weekStart.Month == end.Month)
+        {
+            return $"{_weekStart:MMMM d} – {end:MMMM d, yyyy}";
+        }
+
+        return $"{_weekStart:MMM d} – {end:MMM d, yyyy}";
+    }
+
+    private static DateTime StartOfWeek(DateTime date)
     {
         var diff = (7 + (date.DayOfWeek - DayOfWeek.Sunday)) % 7;
         return date.Date.AddDays(-diff);
+    }
+
+    private string ResolveEmployeeLabel(Shift shift)
+    {
+        if (!string.IsNullOrWhiteSpace(_employeeName))
+        {
+            return _employeeName;
+        }
+
+        return string.IsNullOrWhiteSpace(shift.EmployeeName)
+            ? "My shift"
+            : shift.EmployeeName;
     }
 }

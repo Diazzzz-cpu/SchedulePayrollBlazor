@@ -77,13 +77,13 @@
                     <div class="shift-modal-footer">
                         @if (OnDelete.HasDelegate && _formModel.Id.HasValue)
                         {
-                            <button type="button" class="ps-button ps-button-danger" @onclick="DeleteAsync" disabled="_isSubmitting">
+                            <button type="button" class="ps-button ps-button-danger" @onclick="DeleteAsync" disabled="_isSubmitting || IsBusy">
                                 Delete shift
                             </button>
                         }
                         <div class="shift-modal-footer-actions">
-                            <button type="button" class="ps-button ps-button-ghost" @onclick="CancelAsync" disabled="_isSubmitting">Cancel</button>
-                            <button type="submit" class="ps-button ps-button-primary" disabled="_isSubmitting">Save shift</button>
+                            <button type="button" class="ps-button ps-button-ghost" @onclick="CancelAsync" disabled="_isSubmitting || IsBusy">Cancel</button>
+                            <button type="submit" class="ps-button ps-button-primary" disabled="_isSubmitting || IsBusy">Save shift</button>
                         </div>
                     </div>
                 </EditForm>
@@ -108,6 +108,7 @@
     [Parameter] public EventCallback<int> OnDelete { get; set; }
     [Parameter] public string Title { get; set; } = "Create shift";
     [Parameter] public string? ErrorMessage { get; set; }
+    [Parameter] public bool IsBusy { get; set; }
 
     protected override void OnParametersSet()
     {
@@ -191,12 +192,18 @@
         finally
         {
             _isSubmitting = false;
+            await InvokeAsync(StateHasChanged);
         }
     }
 
-    private Task CancelAsync()
+    private async Task CancelAsync()
     {
-        return InvokeAsync(async () =>
+        if (_isSubmitting || IsBusy)
+        {
+            return;
+        }
+
+        await InvokeAsync(async () =>
         {
             if (OnCancel.HasDelegate)
             {
@@ -210,14 +217,23 @@
         });
     }
 
-    private Task DeleteAsync()
+    private async Task DeleteAsync()
     {
         if (!OnDelete.HasDelegate || !_formModel.Id.HasValue)
         {
-            return Task.CompletedTask;
+            return;
         }
 
-        return OnDelete.InvokeAsync(_formModel.Id.Value);
+        _isSubmitting = true;
+        try
+        {
+            await OnDelete.InvokeAsync(_formModel.Id.Value);
+        }
+        finally
+        {
+            _isSubmitting = false;
+            await InvokeAsync(StateHasChanged);
+        }
     }
 
     private void HandleValidationRequested(object? sender, ValidationRequestedEventArgs args)
@@ -287,7 +303,8 @@
     private void OnStartChanged(ChangeEventArgs e)
     {
         var value = Convert.ToString(e.Value, CultureInfo.InvariantCulture);
-        if (TimeSpan.TryParse(value, CultureInfo.InvariantCulture, out var time))
+        if (!string.IsNullOrWhiteSpace(value) &&
+            TimeSpan.TryParseExact(value, "hh\\:mm", CultureInfo.InvariantCulture, TimeSpanStyles.None, out var time))
         {
             _formModel.StartTime = time;
         }
@@ -298,7 +315,8 @@
     private void OnEndChanged(ChangeEventArgs e)
     {
         var value = Convert.ToString(e.Value, CultureInfo.InvariantCulture);
-        if (TimeSpan.TryParse(value, CultureInfo.InvariantCulture, out var time))
+        if (!string.IsNullOrWhiteSpace(value) &&
+            TimeSpan.TryParseExact(value, "hh\\:mm", CultureInfo.InvariantCulture, TimeSpanStyles.None, out var time))
         {
             _formModel.EndTime = time;
         }

@@ -144,7 +144,8 @@
             OnSave="OnModalSave"
             OnCancel="OnModalCancel"
             OnDelete="OnModalDelete"
-            ErrorMessage="_modalError" />
+            ErrorMessage="@_modalError"
+            IsBusy="_isModalBusy" />
     }
 </div>
 
@@ -164,6 +165,7 @@
     private bool _isNewShift;
     private Shift? _editingShift;
     private string? _modalError;
+    private bool _isModalBusy;
 
     private string? SelectedGroup
     {
@@ -480,6 +482,7 @@
             return;
         }
 
+        _isModalBusy = true;
         try
         {
             _modalError = null;
@@ -494,6 +497,7 @@
             }
 
             _isModalOpen = false;
+            _editingShift = null;
             await LoadShiftsAsync();
         }
         catch (Exception ex)
@@ -501,12 +505,18 @@
             _modalError = ex.Message;
             _editingShift = model;
         }
+        finally
+        {
+            _isModalBusy = false;
+            await InvokeAsync(StateHasChanged);
+        }
     }
 
     private Task OnModalCancel()
     {
         _modalError = null;
         _isModalOpen = false;
+        _editingShift = null;
         return Task.CompletedTask;
     }
 
@@ -516,6 +526,7 @@
         if (!isOpen)
         {
             _modalError = null;
+            _editingShift = null;
         }
 
         return Task.CompletedTask;
@@ -528,6 +539,7 @@
             return;
         }
 
+        _isModalBusy = true;
         try
         {
             _modalError = null;
@@ -539,11 +551,17 @@
             }
 
             _isModalOpen = false;
+            _editingShift = null;
             await LoadShiftsAsync();
         }
         catch (Exception ex)
         {
             _modalError = ex.Message;
+        }
+        finally
+        {
+            _isModalBusy = false;
+            await InvokeAsync(StateHasChanged);
         }
     }
 

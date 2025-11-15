@@ -32,10 +32,10 @@ public class AdminUserService
                 FirstName = u.FirstName,
                 LastName = u.LastName,
 
-                // match User model: RoleId (not RoleID)
+                // match User model: RoleId
                 RoleId = u.RoleId,
 
-                // match Role model: Name (not RoleName)
+                // match Role model: Name
                 RoleName = u.Role != null ? u.Role.Name : string.Empty,
 
                 CreatedAt = u.CreatedAt,
@@ -93,10 +93,7 @@ public class AdminUserService
                 var employee = new Employee
                 {
                     UserId = user.UserId,
-
-                    // store full name in Employee
                     FullName = $"{user.FirstName} {user.LastName}".Trim(),
-
                     Department = model.Department?.Trim() ?? string.Empty,
                     JobTitle = model.JobTitle?.Trim() ?? string.Empty,
                     EmploymentType = ParseEmploymentType(model.EmploymentType),
@@ -182,6 +179,7 @@ public class AdminUserService
                 user.Employee.FullName = $"{user.FirstName} {user.LastName}".Trim();
                 user.Employee.Department = model.Department?.Trim() ?? string.Empty;
                 user.Employee.JobTitle = model.JobTitle?.Trim() ?? string.Empty;
+
                 if (!string.IsNullOrWhiteSpace(model.EmploymentType))
                 {
                     user.Employee.EmploymentType = ParseEmploymentType(model.EmploymentType);
@@ -211,6 +209,28 @@ public class AdminUserService
         }
     }
 
+    // NEW: restore DeleteUserAsync so AdminUsers.razor can call it
+    public async Task<(bool Success, string? ErrorMessage)> DeleteUserAsync(int userId, int currentUserId)
+    {
+        if (userId == currentUserId)
+        {
+            return (false, "You cannot delete your own account while signed in.");
+        }
+
+        var user = await _dbContext.Users
+            .Include(u => u.Employee)
+            .FirstOrDefaultAsync(u => u.UserId == userId);
+
+        if (user is null)
+        {
+            return (false, "User not found.");
+        }
+
+        _dbContext.Users.Remove(user);
+        await _dbContext.SaveChangesAsync();
+        return (true, null);
+    }
+
     private async Task<Role> EnsureRoleAsync(string roleCode)
     {
         var normalizedCode = roleCode.Trim();
@@ -236,10 +256,9 @@ public class AdminUserService
     private static bool ShouldCreateEmployee(AdminUserFormModel model)
         => !string.Equals(model.Role, "Admin", StringComparison.OrdinalIgnoreCase);
 
-    private static readonly SimplePasswordHasher PasswordHasher = new();
-
+    // Simple temp password generator – no SimplePasswordHasher needed
     private static string GenerateTemporaryPassword()
-        => PasswordHasher.GenerateRandomPassword();
+        => Guid.NewGuid().ToString("N")[..10];
 
     private static EmploymentType ParseEmploymentType(string? employmentType)
     {

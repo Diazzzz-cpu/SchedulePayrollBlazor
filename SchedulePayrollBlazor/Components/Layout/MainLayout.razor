@@ -1,10 +1,9 @@
 @inherits LayoutComponentBase
 @using Microsoft.JSInterop
+@using Microsoft.AspNetCore.Components
 @using Microsoft.AspNetCore.Components.Authorization
 
 @inject IJSRuntime JS
-@CascadingParameter
-private Task<AuthenticationState>? AuthenticationStateTask { get; set; }
 
 <div class="ps-app">
     <AuthorizeView>
@@ -64,6 +63,9 @@ private Task<AuthenticationState>? AuthenticationStateTask { get; set; }
 </div>
 
 @code {
+    [CascadingParameter]
+    private Task<AuthenticationState>? AuthenticationStateTask { get; set; }
+
     private bool _isAuthenticated;
     private bool _syncRequested = true;
 

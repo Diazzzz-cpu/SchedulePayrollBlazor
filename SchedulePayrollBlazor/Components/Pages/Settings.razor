@@ -1,17 +1,113 @@
 @page "/settings"
-@attribute [Authorize(Roles = "Admin")]
+@attribute [Authorize]
+@using Microsoft.JSInterop
 
-<div class="page">
-    <header class="page-header">
+@inject IJSRuntime JS
+
+<div class="ps-page">
+    <div class="ps-page-header">
         <div>
-            <h1 class="page-title">Company Settings</h1>
-            <p class="page-subtitle">Configure payroll, scheduling, and HR preferences.</p>
-        </div>
-    </header>
-
-    <div class="content-card">
-        <div class="alert alert-info">
-            Settings management is coming soon. Use the navigation to manage employees, schedules, and payroll in the meantime.
+            <h2>Settings</h2>
+            <p class="ps-subtitle">Personalize PaySync to match how you work.</p>
         </div>
     </div>
+
+    <section class="ps-card ps-settings-section">
+        <div class="ps-card-header">
+            <h3>Appearance</h3>
+            <p class="ps-subtitle">Choose between light and dark theme for PaySync.</p>
+        </div>
+        <p class="ps-settings-intro">
+            Switch modes based on your workspace lighting. Your preference is remembered for the next time you sign in.
+        </p>
+        <div class="ps-theme-options" role="radiogroup" aria-label="Theme selection">
+            <label class="ps-theme-option @(IsLight ? "active" : string.Empty)" data-theme-preview="light">
+                <input type="radio"
+                       name="theme"
+                       value="light"
+                       checked="@IsLight"
+                       @onchange="@(async _ => await ChangeTheme("light"))"
+                       aria-label="Use light theme" />
+                <div>
+                    <span class="ps-theme-label">Light</span>
+                    <p class="ps-theme-description">Balanced contrast that keeps focus on your data.</p>
+                </div>
+                <div class="ps-theme-swatch" aria-hidden="true"></div>
+            </label>
+
+            <label class="ps-theme-option @(IsDark ? "active" : string.Empty)" data-theme-preview="dark">
+                <input type="radio"
+                       name="theme"
+                       value="dark"
+                       checked="@IsDark"
+                       @onchange="@(async _ => await ChangeTheme("dark"))"
+                       aria-label="Use dark theme" />
+                <div>
+                    <span class="ps-theme-label">Dark</span>
+                    <p class="ps-theme-description">A deep interface for low-light environments.</p>
+                </div>
+                <div class="ps-theme-swatch" aria-hidden="true"></div>
+            </label>
+        </div>
+    </section>
+
+    <section class="ps-card ps-settings-section">
+        <div class="ps-card-header">
+            <h3>Account preferences</h3>
+            <p class="ps-subtitle">Additional settings will roll out soon.</p>
+        </div>
+        <div class="ps-settings-note">
+            Settings management for payroll, scheduling, and HR automation is under active development. Continue using the navigation to manage employees, shifts, and payroll runs until these controls are ready.
+        </div>
+    </section>
 </div>
+
+@code {
+    private string currentTheme = "light";
+    private bool _themeInitialized;
+
+    private bool IsLight => string.Equals(currentTheme, "light", StringComparison.OrdinalIgnoreCase);
+    private bool IsDark => string.Equals(currentTheme, "dark", StringComparison.OrdinalIgnoreCase);
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await InitializeThemeAsync();
+        }
+    }
+
+    private async Task InitializeThemeAsync()
+    {
+        try
+        {
+            currentTheme = await JS.InvokeAsync<string>("paySyncTheme.init");
+        }
+        catch (JSException)
+        {
+            currentTheme = "light";
+        }
+
+        _themeInitialized = true;
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task ChangeTheme(string theme)
+    {
+        if (!_themeInitialized)
+        {
+            await InitializeThemeAsync();
+        }
+
+        try
+        {
+            currentTheme = await JS.InvokeAsync<string>("paySyncTheme.setTheme", theme);
+        }
+        catch (JSException)
+        {
+            currentTheme = string.Equals(theme, "dark", StringComparison.OrdinalIgnoreCase) ? "dark" : "light";
+        }
+
+        await InvokeAsync(StateHasChanged);
+    }
+}

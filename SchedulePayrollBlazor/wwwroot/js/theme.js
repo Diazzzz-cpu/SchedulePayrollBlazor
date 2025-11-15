@@ -2,8 +2,12 @@
     const STORAGE_KEY = 'ps-theme';
     const root = document.documentElement;
 
+    function normalizeTheme(theme) {
+        return theme === 'dark' ? 'dark' : 'light';
+    }
+
     function applyTheme(theme) {
-        const normalized = theme === 'dark' ? 'dark' : 'light';
+        const normalized = normalizeTheme(theme);
         root.dataset.theme = normalized;
         return normalized;
     }
@@ -23,7 +27,7 @@
 
     function storeTheme(theme) {
         try {
-            window.localStorage.setItem(STORAGE_KEY, theme);
+            window.localStorage.setItem(STORAGE_KEY, normalizeTheme(theme));
         } catch (error) {
             console.warn('PaySync theme storage unavailable.', error);
         }
@@ -48,12 +52,13 @@
             storeTheme(theme);
             return theme;
         },
-        toggle() {
-            const current = root.dataset.theme === 'dark' ? 'dark' : 'light';
-            const next = current === 'dark' ? 'light' : 'dark';
-            const applied = applyTheme(next);
+        setTheme(theme) {
+            const applied = applyTheme(theme);
             storeTheme(applied);
             return applied;
+        },
+        getTheme() {
+            return root.dataset.theme === 'dark' ? 'dark' : 'light';
         }
     };
 })();

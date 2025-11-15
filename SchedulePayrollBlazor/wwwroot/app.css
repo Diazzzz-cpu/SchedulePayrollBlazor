@@ -1,17 +1,17 @@
 :root {
     color-scheme: light;
-    --ps-bg: #f4f6fb;
-    --ps-bg-soft: #eef1fb;
+    --ps-bg: #f5f7fb;
+    --ps-bg-soft: #edf1f9;
     --ps-surface: #ffffff;
-    --ps-surface-alt: #f8fafc;
-    --ps-sidebar-bg: #eef2fb;
+    --ps-surface-alt: #f3f5fb;
+    --ps-sidebar-bg: #eef1f8;
     --ps-sidebar-text: #1f2937;
-    --ps-topbar-bg: #e7ecf7;
+    --ps-topbar-bg: #ffffff;
     --ps-topbar-border: rgba(148, 163, 184, 0.35);
-    --ps-border: #d9e2ef;
-    --ps-border-strong: #b7c3de;
-    --ps-shadow-soft: 0 22px 46px -26px rgba(37, 99, 235, 0.35);
-    --ps-shadow-card: 0 24px 48px -32px rgba(15, 23, 42, 0.12);
+    --ps-border: rgba(148, 163, 184, 0.35);
+    --ps-border-strong: rgba(100, 116, 139, 0.45);
+    --ps-shadow-soft: 0 28px 60px -38px rgba(15, 23, 42, 0.28);
+    --ps-shadow-card: 0 22px 46px -32px rgba(15, 23, 42, 0.16);
     --ps-text: #0f172a;
     --ps-muted-text: #64748b;
     --ps-secondary-text: #475569;
@@ -21,7 +21,10 @@
     --ps-primary-strong: rgba(37, 99, 235, 0.18);
     --ps-secondary: #7c3aed;
     --ps-secondary-soft: rgba(124, 58, 237, 0.12);
-    --ps-primary-shadow: rgba(37, 99, 235, 0.35);
+    --ps-primary-shadow: rgba(37, 99, 235, 0.4);
+    --ps-success: #16a34a;
+    --ps-warning: #d97706;
+    --ps-danger: #dc2626;
     --ps-success-bg: #ecfdf5;
     --ps-success-text: #047857;
     --ps-success-border: rgba(16, 185, 129, 0.35);
@@ -44,11 +47,11 @@
     --ps-surface-alt: #253147;
     --ps-sidebar-bg: #161f33;
     --ps-sidebar-text: #e2e8f0;
-    --ps-topbar-bg: #182338;
+    --ps-topbar-bg: #17223a;
     --ps-topbar-border: rgba(148, 163, 184, 0.22);
-    --ps-border: rgba(148, 163, 184, 0.2);
+    --ps-border: rgba(148, 163, 184, 0.22);
     --ps-border-strong: rgba(148, 163, 184, 0.35);
-    --ps-shadow-soft: 0 20px 40px -32px rgba(2, 6, 23, 0.72);
+    --ps-shadow-soft: 0 24px 54px -36px rgba(2, 6, 23, 0.8);
     --ps-shadow-card: 0 28px 48px -28px rgba(2, 6, 23, 0.65);
     --ps-text: #e2e8f0;
     --ps-muted-text: #94a3b8;
@@ -59,7 +62,10 @@
     --ps-primary-strong: rgba(96, 165, 250, 0.28);
     --ps-secondary: #a78bfa;
     --ps-secondary-soft: rgba(167, 139, 250, 0.16);
-    --ps-primary-shadow: rgba(96, 165, 250, 0.38);
+    --ps-primary-shadow: rgba(96, 165, 250, 0.42);
+    --ps-success: #34d399;
+    --ps-warning: #fbbf24;
+    --ps-danger: #f87171;
     --ps-success-bg: rgba(34, 197, 94, 0.18);
     --ps-success-text: #34d399;
     --ps-success-border: rgba(52, 211, 153, 0.32);
@@ -313,32 +319,109 @@ small {
     font-weight: 500;
 }
 
-.ps-theme-toggle {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.4rem;
-    padding: 0.35rem 0.95rem;
-    border-radius: 999px;
-    border: 1px solid var(--ps-border);
-    background: var(--ps-surface-alt);
+.ps-settings-section {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.ps-settings-section + .ps-settings-section {
+    margin-top: 1.5rem;
+}
+
+.ps-settings-intro {
+    max-width: 560px;
     color: var(--ps-muted-text);
-    font-size: 0.85rem;
-    font-weight: 500;
+    font-size: 0.95rem;
+}
+
+.ps-theme-options {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 1rem;
+}
+
+.ps-theme-option {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.85rem;
+    border: 1px solid var(--ps-border);
+    border-radius: 1rem;
+    padding: 1rem 1.1rem;
+    background: var(--ps-surface-alt);
     cursor: pointer;
-    transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease, box-shadow 150ms ease;
+    transition: border-color 150ms ease, box-shadow 150ms ease, background-color 150ms ease;
 }
 
-.ps-theme-toggle:hover,
-.ps-theme-toggle:focus-visible {
-    background: var(--ps-primary-soft);
-    color: var(--ps-primary);
+.ps-theme-option:hover,
+.ps-theme-option:focus-within {
     border-color: var(--ps-primary);
-    box-shadow: 0 8px 20px -16px var(--ps-primary);
-    text-decoration: none;
+    box-shadow: 0 0 0 0.25rem var(--ps-primary-soft);
 }
 
-.ps-theme-toggle:focus-visible {
-    outline: none;
+.ps-theme-option input[type="radio"] {
+    margin-top: 0.2rem;
+    accent-color: var(--ps-primary);
+}
+
+.ps-theme-label {
+    font-weight: 600;
+    color: var(--ps-text);
+}
+
+.ps-theme-description {
+    margin-top: 0.25rem;
+    font-size: 0.9rem;
+    color: var(--ps-muted-text);
+}
+
+.ps-theme-swatch {
+    width: 48px;
+    height: 30px;
+    border-radius: 0.85rem;
+    background: linear-gradient(135deg, var(--ps-surface) 55%, var(--ps-primary-soft) 45%);
+    border: 1px solid var(--ps-border);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18);
+    position: relative;
+    margin-left: auto;
+}
+
+.ps-theme-swatch::after {
+    content: "";
+    position: absolute;
+    bottom: 6px;
+    right: 6px;
+    width: 14px;
+    height: 14px;
+    border-radius: 0.5rem;
+    background: var(--ps-primary);
+    opacity: 0.75;
+}
+
+.ps-theme-option[data-theme-preview="dark"] .ps-theme-swatch {
+    background: linear-gradient(135deg, #111827 55%, rgba(96, 165, 250, 0.4) 45%);
+    border-color: rgba(148, 163, 184, 0.4);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.ps-theme-option.active {
+    border-color: var(--ps-primary);
+    box-shadow: 0 0 0 0.3rem var(--ps-primary-soft);
+    background: linear-gradient(180deg, var(--ps-primary-soft) 0%, var(--ps-surface-alt) 100%);
+}
+
+.ps-theme-option.active .ps-theme-label {
+    color: var(--ps-primary);
+}
+
+.ps-settings-note {
+    padding: 1rem 1.25rem;
+    border-radius: 0.85rem;
+    border: 1px solid var(--ps-border);
+    background: var(--ps-secondary-soft);
+    color: var(--ps-secondary-text);
+    font-size: 0.9rem;
+    line-height: 1.5;
 }
 
 .ps-content {
@@ -497,11 +580,11 @@ small {
     background: var(--ps-surface-alt);
     border-bottom: 1px solid var(--ps-border);
     text-align: left;
-    padding: 0.85rem 1.5rem;
+    padding: 0.85rem 1.9rem;
 }
 
 .ps-table tbody td {
-    padding: 0.75rem 1.5rem;
+    padding: 0.8rem 1.9rem;
     border-bottom: 1px solid var(--ps-border);
     color: var(--ps-text);
     vertical-align: middle;

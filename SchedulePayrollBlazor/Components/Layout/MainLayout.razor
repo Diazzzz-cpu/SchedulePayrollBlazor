@@ -1,7 +1,10 @@
 @inherits LayoutComponentBase
 @using Microsoft.JSInterop
+@using Microsoft.AspNetCore.Components.Authorization
 
 @inject IJSRuntime JS
+@CascadingParameter
+private Task<AuthenticationState>? AuthenticationStateTask { get; set; }
 
 <div class="ps-app">
     <AuthorizeView>
@@ -43,14 +46,6 @@
             </div>
             <div class="ps-topbar-actions">
                 <div class="ps-topbar-meta">Internal payroll &amp; scheduling</div>
-                <button type="button"
-                        class="ps-theme-toggle"
-                        @onclick="ToggleTheme"
-                        aria-pressed="@_isDark.ToString().ToLowerInvariant()"
-                        aria-label="@ThemeButtonAriaLabel"
-                        title="Toggle light or dark theme">
-                    @ThemeButtonLabel
-                </button>
             </div>
         </header>
 
@@ -69,54 +64,63 @@
 </div>
 
 @code {
-    private bool _isDark;
-    private bool _initialized;
+    private bool _isAuthenticated;
+    private bool _syncRequested = true;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        var previous = _isAuthenticated;
+        _isAuthenticated = await DetermineAuthenticationAsync();
+
+        if (_isAuthenticated != previous)
+        {
+            _syncRequested = true;
+        }
+    }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (firstRender)
+        if (firstRender || _syncRequested)
         {
-            await InitializeThemeAsync();
-            StateHasChanged();
+            await SyncThemeAsync();
+            _syncRequested = false;
         }
     }
 
-    private async Task ToggleTheme()
+    private async Task<bool> DetermineAuthenticationAsync()
     {
-        if (!_initialized)
+        if (AuthenticationStateTask is null)
         {
-            await InitializeThemeAsync();
-            StateHasChanged();
-            return;
+            return false;
         }
 
         try
         {
-            var theme = await JS.InvokeAsync<string>("paySyncTheme.toggle");
-            _isDark = string.Equals(theme, "dark", StringComparison.OrdinalIgnoreCase);
+            var state = await AuthenticationStateTask;
+            return state.User?.Identity?.IsAuthenticated ?? false;
         }
-        catch (JSException)
+        catch
         {
-            _isDark = !_isDark;
+            return false;
         }
-        StateHasChanged();
     }
 
-    private async Task InitializeThemeAsync()
+    private async Task SyncThemeAsync()
     {
         try
         {
-            var theme = await JS.InvokeAsync<string>("paySyncTheme.init");
-            _isDark = string.Equals(theme, "dark", StringComparison.OrdinalIgnoreCase);
+            if (_isAuthenticated)
+            {
+                await JS.InvokeAsync<string>("paySyncTheme.init");
+            }
+            else
+            {
+                await JS.InvokeAsync<string>("paySyncTheme.setTheme", "light");
+            }
         }
         catch (JSException)
         {
-            _isDark = false;
+            // Ignore failures to update theme gracefully.
         }
-
-        _initialized = true;
     }
-
-    private string ThemeButtonLabel => _isDark ? "☀ Light mode" : "🌙 Dark mode";
-    private string ThemeButtonAriaLabel => _isDark ? "Switch to light theme" : "Switch to dark theme";
 }

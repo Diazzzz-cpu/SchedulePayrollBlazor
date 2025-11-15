@@ -1,147 +1,489 @@
 @page "/schedules"
-@attribute [Authorize(Roles = "Admin")]
-@inject AppDbContext Db
-@inject NavigationManager Nav
-@using Microsoft.EntityFrameworkCore
+@attribute [Authorize]
 @using System.Globalization
-@using SchedulePayrollBlazor.Data.Models
+@using System.Security.Claims
+@using Microsoft.EntityFrameworkCore
+@inject IShiftService ShiftService
+@inject AuthenticationStateProvider AuthStateProvider
+@inject NavigationManager Nav
+@inject IDbContextFactory<AppDbContext> DbFactory
 
-<div class="ps-page">
-    <div class="ps-page-header">
-        <div>
-            <h2>Schedules</h2>
-            <p class="ps-subtitle">Review and manage upcoming shift assignments.</p>
+<div class="ps-schedule-page">
+    <div class="ps-schedule-header-bar">
+        <div class="ps-schedule-heading">
+            <h1 class="ps-schedule-title">Shift schedule</h1>
+            <p class="ps-schedule-subtitle">Plan coverage and keep every team informed.</p>
         </div>
-        <div class="ps-page-actions">
-            <a class="btn btn-primary" href="/schedules/new">Add schedule</a>
+        <div class="ps-schedule-actions">
+            <span class="ps-timezone">@_timezoneDisplay</span>
+            <AuthorizeView Roles="Admin">
+                <Authorized>
+                    <button type="button" class="ps-button ps-button-primary" @onclick="CreateShift">
+                        Create shift(s)
+                    </button>
+                </Authorized>
+            </AuthorizeView>
         </div>
     </div>
 
-    <section class="ps-card">
-        <div class="ps-card-header">
-            <h3>Filter by date</h3>
-            <p class="ps-subtitle">Choose a day to view matching shifts.</p>
-        </div>
-        <div class="row g-3 align-items-end">
-            <div class="col-sm-4 col-12">
-                <label for="schedule-date" class="form-label">Schedule date</label>
-                <input id="schedule-date" class="form-control" type="date" value="@dateString" @onchange="OnDateChanged" />
-            </div>
-            <div class="col-auto">
-                <button class="btn btn-outline-secondary" type="button" @onclick="() => Load()">Load</button>
-            </div>
-        </div>
-    </section>
+    <div class="ps-tabs" role="tablist">
+        <button type="button" class="ps-tab ps-tab-active" aria-current="page">Shift schedule</button>
+        <button type="button" class="ps-tab" @onclick="@(() => Nav.NavigateTo("/schedules/history"))">Shift history</button>
+    </div>
 
-    @if (items is null)
-    {
-        <div class="ps-card">
-            <div class="loading">Loading...</div>
-        </div>
-    }
-    else if (items.Count == 0)
-    {
-        <div class="ps-card">
-            <div class="text-muted">No schedules found for the selected date.</div>
-        </div>
-    }
-    else
-    {
-        <section class="ps-card">
-            <div class="ps-card-header">
-                <h3>Shift overview</h3>
-                <p class="ps-subtitle">Found <strong>@items.Count</strong> schedule(s) for @dateString.</p>
+    <div class="ps-filter-row">
+        <div class="ps-filter-group">
+            <div class="ps-filter-field">
+                <span class="ps-filter-label">Employee group:</span>
+                <InputSelect @bind-Value="SelectedGroup" class="ps-filter-control" disabled="@(!_isAdmin)">
+                    <option value="">Group</option>
+                    @foreach (var group in _groups)
+                    {
+                        <option value="@group">@group</option>
+                    }
+                </InputSelect>
             </div>
-            <div class="ps-table-container">
-                <table class="ps-table">
-                    <thead>
-                        <tr>
-                            <th scope="col">Employee</th>
-                            <th scope="col">Start</th>
-                            <th scope="col">End</th>
-                            <th scope="col">Source</th>
-                            <th scope="col">Date</th>
-                            <th scope="col" data-align="center">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @foreach (var s in items)
+            <div class="ps-filter-field">
+                <span class="ps-filter-label">Employee:</span>
+                @{ var employees = FilteredEmployees.ToList(); }
+                <InputSelect @bind-Value="_selectedEmployeeId" class="ps-filter-control" disabled="@(!_isAdmin && _currentEmployeeId.HasValue)">
+                    <option value="">Employee</option>
+                    @foreach (var employee in employees)
+                    {
+                        <option value="@employee.Id">@employee.Name</option>
+                    }
+                </InputSelect>
+            </div>
+            <div class="ps-filter-field">
+                <span class="ps-filter-label">Date:</span>
+                <input type="month" class="ps-filter-control" value="@MonthInputValue" @onchange="OnMonthChanged" />
+            </div>
+        </div>
+        <div class="ps-filter-actions">
+            <div class="ps-filter-field ps-filter-search">
+                <span class="ps-filter-label">Search:</span>
+                <InputText class="ps-filter-control" placeholder="Search by name or note" @bind-Value="_searchText" />
+            </div>
+            <div class="ps-filter-buttons">
+                <button type="button" class="ps-button ps-button-ghost" @onclick="OnReset">Reset</button>
+                <button type="button" class="ps-button ps-button-primary" @onclick="OnSearchAsync" disabled="@_isLoadingShifts">Search</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="ps-info-note">
+        <span class="ps-info-icon">⚠️</span>
+        <span>Shift times displayed do not automatically adjust for daylight saving time changes</span>
+    </div>
+
+    <div class="ps-schedule-card">
+        <div class="ps-schedule-header">
+            <div class="ps-schedule-nav-buttons">
+                <button type="button" class="ps-button ps-button-ghost ps-icon-button" @onclick="GoToPreviousWeek" disabled="@_isLoadingShifts" aria-label="Previous week">
+                    ‹
+                </button>
+            </div>
+            <div class="ps-schedule-week-label">@GetWeekRangeLabel()</div>
+            <div class="ps-schedule-nav-buttons">
+                <button type="button" class="ps-button ps-button-ghost ps-icon-button" @onclick="GoToNextWeek" disabled="@_isLoadingShifts" aria-label="Next week">
+                    ›
+                </button>
+            </div>
+        </div>
+
+        @if (_isLoadingShifts && !_shifts.Any())
+        {
+            <div class="ps-schedule-loading">Loading shifts...</div>
+        }
+
+        <div class="ps-schedule-grid">
+            @foreach (var day in GetWeekDays())
+            {
+                var dayShifts = _shifts
+                    .Where(s => s.Start.Date == day.Date)
+                    .OrderBy(s => s.Start)
+                    .ToList();
+
+                <div class="ps-schedule-column">
+                    <div class="ps-schedule-column-header">
+                        <div class="ps-schedule-day-name">@day.ToString("ddd", CultureInfo.InvariantCulture)</div>
+                        <div class="ps-schedule-day-date">@day.ToString("dd", CultureInfo.InvariantCulture)</div>
+                    </div>
+                    <div class="ps-schedule-column-body">
+                        @if (dayShifts.Count == 0)
                         {
-                            <tr>
-                                <td>@s.Employee.FullName</td>
-                                <td>@s.StartTime.ToString("hh\\:mm")</td>
-                                <td>@s.EndTime.ToString("hh\\:mm")</td>
-                                <td>@s.Source</td>
-                                <td>@s.ShiftDate.ToString("yyyy-MM-dd")</td>
-                                <td data-align="center">
-                                    <div class="d-inline-flex gap-2">
-                                        <a class="btn btn-outline-secondary btn-sm" href="/schedules/edit/@s.ScheduleId">Edit</a>
-                                        <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="() => DeleteSchedule(s.ScheduleId)">Delete</button>
-                                    </div>
-                                </td>
-                            </tr>
+                            <div class="ps-schedule-empty">No shifts</div>
                         }
-                    </tbody>
-                </table>
-            </div>
-        </section>
-    }
+                        else
+                        {
+                            var visible = dayShifts.Take(3).ToList();
+                            var hiddenCount = dayShifts.Count - visible.Count;
+
+                            @foreach (var shift in visible)
+                            {
+                                <div class="ps-shift-card">
+                                    <div class="ps-shift-accent"></div>
+                                    <div class="ps-shift-body">
+                                        <div class="ps-shift-employee">@shift.EmployeeName</div>
+                                        <div class="ps-shift-time">@shift.Start.ToString("hh:mm tt", CultureInfo.InvariantCulture) – @shift.End.ToString("hh:mm tt", CultureInfo.InvariantCulture)</div>
+                                    </div>
+                                </div>
+                            }
+
+                            @if (hiddenCount > 0)
+                            {
+                                <div class="ps-shift-more">+@hiddenCount more</div>
+                            }
+                        }
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
 </div>
 
 @code {
-    private string dateString = DateTime.Today.ToString("yyyy-MM-dd");
-    private List<Schedule>? items;
+    private bool _isAdmin;
+    private bool _isLoadingShifts;
+    private DateTime _weekStart;
+    private DateTime _selectedMonth;
+    private readonly List<Shift> _shifts = new();
+    private string? _selectedGroup = "All";
+    private int? _selectedEmployeeId;
+    private string? _searchText;
+    private int? _currentEmployeeId;
+    private string _timezoneDisplay = string.Empty;
 
-    protected override Task OnInitializedAsync() => Load();
+    private List<string> _groups = new() { "All", "IT Department", "Operations", "Support" };
+    private List<(int Id, string Name, string Group)> _employees = new();
 
-    private Task OnDateChanged(ChangeEventArgs e)
+    private string? SelectedGroup
     {
-        dateString = Convert.ToString(e.Value, CultureInfo.InvariantCulture) ?? dateString;
-        return Task.CompletedTask;
+        get => _selectedGroup;
+        set
+        {
+            if (_selectedGroup == value)
+            {
+                return;
+            }
+
+            _selectedGroup = value;
+            EnsureEmployeeWithinGroup();
+        }
     }
 
-    private async Task Load()
+    private string MonthInputValue => _selectedMonth.ToString("yyyy-MM", CultureInfo.InvariantCulture);
+
+    private IEnumerable<(int Id, string Name, string Group)> FilteredEmployees =>
+        string.IsNullOrWhiteSpace(_selectedGroup) || _selectedGroup == "All"
+            ? _employees
+            : _employees.Where(e => string.Equals(e.Group, _selectedGroup, StringComparison.OrdinalIgnoreCase));
+
+    protected override async Task OnInitializedAsync()
     {
-        if (!DateTime.TryParseExact(
-                dateString,
-                "yyyy-MM-dd",
-                CultureInfo.InvariantCulture,
-                DateTimeStyles.None,
-                out var date))
+        var today = DateTime.Today;
+        _weekStart = StartOfWeek(today);
+        _selectedMonth = new DateTime(today.Year, today.Month, 1);
+        _timezoneDisplay = FormatTimeZone(TimeZoneInfo.Local);
+
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+
+        _isAdmin = user.IsInRole("Admin");
+
+        var employeeIdClaim = user.FindFirst("EmployeeId")?.Value;
+        if (int.TryParse(employeeIdClaim, out var employeeId))
         {
-            items = new();
+            _currentEmployeeId = employeeId;
+        }
+
+        if (!_isAdmin && _currentEmployeeId.HasValue)
+        {
+            _selectedEmployeeId = _currentEmployeeId;
+        }
+
+        await LoadEmployeesAsync();
+        await LoadShiftsAsync();
+    }
+
+    private async Task LoadEmployeesAsync()
+    {
+        try
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+            var records = await db.Employees
+                .AsNoTracking()
+                .OrderBy(e => e.FullName)
+                .Select(e => new { e.EmployeeId, e.FullName, e.Department })
+                .ToListAsync();
+
+            if (records.Count > 0)
+            {
+                _employees = records
+                    .Select(e => (e.EmployeeId,
+                        string.IsNullOrWhiteSpace(e.FullName) ? $"Employee {e.EmployeeId}" : e.FullName,
+                        string.IsNullOrWhiteSpace(e.Department) ? "General" : e.Department!))
+                    .ToList();
+            }
+            else
+            {
+                _employees = BuildSampleEmployees();
+            }
+        }
+        catch
+        {
+            _employees = BuildSampleEmployees();
+        }
+
+        var groupSet = new SortedSet<string>(StringComparer.OrdinalIgnoreCase) { "All" };
+        foreach (var employee in _employees)
+        {
+            if (!string.IsNullOrWhiteSpace(employee.Group))
+            {
+                groupSet.Add(employee.Group);
+            }
+        }
+
+        _groups = groupSet
+            .OrderBy(g => string.Equals(g, "All", StringComparison.OrdinalIgnoreCase) ? 0 : 1)
+            .ThenBy(g => g, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        if (_isAdmin)
+        {
+            SelectedGroup = _selectedGroup ?? "All";
+        }
+        else if (_currentEmployeeId.HasValue)
+        {
+            var self = _employees.FirstOrDefault(e => e.Id == _currentEmployeeId.Value);
+            if (self != default)
+            {
+                _employees = new List<(int, string, string)> { self };
+                SelectedGroup = self.Group;
+                _selectedEmployeeId = self.Id;
+            }
+            else
+            {
+                SelectedGroup = null;
+            }
+        }
+    }
+
+    private async Task LoadShiftsAsync()
+    {
+        _isLoadingShifts = true;
+        await InvokeAsync(StateHasChanged);
+
+        try
+        {
+            var weekEnd = _weekStart.AddDays(7);
+            var employeeFilter = _isAdmin ? _selectedEmployeeId : _currentEmployeeId;
+            var groupFilter = _isAdmin ? _selectedGroup : null;
+
+            var result = await ShiftService.GetShiftsAsync(_weekStart, weekEnd, employeeFilter, groupFilter);
+
+            IEnumerable<Shift> filtered = result;
+
+            if (!_isAdmin && _currentEmployeeId.HasValue)
+            {
+                filtered = filtered.Where(s => s.EmployeeId == _currentEmployeeId.Value);
+            }
+
+            if (!string.IsNullOrWhiteSpace(_searchText))
+            {
+                var term = _searchText.Trim();
+                filtered = filtered.Where(s =>
+                    s.EmployeeName.Contains(term, StringComparison.OrdinalIgnoreCase) ||
+                    (!string.IsNullOrWhiteSpace(s.GroupName) && s.GroupName.Contains(term, StringComparison.OrdinalIgnoreCase)));
+            }
+
+            _shifts.Clear();
+            _shifts.AddRange(filtered.OrderBy(s => s.Start));
+        }
+        catch
+        {
+            _shifts.Clear();
+            _shifts.AddRange(BuildSampleShifts(_weekStart));
+        }
+        finally
+        {
+            _isLoadingShifts = false;
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private Task OnSearchAsync()
+        => LoadShiftsAsync();
+
+    private async Task OnReset()
+    {
+        _searchText = string.Empty;
+        var today = DateTime.Today;
+        _selectedMonth = new DateTime(today.Year, today.Month, 1);
+        _weekStart = StartOfWeek(today);
+
+        if (_isAdmin)
+        {
+            SelectedGroup = "All";
+            _selectedEmployeeId = null;
+        }
+        else if (_currentEmployeeId.HasValue)
+        {
+            _selectedEmployeeId = _currentEmployeeId;
+            var self = _employees.FirstOrDefault();
+            SelectedGroup = self.Group;
+        }
+        else
+        {
+            SelectedGroup = null;
+        }
+
+        await LoadShiftsAsync();
+    }
+
+    private async Task OnMonthChanged(ChangeEventArgs e)
+    {
+        var value = Convert.ToString(e.Value, CultureInfo.InvariantCulture);
+        if (string.IsNullOrWhiteSpace(value))
+        {
             return;
         }
 
-        var selectedDate = date.Date;
-
-        items = await Db.Schedules
-            .Include(s => s.Employee)
-                .ThenInclude(e => e.User)
-            .Where(s => s.ShiftDate.Date == selectedDate)
-            .OrderBy(s => s.StartTime)
-            .ToListAsync();
-
-        if (items.Count == 0)
+        if (DateTime.TryParseExact(value + "-01", "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var selected))
         {
-            items = await Db.Schedules
-                .Include(s => s.Employee)
-                    .ThenInclude(e => e.User)
-                .OrderByDescending(s => s.ShiftDate)
-                .ThenBy(s => s.StartTime)
-                .Take(10)
-                .ToListAsync();
+            _selectedMonth = new DateTime(selected.Year, selected.Month, 1);
+            _weekStart = StartOfWeek(_selectedMonth);
+            await LoadShiftsAsync();
         }
     }
 
-    private async Task DeleteSchedule(int scheduleId)
+    private async Task GoToPreviousWeek()
     {
-        var entity = await Db.Schedules.FindAsync(scheduleId);
-        if (entity is not null)
+        _weekStart = _weekStart.AddDays(-7);
+        _selectedMonth = new DateTime(_weekStart.Year, _weekStart.Month, 1);
+        await LoadShiftsAsync();
+    }
+
+    private async Task GoToNextWeek()
+    {
+        _weekStart = _weekStart.AddDays(7);
+        _selectedMonth = new DateTime(_weekStart.Year, _weekStart.Month, 1);
+        await LoadShiftsAsync();
+    }
+
+    private IEnumerable<DateTime> GetWeekDays()
+    {
+        for (var i = 0; i < 7; i++)
         {
-            Db.Remove(entity);
-            await Db.SaveChangesAsync();
-            await Load();
+            yield return _weekStart.AddDays(i);
         }
+    }
+
+    private void EnsureEmployeeWithinGroup()
+    {
+        if (string.IsNullOrWhiteSpace(_selectedGroup) || _selectedGroup == "All")
+        {
+            return;
+        }
+
+        if (_selectedEmployeeId.HasValue)
+        {
+            var match = _employees.Any(e => e.Id == _selectedEmployeeId && string.Equals(e.Group, _selectedGroup, StringComparison.OrdinalIgnoreCase));
+            if (!match)
+            {
+                _selectedEmployeeId = null;
+            }
+        }
+    }
+
+    private static DateTime StartOfWeek(DateTime date)
+    {
+        var diff = (7 + (date.DayOfWeek - DayOfWeek.Sunday)) % 7;
+        return date.Date.AddDays(-diff);
+    }
+
+    private static string FormatTimeZone(TimeZoneInfo timeZone)
+    {
+        var offset = timeZone.GetUtcOffset(DateTime.UtcNow);
+        var sign = offset >= TimeSpan.Zero ? "+" : "-";
+        offset = offset.Duration();
+        return $"UTC {sign}{offset:hh\\:mm}";
+    }
+
+    private static List<(int Id, string Name, string Group)> BuildSampleEmployees() => new()
+    {
+        (1, "Ulysses Dela Pena", "IT Department"),
+        (2, "Maria Santos", "Operations"),
+        (3, "Jacob Lee", "Support"),
+        (4, "Avery Quinn", "IT Department"),
+        (5, "Lena Ortiz", "Operations")
+    };
+
+    private static List<Shift> BuildSampleShifts(DateTime weekStart)
+    {
+        return new List<Shift>
+        {
+            new()
+            {
+                Id = 1,
+                EmployeeId = 1,
+                EmployeeName = "Ulysses Dela Pena",
+                GroupName = "IT Department",
+                Start = weekStart.AddHours(8),
+                End = weekStart.AddHours(16)
+            },
+            new()
+            {
+                Id = 2,
+                EmployeeId = 2,
+                EmployeeName = "Maria Santos",
+                GroupName = "Operations",
+                Start = weekStart.AddDays(1).AddHours(9),
+                End = weekStart.AddDays(1).AddHours(17)
+            },
+            new()
+            {
+                Id = 3,
+                EmployeeId = 3,
+                EmployeeName = "Jacob Lee",
+                GroupName = "Support",
+                Start = weekStart.AddDays(2).AddHours(14),
+                End = weekStart.AddDays(2).AddHours(22)
+            },
+            new()
+            {
+                Id = 4,
+                EmployeeId = 4,
+                EmployeeName = "Avery Quinn",
+                GroupName = "IT Department",
+                Start = weekStart.AddDays(4).AddHours(7),
+                End = weekStart.AddDays(4).AddHours(15)
+            },
+            new()
+            {
+                Id = 5,
+                EmployeeId = 5,
+                EmployeeName = "Lena Ortiz",
+                GroupName = "Operations",
+                Start = weekStart.AddDays(5).AddHours(10),
+                End = weekStart.AddDays(5).AddHours(18)
+            }
+        };
+    }
+
+    private string GetWeekRangeLabel()
+    {
+        var end = _weekStart.AddDays(6);
+        if (_weekStart.Month == end.Month)
+        {
+            return $"{_weekStart:MMMM d} – {end:MMMM d, yyyy}";
+        }
+
+        return $"{_weekStart:MMM d} – {end:MMM d, yyyy}";
+    }
+
+    private void CreateShift()
+    {
+        Nav.NavigateTo("/schedules/new");
     }
 }

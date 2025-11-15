@@ -4,60 +4,66 @@
 @using Microsoft.EntityFrameworkCore
 @using SchedulePayrollBlazor.Data.Models
 
-<div class="page">
-    <header class="page-header">
+<div class="ps-page">
+    <div class="ps-page-header">
         <div>
-            <h1 class="page-title">Payroll Runs</h1>
-            <p class="page-subtitle">Monitor payroll status across pay periods.</p>
+            <h2>PaySync Payroll Center</h2>
+            <p class="ps-subtitle">Monitor payroll status across pay periods.</p>
         </div>
-    </header>
+    </div>
 
     @if (payPeriods.Count == 0)
     {
-        <div class="content-card">
+        <div class="ps-card">
             <div class="alert alert-info">No pay periods found. Create pay period records to begin tracking payroll.</div>
         </div>
     }
     else
     {
-        <section class="filter-bar">
-            <div class="form-group">
-                <label>Pay Period</label>
-                <select @onchange="OnPeriodChanged" value="@selectedPeriodId">
-                    @foreach (var period in payPeriods)
-                    {
-                        <option value="@period.PayPeriodId">@period.PeriodName (@period.StartDate:MMM dd → @period.EndDate:MMM dd)</option>
-                    }
-                </select>
+        <section class="ps-card">
+            <div class="ps-card-header">
+                <h3>Filter by pay period</h3>
+                <p class="ps-subtitle">Focus on the dates that matter.</p>
             </div>
-            <div class="form-group">
-                <label>Runs</label>
-                <div class="text-muted">Showing @(filteredRuns.Count) run(s)</div>
+            <div class="filter-bar">
+                <div class="form-group">
+                    <label>Pay Period</label>
+                    <select @onchange="OnPeriodChanged" value="@selectedPeriodId" class="form-select">
+                        @foreach (var period in payPeriods)
+                        {
+                            <option value="@period.PayPeriodId">@period.PeriodName (@period.StartDate:MMM dd → @period.EndDate:MMM dd)</option>
+                        }
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Runs</label>
+                    <div class="text-muted">Showing @(filteredRuns.Count) run(s)</div>
+                </div>
             </div>
         </section>
 
         @if (filteredRuns.Count == 0)
         {
-            <div class="content-card">
+            <div class="ps-card">
                 <div class="alert alert-warning">No payroll runs found for the selected period.</div>
             </div>
         }
         else
         {
-            <section class="content-card">
-                <div class="card-header">
-                    <h3>Payroll Details</h3>
-                    <p>Latest results for the selected pay period.</p>
+            <section class="ps-card">
+                <div class="ps-card-header">
+                    <h3>Payroll details</h3>
+                    <p class="ps-subtitle">Latest results for the selected pay period.</p>
                 </div>
-                <div class="table-responsive">
-                    <table>
+                <div class="ps-table-container">
+                    <table class="ps-table">
                         <thead>
                             <tr>
                                 <th>Employee</th>
                                 <th>Gross Pay</th>
                                 <th>Deductions</th>
                                 <th>Net Pay</th>
-                                <th>Status</th>
+                                <th data-align="center">Status</th>
                                 <th>Processed</th>
                             </tr>
                         </thead>
@@ -69,7 +75,7 @@
                                     <td>$@run.GrossPay.ToString("N2")</td>
                                     <td>$@run.TotalDeductions.ToString("N2")</td>
                                     <td><strong>$@run.NetPay.ToString("N2")</strong></td>
-                                    <td><span class="badge @GetStatusClass(run.Status)">@run.Status</span></td>
+                                    <td data-align="center"><span class="badge @GetStatusClass(run.Status)">@run.Status</span></td>
                                     <td>@run.CreatedAt.ToLocalTime().ToString("MMM dd, yyyy")</td>
                                 </tr>
                             }
@@ -124,8 +130,10 @@
     private static string GetStatusClass(string status) => status switch
     {
         "Paid" => "badge-success",
-        "Approved" => "badge-info",
+        "Approved" => "badge-success",
         "Calculated" => "badge-warning",
+        "Pending" => "badge-warning",
+        "Failed" => "badge-danger",
         _ => "badge-secondary"
     };
 }

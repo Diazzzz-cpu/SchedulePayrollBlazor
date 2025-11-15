@@ -5,6 +5,7 @@
 @using Microsoft.EntityFrameworkCore
 @using System.ComponentModel.DataAnnotations
 @using System.Linq
+@using SchedulePayrollBlazor.Data.Models
 
 <div class="ps-page">
     <div class="ps-page-header">
@@ -13,7 +14,9 @@
             <p class="ps-subtitle">Create periods, generate payroll, and manage adjustments.</p>
         </div>
         <div class="ps-page-actions">
-            <button class="btn btn-outline-primary" @onclick="() => showCreatePeriod = !showCreatePeriod">@(showCreatePeriod ? "Close" : "New period")</button>
+            <button class="btn btn-outline-primary" @onclick="() => showCreatePeriod = !showCreatePeriod">
+                @(showCreatePeriod ? "Close" : "New period")
+            </button>
         </div>
     </div>
 
@@ -21,7 +24,12 @@
     {
         <div class="ps-alert @(alertIsError ? "ps-alert-danger" : "ps-alert-success")" role="status">
             <div>@alertMessage</div>
-            <button type="button" class="ps-alert-close" @onclick="() => alertMessage = string.Empty" aria-label="Dismiss message">&times;</button>
+            <button type="button"
+                    class="ps-alert-close"
+                    @onclick="() => alertMessage = string.Empty"
+                    aria-label="Dismiss message">
+                &times;
+            </button>
         </div>
     }
 
@@ -70,16 +78,25 @@
         <div class="ps-form-grid">
             <div class="form-group">
                 <label for="period-select">Select period</label>
-                <select id="period-select" class="form-select" @onchange="OnPeriodChanged" value="@selectedPeriodId">
+                <select id="period-select"
+                        class="form-select"
+                        @onchange="OnPeriodChanged"
+                        value="@selectedPeriodId">
                     <option value="0">-- Choose a period --</option>
                     @foreach (var period in periods)
                     {
-                        <option value="@period.Id">@period.Name (@period.StartDate:MMM dd, yyyy - @period.EndDate:MMM dd, yyyy)</option>
+                        <option value="@period.Id">
+                            @period.Name (@period.StartDate.ToString("MMM dd, yyyy") – @period.EndDate.ToString("MMM dd, yyyy"))
+                        </option>
                     }
                 </select>
             </div>
             <div class="form-group align-self-end">
-                <button class="btn btn-primary" @onclick="GeneratePayrollAsync" disabled="@(selectedPeriodId == 0)">Generate payroll</button>
+                <button class="btn btn-primary"
+                        @onclick="GeneratePayrollAsync"
+                        disabled="@(selectedPeriodId == 0)">
+                    Generate payroll
+                </button>
             </div>
         </div>
     </section>
@@ -99,7 +116,9 @@
     else if (entries.Count == 0)
     {
         <div class="ps-card">
-            <div class="text-muted">No payroll entries generated for this period yet. Click “Generate payroll” to calculate salaries.</div>
+            <div class="text-muted">
+                No payroll entries generated for this period yet. Click “Generate payroll” to calculate salaries.
+            </div>
         </div>
     }
     else
@@ -107,7 +126,9 @@
         <section class="ps-card">
             <div class="ps-card-header">
                 <h3>Payroll summary</h3>
-                <p class="ps-subtitle">Base pay is derived from shift hours and compensation settings. Adjustments update the totals instantly.</p>
+                <p class="ps-subtitle">
+                    Base pay is derived from shift hours and compensation settings. Adjustments update the totals instantly.
+                </p>
             </div>
             <div class="ps-table-container">
                 <table class="ps-table">
@@ -127,15 +148,24 @@
                         {
                             <tr>
                                 <td>
-                                    <div class="fw-semibold">@entry.Employee.FullName</div>
-                                    <div class="text-muted">@entry.Employee.User?.Email</div>
+                                    <div class="fw-semibold">@GetEmployeeName(entry)</div>
+                                    <div class="text-muted">@GetEmployeeEmail(entry)</div>
                                 </td>
                                 <td>@string.Format("{0:N2} hrs", entry.TotalHoursWorked)</td>
                                 <td><strong>₱@entry.BasePay:N2</strong></td>
                                 <td class="text-danger">₱@entry.TotalDeductions:N2</td>
                                 <td class="text-success">₱@entry.TotalBonuses:N2</td>
                                 <td><strong>₱@entry.NetPay:N2</strong></td>
-                                <td>@entry.CalculatedAt.ToLocalTime().ToString("MMM dd, yyyy HH:mm")</td>
+                                <td>
+                                    <div class="payroll-processed">
+                                        <div class="payroll-processed-date">
+                                            @entry.CalculatedAt.ToLocalTime().ToString("MMM dd, yyyy")
+                                        </div>
+                                        <div class="payroll-processed-time">
+                                            @entry.CalculatedAt.ToLocalTime().ToString("HH:mm")
+                                        </div>
+                                    </div>
+                                </td>
                             </tr>
                             <tr class="ps-table-row-detail">
                                 <td colspan="7">
@@ -149,13 +179,20 @@
                                             else
                                             {
                                                 <ul class="adjustment-list">
-                                                    @foreach (var adjustment in (entry.Adjustments ?? new List<PayrollAdjustment>()).OrderBy(a => a.Type).ThenBy(a => a.Label))
+                                                    @foreach (var adjustment in (entry.Adjustments ?? new List<PayrollAdjustment>())
+                                                        .OrderBy(a => a.Type).ThenBy(a => a.Label))
                                                     {
                                                         <li>
-                                                            <span class="badge @(IsBonus(adjustment) ? "badge-success" : "badge-danger")">@adjustment.Type</span>
+                                                            <span class="badge @(IsBonus(adjustment) ? "badge-success" : "badge-danger")">
+                                                                @adjustment.Type
+                                                            </span>
                                                             <span class="adjustment-label">@adjustment.Label</span>
                                                             <span class="adjustment-amount">₱@adjustment.Amount:N2</span>
-                                                            <button type="button" class="ps-button ps-button-ghost" @onclick="() => RemoveAdjustmentAsync(adjustment.Id)">Remove</button>
+                                                            <button type="button"
+                                                                    class="ps-button ps-button-ghost"
+                                                                    @onclick="() => RemoveAdjustmentAsync(adjustment.Id)">
+                                                                Remove
+                                                            </button>
                                                         </li>
                                                     }
                                                 </ul>
@@ -225,15 +262,23 @@
 
     protected override async Task OnInitializedAsync()
     {
-        periods = await Db.PayrollPeriods
-            .OrderByDescending(p => p.StartDate)
-            .ThenByDescending(p => p.Id)
-            .ToListAsync();
-
-        if (periods.Count > 0)
+        try
         {
-            selectedPeriodId = periods.First().Id;
-            await LoadEntriesAsync();
+            periods = await Db.PayrollPeriods
+                .OrderByDescending(p => p.StartDate)
+                .ThenByDescending(p => p.Id)
+                .ToListAsync();
+
+            if (periods.Count > 0)
+            {
+                selectedPeriodId = periods.First().Id;
+                await LoadEntriesAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            alertIsError = true;
+            alertMessage = $"Error loading payroll periods: {ex.Message}";
         }
     }
 
@@ -241,7 +286,10 @@
     {
         try
         {
-            var period = await PayrollService.CreatePayrollPeriodAsync(createModel.Name ?? string.Empty, createModel.StartDate, createModel.EndDate);
+            var period = await PayrollService.CreatePayrollPeriodAsync(
+                createModel.Name ?? string.Empty,
+                createModel.StartDate,
+                createModel.EndDate);
 
             periods.Insert(0, period);
             selectedPeriodId = period.Id;
@@ -289,9 +337,17 @@
             return;
         }
 
-        entries = await PayrollService.GetPayrollEntriesForPeriodAsync(selectedPeriodId);
-
-        EnsureAdjustmentForms();
+        try
+        {
+            entries = await PayrollService.GetPayrollEntriesForPeriodAsync(selectedPeriodId);
+            EnsureAdjustmentForms();
+        }
+        catch (Exception ex)
+        {
+            alertIsError = true;
+            alertMessage = $"Error loading payroll entries: {ex.Message}";
+            entries = new List<PayrollEntry>();
+        }
     }
 
     private async Task AddAdjustmentAsync(int entryId)
@@ -354,6 +410,12 @@
 
     private static bool IsBonus(PayrollAdjustment adjustment)
         => string.Equals(adjustment.Type, "Bonus", StringComparison.OrdinalIgnoreCase);
+
+    private static string GetEmployeeName(PayrollEntry entry)
+        => entry.Employee?.FullName ?? "Unknown employee";
+
+    private static string GetEmployeeEmail(PayrollEntry entry)
+        => entry.Employee?.User?.Email ?? "-";
 
     private void EnsureAdjustmentForms()
     {

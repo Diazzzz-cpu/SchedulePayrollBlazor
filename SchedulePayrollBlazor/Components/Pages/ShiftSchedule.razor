@@ -7,7 +7,7 @@
 @inject IShiftService ShiftService
 @inject AuthenticationStateProvider AuthStateProvider
 @inject NavigationManager Nav
-@inject IDbContextFactory<AppDbContext> DbFactory
+@inject AppDbContext Db
 
 <div class="ps-schedule-page">
     <div class="ps-schedule-header-bar">
@@ -198,8 +198,8 @@
     {
         try
         {
-            await using var db = await DbFactory.CreateDbContextAsync();
-            var records = await db.Employees
+            // use the injected scoped DbContext
+            var records = await Db.Employees
                 .AsNoTracking()
                 .OrderBy(e => e.FullName)
                 .Select(e => new { e.EmployeeId, e.FullName, e.Department })
@@ -220,6 +220,7 @@
         }
         catch
         {
+            // fall back to sample list if DB query fails
             _employees = BuildSampleEmployees();
         }
 

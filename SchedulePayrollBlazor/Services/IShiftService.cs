@@ -34,28 +34,40 @@ public class ShiftService : IShiftService
         string? group = null,
         string? searchText = null)
     {
-        IQueryable<Shift> query = _db.Shifts
-            .AsNoTracking()
-            .Where(s => s.Start >= weekStart && s.Start < weekEnd);
-
-        if (employeeId.HasValue)
+        try
         {
-            query = query.Where(s => s.EmployeeId == employeeId.Value);
-        }
+            IQueryable<Shift> query = _db.Shifts
+                .AsNoTracking()
+                .Where(s => s.Start >= weekStart && s.Start < weekEnd);
 
-        if (!string.IsNullOrWhiteSpace(group) && !string.Equals(group, "All", StringComparison.OrdinalIgnoreCase))
+            if (employeeId.HasValue)
+            {
+                query = query.Where(s => s.EmployeeId == employeeId.Value);
+            }
+
+            if (!string.IsNullOrWhiteSpace(group) &&
+                !string.Equals(group, "All", StringComparison.OrdinalIgnoreCase))
+            {
+                query = query.Where(s => s.GroupName == group);
+            }
+
+            if (!string.IsNullOrWhiteSpace(searchText))
+            {
+                var term = searchText.Trim().ToLowerInvariant();
+                query = query.Where(s =>
+                    s.EmployeeName != null &&
+                    s.EmployeeName.ToLower().Contains(term));
+            }
+
+            return await query
+                .OrderBy(s => s.Start)
+                .ToListAsync();
+        }
+        catch
         {
-            query = query.Where(s => s.GroupName == group);
+            // If anything goes wrong with the DB, don't crash the page –
+            // just show no shifts.
+            return Array.Empty<Shift>();
         }
-
-        if (!string.IsNullOrWhiteSpace(searchText))
-        {
-            var term = searchText.Trim().ToLowerInvariant();
-            query = query.Where(s => s.EmployeeName != null && s.EmployeeName.ToLower().Contains(term));
-        }
-
-        return await query
-            .OrderBy(s => s.Start)
-            .ToListAsync();
     }
 }

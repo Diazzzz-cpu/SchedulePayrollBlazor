@@ -278,7 +278,8 @@
         catch (Exception ex)
         {
             alertIsError = true;
-            alertMessage = $"Error loading payroll periods: {ex.Message}";
+            alertMessage = $"Error loading payroll data: {ex.Message}";
+            entries = new List<PayrollEntry>();
         }
     }
 
@@ -304,7 +305,7 @@
         catch (Exception ex)
         {
             alertIsError = true;
-            alertMessage = ex.Message;
+            alertMessage = $"Error creating payroll period: {ex.Message}";
         }
     }
 
@@ -325,7 +326,8 @@
         catch (Exception ex)
         {
             alertIsError = true;
-            alertMessage = ex.Message;
+            alertMessage = $"Error generating payroll: {ex.Message}";
+            entries ??= new List<PayrollEntry>();
         }
     }
 
@@ -366,7 +368,7 @@
         catch (Exception ex)
         {
             alertIsError = true;
-            alertMessage = ex.Message;
+            alertMessage = $"Error adding adjustment: {ex.Message}";
         }
     }
 
@@ -383,7 +385,7 @@
         catch (Exception ex)
         {
             alertIsError = true;
-            alertMessage = ex.Message;
+            alertMessage = $"Error removing adjustment: {ex.Message}";
         }
     }
 

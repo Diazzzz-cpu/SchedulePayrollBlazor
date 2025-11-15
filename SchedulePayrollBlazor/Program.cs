@@ -24,6 +24,7 @@ builder.Host.UseDefaultServiceProvider(options =>
 // 1. Blazor + Razor Pages
 builder.Services.AddRazorPages();
 builder.Services.AddServerSideBlazor();
+builder.Services.AddControllers();
 
 // 2. Connection string + DbContext setup
 var connectionString = builder.Configuration.GetConnectionString("Default")
@@ -72,6 +73,7 @@ app.UseHttpsRedirection();
 app.UseStaticFiles();
 app.UseRouting();
 
+app.MapControllers();
 app.MapBlazorHub();
 app.MapFallbackToPage("/_Host");
 

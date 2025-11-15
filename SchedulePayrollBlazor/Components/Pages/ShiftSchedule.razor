@@ -2,6 +2,7 @@
 @attribute [Authorize]
 @using System
 @using System.Globalization
+@using System.Linq
 @using System.Security.Claims
 @using Microsoft.EntityFrameworkCore
 @inject IShiftService ShiftService
@@ -117,7 +118,7 @@
                             @* Removed hardcoded shifts; data now fully driven by _shifts *@
                             @foreach (var shift in dayShifts)
                             {
-                                <div class="ps-shift-card">
+                                <div class="ps-shift-card @(_isAdmin ? "ps-shift-card-action" : string.Empty)" @onclick="(() => OnShiftSelected(shift))">
                                     <div class="ps-shift-accent"></div>
                                     <div class="ps-shift-body">
                                         <div class="ps-shift-employee">@shift.EmployeeName</div>
@@ -131,6 +132,20 @@
             }
         </div>
     </div>
+
+    @if (_isAdmin)
+    {
+        <ShiftModal
+            IsOpen="_isModalOpen"
+            IsOpenChanged="OnModalOpenChanged"
+            Model="_editingShift"
+            Employees="_employees.Select(e => (e.Id, e.Name)).ToList()"
+            Title="@(_isNewShift ? "Create shift" : "Edit shift")"
+            OnSave="OnModalSave"
+            OnCancel="OnModalCancel"
+            OnDelete="OnModalDelete"
+            ErrorMessage="_modalError" />
+    }
 </div>
 
 @code {
@@ -145,6 +160,10 @@
     private int? _currentEmployeeId;
     private List<string> _groups = new() { "All", "IT Department", "Operations", "Support" };
     private List<(int Id, string Name, string Group)> _employees = new();
+    private bool _isModalOpen;
+    private bool _isNewShift;
+    private Shift? _editingShift;
+    private string? _modalError;
 
     private string? SelectedGroup
     {
@@ -267,7 +286,9 @@
         {
             var weekEnd = _weekStart.AddDays(7);
             var employeeFilter = _isAdmin ? _selectedEmployeeId : _currentEmployeeId;
-            var groupFilter = _selectedGroup;
+            var groupFilter = string.Equals(_selectedGroup, "All", StringComparison.OrdinalIgnoreCase)
+                ? null
+                : _selectedGroup;
 
             var result = await ShiftService.GetShiftsAsync(
                 _weekStart,
@@ -401,6 +422,161 @@
 
     private void CreateShift()
     {
-        Nav.NavigateTo("/schedules/new");
+        if (!_isAdmin)
+        {
+            return;
+        }
+
+        var targetDate = GetDefaultShiftDate();
+        var defaultStart = targetDate.AddHours(9);
+        var defaultEnd = defaultStart.AddHours(8);
+
+        var employeeId = _selectedEmployeeId
+            ?? _employees.FirstOrDefault(e => _selectedGroup is null || _selectedGroup == "All" || string.Equals(e.Group, _selectedGroup, StringComparison.OrdinalIgnoreCase)).Id;
+
+        var employeeName = ResolveEmployeeName(employeeId);
+        var group = ResolveGroupForEmployee(employeeId) ?? (_selectedGroup is null || _selectedGroup == "All" ? null : _selectedGroup);
+
+        _editingShift = new Shift
+        {
+            EmployeeId = employeeId,
+            EmployeeName = employeeName ?? string.Empty,
+            Start = defaultStart,
+            End = defaultEnd,
+            GroupName = group
+        };
+
+        _modalError = null;
+        _isNewShift = true;
+        _isModalOpen = true;
+    }
+
+    private void OnShiftSelected(Shift shift)
+    {
+        if (!_isAdmin)
+        {
+            return;
+        }
+
+        _editingShift = new Shift
+        {
+            Id = shift.Id,
+            EmployeeId = shift.EmployeeId,
+            EmployeeName = shift.EmployeeName,
+            Start = shift.Start,
+            End = shift.End,
+            GroupName = shift.GroupName
+        };
+
+        _modalError = null;
+        _isNewShift = false;
+        _isModalOpen = true;
+    }
+
+    private async Task OnModalSave(Shift model)
+    {
+        if (!_isAdmin)
+        {
+            return;
+        }
+
+        try
+        {
+            _modalError = null;
+
+            if (_isNewShift)
+            {
+                await ShiftService.InsertShiftAsync(model);
+            }
+            else
+            {
+                await ShiftService.UpdateShiftAsync(model);
+            }
+
+            _isModalOpen = false;
+            await LoadShiftsAsync();
+        }
+        catch (Exception ex)
+        {
+            _modalError = ex.Message;
+            _editingShift = model;
+        }
+    }
+
+    private Task OnModalCancel()
+    {
+        _modalError = null;
+        _isModalOpen = false;
+        return Task.CompletedTask;
+    }
+
+    private Task OnModalOpenChanged(bool isOpen)
+    {
+        _isModalOpen = isOpen;
+        if (!isOpen)
+        {
+            _modalError = null;
+        }
+
+        return Task.CompletedTask;
+    }
+
+    private async Task OnModalDelete(int shiftId)
+    {
+        if (!_isAdmin)
+        {
+            return;
+        }
+
+        try
+        {
+            _modalError = null;
+            var deleted = await ShiftService.DeleteShiftAsync(shiftId);
+            if (!deleted)
+            {
+                _modalError = "Shift could not be found.";
+                return;
+            }
+
+            _isModalOpen = false;
+            await LoadShiftsAsync();
+        }
+        catch (Exception ex)
+        {
+            _modalError = ex.Message;
+        }
+    }
+
+    private DateTime GetDefaultShiftDate()
+    {
+        var weekEnd = _weekStart.AddDays(7);
+        if (DateTime.Today >= _weekStart && DateTime.Today < weekEnd)
+        {
+            return DateTime.Today;
+        }
+
+        return _weekStart;
+    }
+
+    private string? ResolveEmployeeName(int employeeId)
+    {
+        if (employeeId == 0)
+        {
+            return null;
+        }
+
+        var employee = _employees.FirstOrDefault(e => e.Id == employeeId);
+        return employee == default ? null : employee.Name;
+    }
+
+    private string? ResolveGroupForEmployee(int employeeId)
+    {
+        if (employeeId == 0)
+        {
+            return null;
+        }
+
+        var employee = _employees.FirstOrDefault(e => e.Id == employeeId);
+        return employee == default || string.IsNullOrWhiteSpace(employee.Group) ? null : employee.Group;
     }
 }

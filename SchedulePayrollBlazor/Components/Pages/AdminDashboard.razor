@@ -3,6 +3,7 @@
 @inject AppDbContext Db
 @using Microsoft.EntityFrameworkCore
 @using SchedulePayrollBlazor.Data.Models
+@using PayrollRunModel = SchedulePayrollBlazor.Data.Models.PayrollRun
 
 <div class="ps-page">
     <div class="ps-page-header">
@@ -85,18 +86,18 @@
                             <td>@FormatEmploymentType(employee.EmploymentType)</td>
                             <td>
                                 @(
-                                    employee.StartDate.HasValue
-                                        ? employee.StartDate.Value.ToString("MMM dd, yyyy")
-                                        : "-"
-                                )
-                            </td>
-                            <td>
-                                <span class="badge @(employee.IsActive ? "badge-success" : "badge-secondary")">
-                                    @(employee.IsActive ? "Active" : "Inactive")
-                                </span>
-                            </td>
-                        </tr>
-                    }
+                                                            employee.StartDate.HasValue
+                                                            ? employee.StartDate.Value.ToString("MMM dd, yyyy")
+                                                            : "-"
+                                                            )
+                        </td>
+                        <td>
+                            <span class="badge @(employee.IsActive ? "badge-success" : "badge-secondary")">
+                                @(employee.IsActive ? "Active" : "Inactive")
+                            </span>
+                        </td>
+                    </tr>
+                                        }
                 </tbody>
             </table>
         </div>
@@ -130,7 +131,7 @@
                             <tr>
                                 <td>@run.Employee.FullName</td>
                                 <td>@(run.PayPeriod?.PeriodName ?? "Ad hoc")</td>
-                                <td>$@run.NetPay.ToString("N2")</td>
+                                <td>?@run.NetPay.ToString("N2")</td>
                                 <td>
                                     <span class="badge @GetStatusClass(run.Status)">@run.Status</span>
                                 </td>
@@ -150,7 +151,7 @@
     private int upcomingShiftCount;
     private int activePayrolls;
     private List<Employee> recentEmployees = new();
-    private List<PayrollRun> recentPayrollRuns = new();
+    private List<PayrollRunModel> recentPayrollRuns = new();
 
     protected override async Task OnInitializedAsync()
     {
@@ -180,6 +181,7 @@
         recentPayrollRuns = await Db.PayrollRuns
             .Include(p => p.Employee)
                 .ThenInclude(e => e.User)
+            .Include(p => p.PayPeriod)
             .OrderByDescending(p => p.CreatedAt)
             .Take(5)
             .ToListAsync();

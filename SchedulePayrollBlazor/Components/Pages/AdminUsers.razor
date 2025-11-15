@@ -152,6 +152,7 @@ else
                                     <th>Role</th>
                                     <th>Department</th>
                                     <th>Job Title</th>
+                                    <th>Status</th>
                                     <th>Created</th>
                                     <th></th>
                                 </tr>
@@ -165,6 +166,20 @@ else
                                         <td>@FormatRole(user)</td>
                                         <td>@(string.IsNullOrWhiteSpace(user.Department) ? "—" : user.Department)</td>
                                         <td>@(string.IsNullOrWhiteSpace(user.JobTitle) ? "—" : user.JobTitle)</td>
+                                        <td>
+                                            @if (user.IsEmployeeActive is true)
+                                            {
+                                                <span class="badge badge-success">Active</span>
+                                            }
+                                            else if (user.IsEmployeeActive is false)
+                                            {
+                                                <span class="badge badge-secondary">Inactive (Archived)</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="badge badge-secondary">N/A</span>
+                                            }
+                                        </td>
                                         <td>@user.CreatedAt.ToLocalTime().ToString("MMM dd, yyyy")</td>
                                         <td class="table-actions">
                                             <button class="btn btn-link" @onclick="() => BeginEdit(user)">Edit</button>
@@ -417,12 +432,12 @@ else
         {
             if (user.UserId == currentUserId)
             {
-                alertMessage = "You cannot delete your own signed-in account.";
+                alertMessage = "You cannot deactivate your own signed-in account.";
                 alertStyle = "warning";
                 return;
             }
 
-            var confirmed = await JS.InvokeAsync<bool>("confirm", $"Are you sure you want to delete {user.Email}?");
+            var confirmed = await JS.InvokeAsync<bool>("confirm", $"Are you sure you want to deactivate {user.Email}?");
             if (!confirmed)
             {
                 return;
@@ -432,12 +447,12 @@ else
 
             if (!success)
             {
-                alertMessage = errorMessage ?? "Unable to delete user.";
+                alertMessage = errorMessage ?? "Unable to archive user.";
                 alertStyle = "danger";
                 return;
             }
 
-            alertMessage = "User deleted.";
+            alertMessage = "User archived.";
             alertStyle = "success";
             temporaryPassword = null;
 

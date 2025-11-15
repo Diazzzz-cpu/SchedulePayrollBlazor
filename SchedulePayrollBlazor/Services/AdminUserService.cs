@@ -44,7 +44,8 @@ public class AdminUserService
                 JobTitle = u.Employee != null ? u.Employee.JobTitle : null,
                 EmploymentType = u.Employee != null ? u.Employee.EmploymentType.ToString() : null,
                 StartDate = u.Employee != null ? u.Employee.StartDate : null,
-                Location = u.Employee != null ? u.Employee.Location : null
+                Location = u.Employee != null ? u.Employee.Location : null,
+                IsEmployeeActive = u.Employee != null ? u.Employee.IsActive : null
             })
             .ToListAsync();
     }
@@ -214,7 +215,7 @@ public class AdminUserService
     {
         if (userId == currentUserId)
         {
-            return (false, "You cannot delete your own account while signed in.");
+            return (false, "You cannot deactivate your own account while signed in.");
         }
 
         var user = await _dbContext.Users
@@ -226,9 +227,28 @@ public class AdminUserService
             return (false, "User not found.");
         }
 
-        _dbContext.Users.Remove(user);
-        await _dbContext.SaveChangesAsync();
-        return (true, null);
+        var timestamp = DateTime.UtcNow.Ticks;
+        user.Email = $"archived-{user.UserId}-{timestamp}@archive.local";
+        user.FirstName = "Archived";
+        user.LastName = "Employee";
+
+        if (user.Employee is not null)
+        {
+            var employee = user.Employee;
+            employee.IsActive = false;
+            employee.FullName = "Archived Employee";
+            employee.Location = string.Empty;
+        }
+
+        try
+        {
+            await _dbContext.SaveChangesAsync();
+            return (true, null);
+        }
+        catch
+        {
+            return (false, "Failed to archive the user. Please try again.");
+        }
     }
 
     private async Task<Role> EnsureRoleAsync(string roleCode)
@@ -256,7 +276,7 @@ public class AdminUserService
     private static bool ShouldCreateEmployee(AdminUserFormModel model)
         => !string.Equals(model.Role, "Admin", StringComparison.OrdinalIgnoreCase);
 
-    // Simple temp password generator – no SimplePasswordHasher needed
+    // Simple temp password generator - no SimplePasswordHasher needed
     private static string GenerateTemporaryPassword()
         => Guid.NewGuid().ToString("N")[..10];
 

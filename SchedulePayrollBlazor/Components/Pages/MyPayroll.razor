@@ -7,7 +7,7 @@
 @using System.Security.Claims
 @using System.Linq
 
-<div class="ps-page">
+<div class="ps-page ps-page-payroll">
     <div class="ps-page-header">
         <div>
             <h2>My payroll</h2>
@@ -29,23 +29,23 @@
     }
     else
     {
-        <section class="ps-card">
+        <section class="ps-card ps-card-payroll-summary">
             <div class="ps-card-header">
                 <h3>Earnings summary</h3>
                 <p class="ps-subtitle">Overview of total and most recent payouts.</p>
             </div>
-            <div class="ps-summary-grid">
-                <div class="ps-summary-card">
-                    <h4>Total net pay (all time)</h4>
-                    <p class="ps-summary-value">₱@totalNet.ToString("N2")</p>
+            <div class="ps-stat-grid">
+                <div class="ps-stat-card ps-stat-card-payroll">
+                    <span class="ps-stat-title">Total net pay (all time)</span>
+                    <span class="ps-stat-value">₱@totalNet.ToString("N2")</span>
                 </div>
-                <div class="ps-summary-card">
-                    <h4>Last payout</h4>
-                    <p class="ps-summary-value">₱@lastNet.ToString("N2")</p>
+                <div class="ps-stat-card ps-stat-card-payroll">
+                    <span class="ps-stat-title">Last payout</span>
+                    <span class="ps-stat-value">₱@lastNet.ToString("N2")</span>
                 </div>
-                <div class="ps-summary-card">
-                    <h4>Average net pay</h4>
-                    <p class="ps-summary-value">₱@averageNet.ToString("N2")</p>
+                <div class="ps-stat-card ps-stat-card-payroll">
+                    <span class="ps-stat-title">Average net pay</span>
+                    <span class="ps-stat-value">₱@averageNet.ToString("N2")</span>
                 </div>
             </div>
         </section>
@@ -72,12 +72,16 @@
                         @foreach (var entry in entries)
                         {
                             <tr>
-                                <td>
-                                    <div class="fw-semibold">@(entry.PayrollPeriod?.Name ?? "Payroll period")</div>
-                                    <div class="text-muted">
+                                <td class="payroll-period-cell">
+                                    <div class="payroll-period-title">
+                                        @(entry.PayrollPeriod?.Name ?? "Payroll period")
+                                    </div>
+                                    <div class="payroll-period-dates">
                                         @if (entry.PayrollPeriod is not null)
                                         {
-                                            <span>@entry.PayrollPeriod.StartDate.ToString("MMM dd, yyyy") – @entry.PayrollPeriod.EndDate.ToString("MMM dd, yyyy")</span>
+                                            @entry.PayrollPeriod.StartDate.ToString("MMM dd, yyyy")
+                                            <span class="payroll-period-separator">–</span>
+                                            @entry.PayrollPeriod.EndDate.ToString("MMM dd, yyyy")
                                         }
                                         else
                                         {
@@ -90,7 +94,16 @@
                                 <td class="text-danger">@($"₱{entry.TotalDeductions:N2}")</td>
                                 <td class="text-success">@($"₱{entry.TotalBonuses:N2}")</td>
                                 <td><strong>@($"₱{entry.NetPay:N2}")</strong></td>
-                                <td>@entry.CalculatedAt.ToLocalTime().ToString("MMM dd, yyyy HH:mm")</td>
+                                <td class="payroll-processed-cell">
+                                    <div class="processed-wrapper">
+                                        <span class="processed-date">
+                                            @entry.CalculatedAt.ToLocalTime().ToString("MMM dd, yyyy")
+                                        </span>
+                                        <span class="processed-time">
+                                            @entry.CalculatedAt.ToLocalTime().ToString("HH:mm")
+                                        </span>
+                                    </div>
+                                </td>
                             </tr>
                             @if (entry.Adjustments is not null && entry.Adjustments.Count > 0)
                             {

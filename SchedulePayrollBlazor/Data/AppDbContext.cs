@@ -19,6 +19,10 @@ public class AppDbContext : DbContext
     public DbSet<PayPeriod> PayPeriods => Set<PayPeriod>();
     public DbSet<PayrollRun> PayrollRuns => Set<PayrollRun>();
     public DbSet<PayrollLine> PayrollLines => Set<PayrollLine>();
+    public DbSet<EmployeeCompensation> EmployeeCompensations => Set<EmployeeCompensation>();
+    public DbSet<PayrollPeriod> PayrollPeriods => Set<PayrollPeriod>();
+    public DbSet<PayrollEntry> PayrollEntries => Set<PayrollEntry>();
+    public DbSet<PayrollAdjustment> PayrollAdjustments => Set<PayrollAdjustment>();
     public DbSet<Schedule> Schedules => Set<Schedule>();
     public DbSet<TimeLog> TimeLogs => Set<TimeLog>();
     public DbSet<Shift> Shifts => Set<Shift>();
@@ -137,6 +141,22 @@ public class AppDbContext : DbContext
                   .OnDelete(DeleteBehavior.Restrict);
         });
 
+        modelBuilder.Entity<EmployeeCompensation>(entity =>
+        {
+            entity.ToTable("employee_compensation");
+            entity.HasKey(ec => ec.EmployeeId);
+
+            entity.Property(ec => ec.EmployeeId).HasColumnName("employee_id");
+            entity.Property(ec => ec.IsHourly).HasColumnName("is_hourly");
+            entity.Property(ec => ec.HourlyRate).HasColumnName("hourly_rate").HasColumnType("decimal(18,2)");
+            entity.Property(ec => ec.FixedMonthlySalary).HasColumnName("fixed_monthly_salary").HasColumnType("decimal(18,2)");
+
+            entity.HasOne(ec => ec.Employee)
+                  .WithOne(e => e.Compensation)
+                  .HasForeignKey<EmployeeCompensation>(ec => ec.EmployeeId)
+                  .OnDelete(DeleteBehavior.Cascade);
+        });
+
         // PAY PERIODS
         modelBuilder.Entity<PayPeriod>(entity =>
         {
@@ -193,6 +213,61 @@ public class AppDbContext : DbContext
             entity.HasOne(pl => pl.PayComponent)
                   .WithMany(pc => pc.PayrollLines)
                   .HasForeignKey(pl => pl.PayComponentId);
+        });
+
+        modelBuilder.Entity<PayrollPeriod>(entity =>
+        {
+            entity.ToTable("payroll_periods");
+            entity.HasKey(pp => pp.Id);
+
+            entity.Property(pp => pp.Id).HasColumnName("id");
+            entity.Property(pp => pp.Name).HasColumnName("name").HasMaxLength(150).IsRequired();
+            entity.Property(pp => pp.StartDate).HasColumnName("start_date").IsRequired();
+            entity.Property(pp => pp.EndDate).HasColumnName("end_date").IsRequired();
+            entity.Property(pp => pp.CreatedAt).HasColumnName("created_at").IsRequired();
+        });
+
+        modelBuilder.Entity<PayrollEntry>(entity =>
+        {
+            entity.ToTable("payroll_entries");
+            entity.HasKey(pe => pe.Id);
+
+            entity.Property(pe => pe.Id).HasColumnName("id");
+            entity.Property(pe => pe.PayrollPeriodId).HasColumnName("payroll_period_id");
+            entity.Property(pe => pe.EmployeeId).HasColumnName("employee_id");
+            entity.Property(pe => pe.TotalHoursWorked).HasColumnName("total_hours_worked").HasColumnType("decimal(18,2)");
+            entity.Property(pe => pe.BasePay).HasColumnName("base_pay").HasColumnType("decimal(18,2)");
+            entity.Property(pe => pe.TotalDeductions).HasColumnName("total_deductions").HasColumnType("decimal(18,2)");
+            entity.Property(pe => pe.TotalBonuses).HasColumnName("total_bonuses").HasColumnType("decimal(18,2)");
+            entity.Property(pe => pe.NetPay).HasColumnName("net_pay").HasColumnType("decimal(18,2)");
+            entity.Property(pe => pe.CalculatedAt).HasColumnName("calculated_at").IsRequired();
+
+            entity.HasOne(pe => pe.PayrollPeriod)
+                  .WithMany(pp => pp.Entries)
+                  .HasForeignKey(pe => pe.PayrollPeriodId)
+                  .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(pe => pe.Employee)
+                  .WithMany(e => e.PayrollEntries)
+                  .HasForeignKey(pe => pe.EmployeeId)
+                  .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<PayrollAdjustment>(entity =>
+        {
+            entity.ToTable("payroll_adjustments");
+            entity.HasKey(pa => pa.Id);
+
+            entity.Property(pa => pa.Id).HasColumnName("id");
+            entity.Property(pa => pa.PayrollEntryId).HasColumnName("payroll_entry_id");
+            entity.Property(pa => pa.Type).HasColumnName("type").HasMaxLength(50).IsRequired();
+            entity.Property(pa => pa.Label).HasColumnName("label").HasMaxLength(200).IsRequired();
+            entity.Property(pa => pa.Amount).HasColumnName("amount").HasColumnType("decimal(18,2)").IsRequired();
+
+            entity.HasOne(pa => pa.PayrollEntry)
+                  .WithMany(pe => pe.Adjustments)
+                  .HasForeignKey(pa => pa.PayrollEntryId)
+                  .OnDelete(DeleteBehavior.Cascade);
         });
 
         // SCHEDULES

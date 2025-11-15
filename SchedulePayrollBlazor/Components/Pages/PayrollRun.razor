@@ -1,0 +1,420 @@
+@page "/admin/payroll"
+@attribute [Authorize(Roles = "Admin")]
+@inject AppDbContext Db
+@inject IPayrollService PayrollService
+@using Microsoft.EntityFrameworkCore
+@using System.ComponentModel.DataAnnotations
+@using System.Linq
+
+<div class="ps-page">
+    <div class="ps-page-header">
+        <div>
+            <h2>Payroll processing</h2>
+            <p class="ps-subtitle">Create periods, generate payroll, and manage adjustments.</p>
+        </div>
+        <div class="ps-page-actions">
+            <button class="btn btn-outline-primary" @onclick="() => showCreatePeriod = !showCreatePeriod">@(showCreatePeriod ? "Close" : "New period")</button>
+        </div>
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(alertMessage))
+    {
+        <div class="ps-alert @(alertIsError ? "ps-alert-danger" : "ps-alert-success")" role="status">
+            <div>@alertMessage</div>
+            <button type="button" class="ps-alert-close" @onclick="() => alertMessage = string.Empty" aria-label="Dismiss message">&times;</button>
+        </div>
+    }
+
+    @if (showCreatePeriod)
+    {
+        <section class="ps-card">
+            <div class="ps-card-header">
+                <h3>Create payroll period</h3>
+                <p class="ps-subtitle">Define the date range that will be used when calculating shifts.</p>
+            </div>
+            <EditForm Model="createModel" OnValidSubmit="CreatePeriodAsync">
+                <DataAnnotationsValidator />
+                <ValidationSummary />
+
+                <div class="ps-form-grid">
+                    <div class="form-group">
+                        <label for="period-name">Name</label>
+                        <InputText id="period-name" class="form-control" @bind-Value="createModel.Name" />
+                        <ValidationMessage For="() => createModel.Name" />
+                    </div>
+                    <div class="form-group">
+                        <label for="period-start">Start date</label>
+                        <InputDate id="period-start" class="form-control" @bind-Value="createModel.StartDate" />
+                        <ValidationMessage For="() => createModel.StartDate" />
+                    </div>
+                    <div class="form-group">
+                        <label for="period-end">End date</label>
+                        <InputDate id="period-end" class="form-control" @bind-Value="createModel.EndDate" />
+                        <ValidationMessage For="() => createModel.EndDate" />
+                    </div>
+                </div>
+
+                <div class="ps-form-actions">
+                    <button type="submit" class="btn btn-primary">Create period</button>
+                    <button type="button" class="btn btn-outline-secondary" @onclick="() => showCreatePeriod = false">Cancel</button>
+                </div>
+            </EditForm>
+        </section>
+    }
+
+    <section class="ps-card">
+        <div class="ps-card-header">
+            <h3>Payroll periods</h3>
+            <p class="ps-subtitle">Select a period to view generated payroll entries.</p>
+        </div>
+        <div class="ps-form-grid">
+            <div class="form-group">
+                <label for="period-select">Select period</label>
+                <select id="period-select" class="form-select" @onchange="OnPeriodChanged" value="@selectedPeriodId">
+                    <option value="0">-- Choose a period --</option>
+                    @foreach (var period in periods)
+                    {
+                        <option value="@period.Id">@period.Name (@period.StartDate:MMM dd, yyyy - @period.EndDate:MMM dd, yyyy)</option>
+                    }
+                </select>
+            </div>
+            <div class="form-group align-self-end">
+                <button class="btn btn-primary" @onclick="GeneratePayrollAsync" disabled="@(selectedPeriodId == 0)">Generate payroll</button>
+            </div>
+        </div>
+    </section>
+
+    @if (selectedPeriodId == 0)
+    {
+        <div class="ps-card">
+            <div class="text-muted">Choose a payroll period to see calculated entries.</div>
+        </div>
+    }
+    else if (entries is null)
+    {
+        <div class="ps-card">
+            <div class="loading">Loading…</div>
+        </div>
+    }
+    else if (entries.Count == 0)
+    {
+        <div class="ps-card">
+            <div class="text-muted">No payroll entries generated for this period yet. Click “Generate payroll” to calculate salaries.</div>
+        </div>
+    }
+    else
+    {
+        <section class="ps-card">
+            <div class="ps-card-header">
+                <h3>Payroll summary</h3>
+                <p class="ps-subtitle">Base pay is derived from shift hours and compensation settings. Adjustments update the totals instantly.</p>
+            </div>
+            <div class="ps-table-container">
+                <table class="ps-table">
+                    <thead>
+                        <tr>
+                            <th>Employee</th>
+                            <th>Total hours</th>
+                            <th>Base pay</th>
+                            <th>Deductions</th>
+                            <th>Bonuses</th>
+                            <th>Net pay</th>
+                            <th>Updated</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var entry in entries)
+                        {
+                            <tr>
+                                <td>
+                                    <div class="fw-semibold">@entry.Employee.FullName</div>
+                                    <div class="text-muted">@entry.Employee.User?.Email</div>
+                                </td>
+                                <td>@string.Format("{0:N2} hrs", entry.TotalHoursWorked)</td>
+                                <td><strong>₱@entry.BasePay:N2</strong></td>
+                                <td class="text-danger">₱@entry.TotalDeductions:N2</td>
+                                <td class="text-success">₱@entry.TotalBonuses:N2</td>
+                                <td><strong>₱@entry.NetPay:N2</strong></td>
+                                <td>@entry.CalculatedAt.ToLocalTime().ToString("MMM dd, yyyy HH:mm")</td>
+                            </tr>
+                            <tr class="ps-table-row-detail">
+                                <td colspan="7">
+                                    <div class="payroll-adjustments">
+                                        <div class="payroll-adjustments-list">
+                                            <h4>Adjustments</h4>
+                                            @if (entry.Adjustments is null || entry.Adjustments.Count == 0)
+                                            {
+                                                <div class="text-muted">No adjustments applied.</div>
+                                            }
+                                            else
+                                            {
+                                                <ul class="adjustment-list">
+                                                    @foreach (var adjustment in (entry.Adjustments ?? new List<PayrollAdjustment>()).OrderBy(a => a.Type).ThenBy(a => a.Label))
+                                                    {
+                                                        <li>
+                                                            <span class="badge @(IsBonus(adjustment) ? "badge-success" : "badge-danger")">@adjustment.Type</span>
+                                                            <span class="adjustment-label">@adjustment.Label</span>
+                                                            <span class="adjustment-amount">₱@adjustment.Amount:N2</span>
+                                                            <button type="button" class="ps-button ps-button-ghost" @onclick="() => RemoveAdjustmentAsync(adjustment.Id)">Remove</button>
+                                                        </li>
+                                                    }
+                                                </ul>
+                                            }
+                                        </div>
+                                        <div class="payroll-adjustments-form">
+                                            <h4>Add adjustment</h4>
+                                            <EditForm Model="GetAdjustmentForm(entry.Id)" OnValidSubmit="() => AddAdjustmentAsync(entry.Id)">
+                                                <DataAnnotationsValidator />
+                                                <ValidationSummary />
+                                                <div class="ps-form-grid">
+                                                    <div class="form-group">
+                                                        <label for="type-@entry.Id">Type</label>
+                                                        <InputSelect id="type-@entry.Id" class="form-select" @bind-Value="GetAdjustmentForm(entry.Id).Type">
+                                                            <option value="Deduction">Deduction</option>
+                                                            <option value="Bonus">Bonus</option>
+                                                        </InputSelect>
+                                                    </div>
+                                                    <div class="form-group">
+                                                        <label for="label-@entry.Id">Label</label>
+                                                        <InputText id="label-@entry.Id" class="form-control" @bind-Value="GetAdjustmentForm(entry.Id).Label" />
+                                                        <ValidationMessage For="() => GetAdjustmentForm(entry.Id).Label" />
+                                                    </div>
+                                                    <div class="form-group">
+                                                        <label for="amount-@entry.Id">Amount (PHP)</label>
+                                                        <InputNumber id="amount-@entry.Id" class="form-control" @bind-Value="GetAdjustmentForm(entry.Id).Amount" step="0.01" />
+                                                        <ValidationMessage For="() => GetAdjustmentForm(entry.Id).Amount" />
+                                                    </div>
+                                                </div>
+                                                <div class="ps-form-actions">
+                                                    <button type="submit" class="btn btn-primary">Add adjustment</button>
+                                                </div>
+                                            </EditForm>
+                                        </div>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    }
+</div>
+
+@code {
+    private readonly Dictionary<int, AdjustmentFormModel> adjustmentForms = new();
+    private List<PayrollPeriod> periods = new();
+    private List<PayrollEntry>? entries;
+    private bool showCreatePeriod;
+    private int selectedPeriodId;
+    private string? alertMessage;
+    private bool alertIsError;
+
+    private readonly CreatePeriodModel createModel = new()
+    {
+        StartDate = DateTime.Today,
+        EndDate = DateTime.Today
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        periods = await Db.PayrollPeriods
+            .OrderByDescending(p => p.StartDate)
+            .ThenByDescending(p => p.Id)
+            .ToListAsync();
+
+        if (periods.Count > 0)
+        {
+            selectedPeriodId = periods.First().Id;
+            await LoadEntriesAsync();
+        }
+    }
+
+    private async Task CreatePeriodAsync()
+    {
+        try
+        {
+            var period = await PayrollService.CreatePayrollPeriodAsync(createModel.Name ?? string.Empty, createModel.StartDate, createModel.EndDate);
+
+            periods.Insert(0, period);
+            selectedPeriodId = period.Id;
+            showCreatePeriod = false;
+            createModel.Reset();
+
+            alertIsError = false;
+            alertMessage = $"Created payroll period '{period.Name}'.";
+
+            await LoadEntriesAsync();
+        }
+        catch (Exception ex)
+        {
+            alertIsError = true;
+            alertMessage = ex.Message;
+        }
+    }
+
+    private async Task GeneratePayrollAsync()
+    {
+        if (selectedPeriodId == 0)
+        {
+            return;
+        }
+
+        try
+        {
+            entries = await PayrollService.GeneratePayrollForPeriodAsync(selectedPeriodId);
+            EnsureAdjustmentForms();
+            alertIsError = false;
+            alertMessage = "Payroll recalculated successfully.";
+        }
+        catch (Exception ex)
+        {
+            alertIsError = true;
+            alertMessage = ex.Message;
+        }
+    }
+
+    private async Task LoadEntriesAsync()
+    {
+        if (selectedPeriodId == 0)
+        {
+            entries = null;
+            return;
+        }
+
+        entries = await PayrollService.GetPayrollEntriesForPeriodAsync(selectedPeriodId);
+
+        EnsureAdjustmentForms();
+    }
+
+    private async Task AddAdjustmentAsync(int entryId)
+    {
+        var form = GetAdjustmentForm(entryId);
+
+        try
+        {
+            await PayrollService.AddAdjustmentAsync(entryId, form.Type, form.Label, form.Amount);
+            adjustmentForms[entryId] = new AdjustmentFormModel { Type = form.Type };
+            await LoadEntriesAsync();
+
+            alertIsError = false;
+            alertMessage = "Adjustment added.";
+        }
+        catch (Exception ex)
+        {
+            alertIsError = true;
+            alertMessage = ex.Message;
+        }
+    }
+
+    private async Task RemoveAdjustmentAsync(int adjustmentId)
+    {
+        try
+        {
+            await PayrollService.RemoveAdjustmentAsync(adjustmentId);
+            await LoadEntriesAsync();
+
+            alertIsError = false;
+            alertMessage = "Adjustment removed.";
+        }
+        catch (Exception ex)
+        {
+            alertIsError = true;
+            alertMessage = ex.Message;
+        }
+    }
+
+    private async Task OnPeriodChanged(ChangeEventArgs args)
+    {
+        if (int.TryParse(args.Value?.ToString(), out var id))
+        {
+            selectedPeriodId = id;
+            entries = null;
+            await LoadEntriesAsync();
+        }
+    }
+
+    private AdjustmentFormModel GetAdjustmentForm(int entryId)
+    {
+        if (!adjustmentForms.TryGetValue(entryId, out var model))
+        {
+            model = new AdjustmentFormModel();
+            adjustmentForms[entryId] = model;
+        }
+
+        return model;
+    }
+
+    private static bool IsBonus(PayrollAdjustment adjustment)
+        => string.Equals(adjustment.Type, "Bonus", StringComparison.OrdinalIgnoreCase);
+
+    private void EnsureAdjustmentForms()
+    {
+        if (entries is null)
+        {
+            return;
+        }
+
+        foreach (var entry in entries)
+        {
+            if (!adjustmentForms.ContainsKey(entry.Id))
+            {
+                adjustmentForms[entry.Id] = new AdjustmentFormModel();
+            }
+        }
+    }
+
+    private sealed class CreatePeriodModel : IValidatableObject
+    {
+        [Required]
+        [StringLength(150, MinimumLength = 3)]
+        public string? Name { get; set; }
+
+        [Required]
+        public DateTime StartDate { get; set; }
+
+        [Required]
+        public DateTime EndDate { get; set; }
+
+        public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
+        {
+            if (EndDate < StartDate)
+            {
+                yield return new ValidationResult("End date cannot be earlier than start date.", new[] { nameof(EndDate) });
+            }
+        }
+
+        public void Reset()
+        {
+            Name = string.Empty;
+            StartDate = DateTime.Today;
+            EndDate = DateTime.Today;
+        }
+    }
+
+    private sealed class AdjustmentFormModel : IValidatableObject
+    {
+        public string Type { get; set; } = "Deduction";
+
+        [Required]
+        [StringLength(150)]
+        public string Label { get; set; } = string.Empty;
+
+        [Required]
+        public decimal Amount { get; set; } = 0.01m;
+
+        public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
+        {
+            if (!string.Equals(Type, "Deduction", StringComparison.OrdinalIgnoreCase) &&
+                !string.Equals(Type, "Bonus", StringComparison.OrdinalIgnoreCase))
+            {
+                yield return new ValidationResult("Type must be either Deduction or Bonus.", new[] { nameof(Type) });
+            }
+
+            if (Amount <= 0)
+            {
+                yield return new ValidationResult("Amount must be greater than 0.", new[] { nameof(Amount) });
+            }
+        }
+    }
+}

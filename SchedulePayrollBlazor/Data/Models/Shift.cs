@@ -25,5 +25,5 @@ public class Shift
     public DateTime End { get; set; }
 
     [Column("group_name")]
-    public string GroupName { get; set; } = string.Empty;
+    public string? GroupName { get; set; }
 }

@@ -1,0 +1,385 @@
+@page "/schedules/new"
+@attribute [Authorize(Roles = "Admin")]
+@using System.Globalization
+@using Microsoft.EntityFrameworkCore
+@implements IDisposable
+
+<div class="ps-page">
+    <div class="ps-page-header">
+        <div>
+            <h1>Create shift</h1>
+            <p class="ps-subtitle">Assign a teammate to a shift and set the working hours.</p>
+        </div>
+        <div class="ps-page-actions">
+            <a class="ps-button ps-button-ghost" href="/schedules">Back to schedule</a>
+        </div>
+    </div>
+
+    <section class="ps-card">
+        <div class="ps-card-header">
+            <h2>Shift details</h2>
+            <p class="ps-subtitle">Select the employee, date, and shift times.</p>
+        </div>
+
+        @if (_isLoading)
+        {
+            <div class="ps-card-body">
+                <div class="ps-schedule-loading">Loading…</div>
+            </div>
+        }
+        else if (_employees.Count == 0)
+        {
+            <div class="ps-card-body">
+                <div class="ps-empty">Add employees before creating shifts.</div>
+            </div>
+        }
+        else if (_editContext is not null)
+        {
+            <div class="ps-card-body">
+                <EditForm EditContext="_editContext" OnValidSubmit="() => SubmitAsync(false)">
+                    <ValidationSummary />
+
+                    @if (!string.IsNullOrWhiteSpace(_errorMessage))
+                    {
+                        <div class="ps-alert ps-alert-danger">@_errorMessage</div>
+                    }
+
+                    @if (!string.IsNullOrWhiteSpace(_successMessage))
+                    {
+                        <div class="ps-alert ps-alert-success">@_successMessage</div>
+                    }
+
+                    <div class="ps-form-grid">
+                        <div class="form-group">
+                            <label class="ps-label" for="shift-editor-employee">Employee</label>
+                            <select id="shift-editor-employee"
+                                    class="ps-input"
+                                    value="@(_form.EmployeeId == 0 ? string.Empty : _form.EmployeeId.ToString(CultureInfo.InvariantCulture))"
+                                    @onchange="OnEmployeeChanged">
+                                <option value="">Select employee</option>
+                                @foreach (var employee in _employees)
+                                {
+                                    <option value="@employee.Id">@employee.Name</option>
+                                }
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="ps-label" for="shift-editor-date">Date</label>
+                            <InputDate @bind-Value="_form.Date"
+                                       id="shift-editor-date"
+                                       class="ps-input" />
+                        </div>
+
+                        <div class="form-group">
+                            <label class="ps-label" for="shift-editor-start">Start time</label>
+                            <input id="shift-editor-start"
+                                   type="time"
+                                   class="ps-input"
+                                   value="@_form.GetStartTimeText()"
+                                   step="300"
+                                   @onchange="OnStartChanged" />
+                        </div>
+
+                        <div class="form-group">
+                            <label class="ps-label" for="shift-editor-end">End time</label>
+                            <input id="shift-editor-end"
+                                   type="time"
+                                   class="ps-input"
+                                   value="@_form.GetEndTimeText()"
+                                   step="300"
+                                   @onchange="OnEndChanged" />
+                        </div>
+
+                        <div class="form-group">
+                            <label class="ps-label" for="shift-editor-group">Group</label>
+                            <InputText id="shift-editor-group"
+                                       class="ps-input"
+                                       @bind-Value="_form.GroupName" />
+                        </div>
+                    </div>
+
+                    <div class="ps-form-actions">
+                        <button type="submit" class="ps-button ps-button-primary" disabled="_isSaving">Save shift</button>
+                        <button type="button" class="ps-button" @onclick="SubmitAndAddAnother" disabled="_isSaving">Save &amp; add another</button>
+                        <button type="button" class="ps-button ps-button-ghost" @onclick="Cancel" disabled="_isSaving">Cancel</button>
+                    </div>
+                </EditForm>
+            </div>
+        }
+    </section>
+</div>
+
+@code {
+    private readonly ShiftFormModel _form = ShiftFormModel.CreateDefault();
+    private readonly List<EmployeeOption> _employees = new();
+    private EditContext? _editContext;
+    private ValidationMessageStore? _validationMessages;
+    private bool _isLoading = true;
+    private bool _isSaving;
+    private string? _errorMessage;
+    private string? _successMessage;
+
+    [Inject] private IShiftService ShiftService { get; set; } = default!;
+    [Inject] private AppDbContext Db { get; set; } = default!;
+    [Inject] private NavigationManager Nav { get; set; } = default!;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadEmployeesAsync();
+        ConfigureEditContext();
+    }
+
+    private async Task LoadEmployeesAsync()
+    {
+        _employees.Clear();
+        try
+        {
+            var records = await Db.Employees
+                .AsNoTracking()
+                .OrderBy(e => e.FullName)
+                .Select(e => new { e.EmployeeId, e.FullName, e.Department })
+                .ToListAsync();
+
+            foreach (var record in records)
+            {
+                var name = string.IsNullOrWhiteSpace(record.FullName)
+                    ? $"Employee {record.EmployeeId}"
+                    : record.FullName!;
+                var group = string.IsNullOrWhiteSpace(record.Department)
+                    ? null
+                    : record.Department;
+                _employees.Add(new EmployeeOption(record.EmployeeId, name, group));
+            }
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+
+        if (_employees.Count > 0 && _form.EmployeeId == 0)
+        {
+            var first = _employees[0];
+            _form.EmployeeId = first.Id;
+            _form.EmployeeName = first.Name;
+            _form.GroupName ??= first.Group;
+        }
+    }
+
+    private void ConfigureEditContext()
+    {
+        _editContext?.OnValidationRequested -= HandleValidationRequested;
+        _editContext?.OnFieldChanged -= HandleFieldChanged;
+
+        _editContext = new EditContext(_form);
+        _validationMessages = new ValidationMessageStore(_editContext);
+        _editContext.OnValidationRequested += HandleValidationRequested;
+        _editContext.OnFieldChanged += HandleFieldChanged;
+    }
+
+    private async Task SubmitAsync(bool addAnother)
+    {
+        _errorMessage = null;
+        _successMessage = null;
+
+        if (_editContext is null)
+        {
+            return;
+        }
+
+        if (!_editContext.Validate())
+        {
+            return;
+        }
+
+        var employee = _employees.FirstOrDefault(e => e.Id == _form.EmployeeId);
+        if (employee == default)
+        {
+            _errorMessage = "Select a valid employee.";
+            return;
+        }
+
+        var shift = _form.ToShift();
+        shift.EmployeeName = employee.Name;
+        if (string.IsNullOrWhiteSpace(shift.GroupName))
+        {
+            shift.GroupName = employee.Group;
+        }
+
+        _isSaving = true;
+        try
+        {
+            await ShiftService.InsertShiftAsync(shift);
+
+            if (addAnother)
+            {
+                _successMessage = "Shift created.";
+                ResetFormForNext(employee);
+            }
+            else
+            {
+                Nav.NavigateTo("/schedules");
+            }
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = ex.Message;
+        }
+        finally
+        {
+            _isSaving = false;
+        }
+    }
+
+    private Task SubmitAndAddAnother()
+    {
+        return SubmitAsync(true);
+    }
+
+    private void Cancel()
+    {
+        Nav.NavigateTo("/schedules");
+    }
+
+    private void HandleValidationRequested(object? sender, ValidationRequestedEventArgs args)
+    {
+        if (_validationMessages is null)
+        {
+            return;
+        }
+
+        _validationMessages.Clear();
+
+        var employeeField = new FieldIdentifier(_form, nameof(ShiftFormModel.EmployeeId));
+        var dateField = new FieldIdentifier(_form, nameof(ShiftFormModel.Date));
+        var endField = new FieldIdentifier(_form, nameof(ShiftFormModel.EndTime));
+
+        if (_form.EmployeeId <= 0)
+        {
+            _validationMessages.Add(employeeField, "Select an employee.");
+        }
+
+        if (_form.Date == default)
+        {
+            _validationMessages.Add(dateField, "Select a valid date.");
+        }
+
+        if (_form.EndTime <= _form.StartTime)
+        {
+            _validationMessages.Add(endField, "End time must be after the start time.");
+        }
+
+        _editContext?.NotifyValidationStateChanged();
+    }
+
+    private void HandleFieldChanged(object? sender, FieldChangedEventArgs args)
+    {
+        _validationMessages?.Clear(args.FieldIdentifier);
+
+        if (args.FieldIdentifier.FieldName == nameof(ShiftFormModel.EmployeeId))
+        {
+            var employee = _employees.FirstOrDefault(e => e.Id == _form.EmployeeId);
+            _form.EmployeeName = employee == default ? null : employee.Name;
+            if (string.IsNullOrWhiteSpace(_form.GroupName) && employee != default)
+            {
+                _form.GroupName = employee.Group;
+            }
+        }
+        else if (args.FieldIdentifier.FieldName == nameof(ShiftFormModel.StartTime))
+        {
+            _validationMessages?.Clear(new FieldIdentifier(_form, nameof(ShiftFormModel.EndTime)));
+        }
+    }
+
+    private void OnEmployeeChanged(ChangeEventArgs e)
+    {
+        var value = Convert.ToString(e.Value, CultureInfo.InvariantCulture);
+        if (int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var id))
+        {
+            _form.EmployeeId = id;
+        }
+        else
+        {
+            _form.EmployeeId = 0;
+        }
+
+        _editContext?.NotifyFieldChanged(new FieldIdentifier(_form, nameof(ShiftFormModel.EmployeeId)));
+    }
+
+    private void OnStartChanged(ChangeEventArgs e)
+    {
+        var value = Convert.ToString(e.Value, CultureInfo.InvariantCulture);
+        if (TimeSpan.TryParse(value, CultureInfo.InvariantCulture, out var start))
+        {
+            _form.StartTime = start;
+        }
+
+        _editContext?.NotifyFieldChanged(new FieldIdentifier(_form, nameof(ShiftFormModel.StartTime)));
+    }
+
+    private void OnEndChanged(ChangeEventArgs e)
+    {
+        var value = Convert.ToString(e.Value, CultureInfo.InvariantCulture);
+        if (TimeSpan.TryParse(value, CultureInfo.InvariantCulture, out var end))
+        {
+            _form.EndTime = end;
+        }
+
+        _editContext?.NotifyFieldChanged(new FieldIdentifier(_form, nameof(ShiftFormModel.EndTime)));
+    }
+
+    private void ResetFormForNext(EmployeeOption employee)
+    {
+        _form.Id = null;
+        _form.Date = _form.Date.AddDays(1);
+        _form.StartTime = TimeSpan.FromHours(9);
+        _form.EndTime = TimeSpan.FromHours(17);
+        _form.EmployeeId = employee.Id;
+        _form.EmployeeName = employee.Name;
+        _form.GroupName = employee.Group;
+
+        ConfigureEditContext();
+    }
+
+    private sealed record EmployeeOption(int Id, string Name, string? Group);
+
+    private sealed class ShiftFormModel
+    {
+        public int? Id { get; set; }
+        public int EmployeeId { get; set; }
+        public string? EmployeeName { get; set; }
+        public DateTime Date { get; set; } = DateTime.Today;
+        public TimeSpan StartTime { get; set; } = TimeSpan.FromHours(9);
+        public TimeSpan EndTime { get; set; } = TimeSpan.FromHours(17);
+        public string? GroupName { get; set; }
+
+        public static ShiftFormModel CreateDefault() => new();
+
+        public Shift ToShift()
+        {
+            var baseDate = Date.Date;
+            return new Shift
+            {
+                Id = Id ?? 0,
+                EmployeeId = EmployeeId,
+                EmployeeName = EmployeeName ?? string.Empty,
+                Start = baseDate.Add(StartTime),
+                End = baseDate.Add(EndTime),
+                GroupName = string.IsNullOrWhiteSpace(GroupName) ? null : GroupName.Trim()
+            };
+        }
+
+        public string GetStartTimeText() => StartTime.ToString(@"hh\\:mm");
+
+        public string GetEndTimeText() => EndTime.ToString(@"hh\\:mm");
+    }
+
+    public void Dispose()
+    {
+        if (_editContext is not null)
+        {
+            _editContext.OnValidationRequested -= HandleValidationRequested;
+            _editContext.OnFieldChanged -= HandleFieldChanged;
+        }
+    }
+}

@@ -1029,7 +1029,7 @@ textarea:focus {
     z-index: 1050;
 }
 
-.ps-modal {
+.ps-modal { 
     background: var(--ps-surface);
     border-radius: 1.1rem;
     box-shadow: var(--ps-shadow-card);
@@ -1066,6 +1066,12 @@ textarea:focus {
 .ps-modal-close:hover,
 .ps-modal-close:focus {
     color: var(--ps-primary);
+}
+
+.ps-modal-subtitle {
+    margin: 0.25rem 0 0;
+    color: var(--ps-muted-text);
+    font-size: 0.95rem;
 }
 
 /* Form layout */
@@ -1472,6 +1478,17 @@ textarea:focus {
     transition: background-color 0.25s ease, color 0.25s ease, border-color 0.25s ease;
 }
 
+.ps-shift-card-action {
+    cursor: pointer;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.ps-shift-card-action:hover,
+.ps-shift-card-action:focus {
+    transform: translateY(-2px);
+    box-shadow: var(--ps-shadow-card);
+}
+
 .ps-shift-accent {
     width: 4px;
     background-color: var(--accent);
@@ -1482,6 +1499,19 @@ textarea:focus {
     display: flex;
     flex-direction: column;
     gap: 0.15rem;
+}
+
+.shift-modal-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-top: 1.5rem;
+}
+
+.shift-modal-footer-actions {
+    display: flex;
+    gap: 0.75rem;
 }
 
 .ps-shift-employee {

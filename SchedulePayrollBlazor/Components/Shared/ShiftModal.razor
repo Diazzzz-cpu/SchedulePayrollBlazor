@@ -1,0 +1,364 @@
+@using System.Globalization
+@implements IDisposable
+
+@if (IsOpen && _editContext is not null)
+{
+    <div class="ps-modal-backdrop">
+        <div class="ps-modal" @onclick:stopPropagation>
+            <div class="ps-modal-header">
+                <div>
+                    <h3>@Title</h3>
+                    @if (!string.IsNullOrWhiteSpace(_formModel.EmployeeName))
+                    {
+                        <p class="ps-modal-subtitle">@_formModel.EmployeeName</p>
+                    }
+                </div>
+                <button type="button" class="ps-modal-close" @onclick="CancelAsync" aria-label="Close">×</button>
+            </div>
+            <div class="ps-modal-body">
+                <EditForm EditContext="_editContext" OnValidSubmit="HandleValidSubmit">
+                    <ValidationSummary />
+
+                    @if (!string.IsNullOrWhiteSpace(ErrorMessage))
+                    {
+                        <div class="ps-alert ps-alert-danger">@ErrorMessage</div>
+                    }
+
+                    <div class="ps-form-grid">
+                        <div class="form-group">
+                            <label class="ps-label" for="shift-modal-employee">Employee</label>
+                            <select id="shift-modal-employee"
+                                    class="ps-input"
+                                    value="@(_formModel.EmployeeId == 0 ? string.Empty : _formModel.EmployeeId.ToString(CultureInfo.InvariantCulture))"
+                                    @onchange="OnEmployeeChanged">
+                                <option value="">Select employee</option>
+                                @foreach (var employee in Employees)
+                                {
+                                    <option value="@employee.Id">@employee.Name</option>
+                                }
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="ps-label" for="shift-modal-date">Date</label>
+                            <InputDate @bind-Value="_formModel.Date"
+                                       id="shift-modal-date"
+                                       class="ps-input" />
+                        </div>
+
+                        <div class="form-group">
+                            <label class="ps-label" for="shift-modal-start">Start time</label>
+                            <input id="shift-modal-start"
+                                   type="time"
+                                   class="ps-input"
+                                   value="@_formModel.GetStartTimeText()"
+                                   step="300"
+                                   @onchange="OnStartChanged" />
+                        </div>
+
+                        <div class="form-group">
+                            <label class="ps-label" for="shift-modal-end">End time</label>
+                            <input id="shift-modal-end"
+                                   type="time"
+                                   class="ps-input"
+                                   value="@_formModel.GetEndTimeText()"
+                                   step="300"
+                                   @onchange="OnEndChanged" />
+                        </div>
+
+                        <div class="form-group">
+                            <label class="ps-label" for="shift-modal-group">Group</label>
+                            <InputText id="shift-modal-group"
+                                       class="ps-input"
+                                       @bind-Value="_formModel.GroupName" />
+                        </div>
+                    </div>
+
+                    <div class="shift-modal-footer">
+                        @if (OnDelete.HasDelegate && _formModel.Id.HasValue)
+                        {
+                            <button type="button" class="ps-button ps-button-danger" @onclick="DeleteAsync" disabled="_isSubmitting">
+                                Delete shift
+                            </button>
+                        }
+                        <div class="shift-modal-footer-actions">
+                            <button type="button" class="ps-button ps-button-ghost" @onclick="CancelAsync" disabled="_isSubmitting">Cancel</button>
+                            <button type="submit" class="ps-button ps-button-primary" disabled="_isSubmitting">Save shift</button>
+                        </div>
+                    </div>
+                </EditForm>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private bool _initializedForOpen;
+    private ShiftEditorModel _formModel = ShiftEditorModel.CreateDefault();
+    private EditContext? _editContext;
+    private ValidationMessageStore? _validationMessages;
+    private bool _isSubmitting;
+
+    [Parameter] public bool IsOpen { get; set; }
+    [Parameter] public EventCallback<bool> IsOpenChanged { get; set; }
+    [Parameter] public Shift? Model { get; set; }
+    [Parameter] public IEnumerable<(int Id, string Name)> Employees { get; set; } = Enumerable.Empty<(int, string)>();
+    [Parameter] public EventCallback<Shift> OnSave { get; set; }
+    [Parameter] public EventCallback OnCancel { get; set; }
+    [Parameter] public EventCallback<int> OnDelete { get; set; }
+    [Parameter] public string Title { get; set; } = "Create shift";
+    [Parameter] public string? ErrorMessage { get; set; }
+
+    protected override void OnParametersSet()
+    {
+        if (!IsOpen)
+        {
+            if (_initializedForOpen)
+            {
+                TearDownEditContext();
+                _initializedForOpen = false;
+            }
+
+            return;
+        }
+
+        if (!_initializedForOpen)
+        {
+            InitializeEditContext();
+            _initializedForOpen = true;
+        }
+    }
+
+    private void InitializeEditContext()
+    {
+        var model = Model is not null
+            ? ShiftEditorModel.FromShift(Model)
+            : ShiftEditorModel.CreateDefault();
+
+        if (model.EmployeeId == 0)
+        {
+            var first = Employees.FirstOrDefault();
+            if (first.Id != 0)
+            {
+                model.EmployeeId = first.Id;
+                model.EmployeeName = first.Name;
+            }
+        }
+        else if (string.IsNullOrWhiteSpace(model.EmployeeName))
+        {
+            model.EmployeeName = ResolveEmployeeName(model.EmployeeId);
+        }
+
+        ResetEditContext(model);
+    }
+
+    private void ResetEditContext(ShiftEditorModel model)
+    {
+        TearDownEditContext();
+
+        _formModel = model;
+        _editContext = new EditContext(_formModel);
+        _validationMessages = new ValidationMessageStore(_editContext);
+        _editContext.OnValidationRequested += HandleValidationRequested;
+        _editContext.OnFieldChanged += HandleFieldChanged;
+    }
+
+    private void TearDownEditContext()
+    {
+        if (_editContext is not null)
+        {
+            _editContext.OnValidationRequested -= HandleValidationRequested;
+            _editContext.OnFieldChanged -= HandleFieldChanged;
+        }
+
+        _validationMessages = null;
+        _editContext = null;
+    }
+
+    private async Task HandleValidSubmit()
+    {
+        if (_editContext is null)
+        {
+            return;
+        }
+
+        _isSubmitting = true;
+        try
+        {
+            var shift = _formModel.ToShift();
+            await OnSave.InvokeAsync(shift);
+        }
+        finally
+        {
+            _isSubmitting = false;
+        }
+    }
+
+    private Task CancelAsync()
+    {
+        return InvokeAsync(async () =>
+        {
+            if (OnCancel.HasDelegate)
+            {
+                await OnCancel.InvokeAsync();
+            }
+
+            if (IsOpenChanged.HasDelegate)
+            {
+                await IsOpenChanged.InvokeAsync(false);
+            }
+        });
+    }
+
+    private Task DeleteAsync()
+    {
+        if (!OnDelete.HasDelegate || !_formModel.Id.HasValue)
+        {
+            return Task.CompletedTask;
+        }
+
+        return OnDelete.InvokeAsync(_formModel.Id.Value);
+    }
+
+    private void HandleValidationRequested(object? sender, ValidationRequestedEventArgs args)
+    {
+        if (_validationMessages is null || _editContext is null)
+        {
+            return;
+        }
+
+        _validationMessages.Clear();
+
+        var employeeField = new FieldIdentifier(_formModel, nameof(ShiftEditorModel.EmployeeId));
+        var dateField = new FieldIdentifier(_formModel, nameof(ShiftEditorModel.Date));
+        var startField = new FieldIdentifier(_formModel, nameof(ShiftEditorModel.StartTime));
+        var endField = new FieldIdentifier(_formModel, nameof(ShiftEditorModel.EndTime));
+
+        if (_formModel.EmployeeId <= 0 || !Employees.Any(e => e.Id == _formModel.EmployeeId))
+        {
+            _validationMessages.Add(employeeField, "Select an employee.");
+        }
+
+        if (_formModel.Date == default)
+        {
+            _validationMessages.Add(dateField, "Select a valid date.");
+        }
+
+        if (_formModel.EndTime <= _formModel.StartTime)
+        {
+            _validationMessages.Add(endField, "End time must be after the start time.");
+        }
+
+        _editContext.NotifyValidationStateChanged();
+    }
+
+    private void HandleFieldChanged(object? sender, FieldChangedEventArgs args)
+    {
+        if (_validationMessages is null)
+        {
+            return;
+        }
+
+        _validationMessages.Clear(args.FieldIdentifier);
+
+        if (args.FieldIdentifier.FieldName == nameof(ShiftEditorModel.EmployeeId))
+        {
+            _formModel.EmployeeName = ResolveEmployeeName(_formModel.EmployeeId);
+        }
+    }
+
+    private void OnEmployeeChanged(ChangeEventArgs e)
+    {
+        var value = Convert.ToString(e.Value, CultureInfo.InvariantCulture);
+        if (int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var employeeId))
+        {
+            _formModel.EmployeeId = employeeId;
+            _formModel.EmployeeName = ResolveEmployeeName(employeeId);
+        }
+        else
+        {
+            _formModel.EmployeeId = 0;
+            _formModel.EmployeeName = null;
+        }
+
+        _editContext?.NotifyFieldChanged(new FieldIdentifier(_formModel, nameof(ShiftEditorModel.EmployeeId)));
+    }
+
+    private void OnStartChanged(ChangeEventArgs e)
+    {
+        var value = Convert.ToString(e.Value, CultureInfo.InvariantCulture);
+        if (TimeSpan.TryParse(value, CultureInfo.InvariantCulture, out var time))
+        {
+            _formModel.StartTime = time;
+        }
+
+        _editContext?.NotifyFieldChanged(new FieldIdentifier(_formModel, nameof(ShiftEditorModel.StartTime)));
+    }
+
+    private void OnEndChanged(ChangeEventArgs e)
+    {
+        var value = Convert.ToString(e.Value, CultureInfo.InvariantCulture);
+        if (TimeSpan.TryParse(value, CultureInfo.InvariantCulture, out var time))
+        {
+            _formModel.EndTime = time;
+        }
+
+        _editContext?.NotifyFieldChanged(new FieldIdentifier(_formModel, nameof(ShiftEditorModel.EndTime)));
+    }
+
+    private string? ResolveEmployeeName(int employeeId)
+    {
+        var match = Employees.FirstOrDefault(e => e.Id == employeeId);
+        return match == default ? null : match.Name;
+    }
+
+    private sealed class ShiftEditorModel
+    {
+        public int? Id { get; set; }
+        public int EmployeeId { get; set; }
+        public string? EmployeeName { get; set; }
+        public DateTime Date { get; set; } = DateTime.Today;
+        public TimeSpan StartTime { get; set; } = TimeSpan.FromHours(9);
+        public TimeSpan EndTime { get; set; } = TimeSpan.FromHours(17);
+        public string? GroupName { get; set; }
+
+        public static ShiftEditorModel CreateDefault() => new();
+
+        public static ShiftEditorModel FromShift(Shift shift)
+        {
+            return new ShiftEditorModel
+            {
+                Id = shift.Id,
+                EmployeeId = shift.EmployeeId,
+                EmployeeName = shift.EmployeeName,
+                Date = shift.Start.Date,
+                StartTime = shift.Start.TimeOfDay,
+                EndTime = shift.End.TimeOfDay,
+                GroupName = shift.GroupName
+            };
+        }
+
+        public Shift ToShift()
+        {
+            var baseDate = Date.Date;
+            return new Shift
+            {
+                Id = Id ?? 0,
+                EmployeeId = EmployeeId,
+                EmployeeName = EmployeeName ?? string.Empty,
+                Start = baseDate.Add(StartTime),
+                End = baseDate.Add(EndTime),
+                GroupName = string.IsNullOrWhiteSpace(GroupName) ? null : GroupName.Trim()
+            };
+        }
+
+        public string GetStartTimeText() => StartTime.ToString(@"hh\\:mm");
+
+        public string GetEndTimeText() => EndTime.ToString(@"hh\\:mm");
+    }
+
+    public void Dispose()
+    {
+        TearDownEditContext();
+    }
+}

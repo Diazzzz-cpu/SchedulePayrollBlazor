@@ -6,37 +6,37 @@
 @using Microsoft.EntityFrameworkCore
 @using SchedulePayrollBlazor.Data.Models
 
-<div class="page">
-    <header class="page-header">
+<div class="ps-page">
+    <div class="ps-page-header">
         <div>
-            <h1 class="page-title">Edit Schedule</h1>
-            <p class="page-subtitle">Adjust the shift details for this assignment.</p>
+            <h2>Edit schedule</h2>
+            <p class="ps-subtitle">Adjust the shift details for this assignment.</p>
         </div>
-        <div class="page-actions">
-            <a class="btn btn-outline" href="/schedules">Back to schedules</a>
+        <div class="ps-page-actions">
+            <a class="btn btn-outline-secondary" href="/schedules">Back to schedules</a>
         </div>
-    </header>
+    </div>
 
     @if (vm is null)
     {
-        <div class="content-card">
+        <div class="ps-card">
             <div class="loading">Loading…</div>
         </div>
     }
     else
     {
-        <section class="content-card">
-            <div class="card-header">
-                <h3>Shift Details</h3>
-                <p>Update the assigned employee, timing, or source.</p>
+        <section class="ps-card">
+            <div class="ps-card-header">
+                <h3>Shift details</h3>
+                <p class="ps-subtitle">Update the assigned employee, timing, or source.</p>
             </div>
             <EditForm Model="vm" OnValidSubmit="Save" FormName="EditScheduleForm">
                 <DataAnnotationsValidator />
                 <ValidationSummary />
 
-                <div class="form-group">
-                    <label>Employee</label>
-                    <select value="@vm.EmployeeId" @onchange="OnEmpChanged">
+                <div class="mb-3">
+                    <label for="edit-employee" class="form-label">Employee</label>
+                    <select id="edit-employee" class="form-select" value="@vm.EmployeeId" @onchange="OnEmpChanged">
                         @foreach (var e in employees)
                         {
                             <option value="@e.EmployeeId">@e.FullName (@e.User.Email)</option>
@@ -44,24 +44,24 @@
                     </select>
                 </div>
 
-                <div class="form-row">
-                    <div class="form-group">
-                        <label>Date</label>
-                        <input type="date" value="@vm.ShiftDateText" @onchange="OnDateChanged" />
+                <div class="row g-3">
+                    <div class="col-md-4 col-12">
+                        <label for="edit-date" class="form-label">Date</label>
+                        <input id="edit-date" type="date" class="form-control" value="@vm.ShiftDateText" @onchange="OnDateChanged" />
                     </div>
-                    <div class="form-group">
-                        <label>Start</label>
-                        <input type="time" value="@vm.StartTimeText" step="60" @onchange="OnStartChanged" />
+                    <div class="col-md-4 col-12">
+                        <label for="edit-start" class="form-label">Start time</label>
+                        <input id="edit-start" type="time" class="form-control" value="@vm.StartTimeText" step="60" @onchange="OnStartChanged" />
                     </div>
-                    <div class="form-group">
-                        <label>End</label>
-                        <input type="time" value="@vm.EndTimeText" step="60" @onchange="OnEndChanged" />
+                    <div class="col-md-4 col-12">
+                        <label for="edit-end" class="form-label">End time</label>
+                        <input id="edit-end" type="time" class="form-control" value="@vm.EndTimeText" step="60" @onchange="OnEndChanged" />
                     </div>
                 </div>
 
-                <div class="form-group">
-                    <label>Source</label>
-                    <select value="@vm.Source" @onchange="OnSourceChanged">
+                <div class="mb-3 mt-3">
+                    <label for="edit-source" class="form-label">Source</label>
+                    <select id="edit-source" class="form-select" value="@vm.Source" @onchange="OnSourceChanged">
                         <option>Manual</option>
                         <option>Auto</option>
                     </select>
@@ -69,12 +69,12 @@
 
                 @if (!string.IsNullOrWhiteSpace(vm.FormError))
                 {
-                    <div class="alert alert-danger">@vm.FormError</div>
+                    <div class="alert alert-danger" role="alert">@vm.FormError</div>
                 }
 
-                <div class="form-actions">
-                    <button class="btn btn-primary" type="submit">Save Changes</button>
-                    <a class="btn btn-secondary" href="/schedules">Cancel</a>
+                <div class="ps-form-actions">
+                    <button class="btn btn-primary" type="submit">Save changes</button>
+                    <a class="btn btn-outline-secondary" href="/schedules">Cancel</a>
                 </div>
             </EditForm>
         </section>
@@ -179,7 +179,6 @@
             return;
         }
 
-        // Compare DateTime to DateTime, TimeSpan to TimeSpan
         var overlap = await Db.Schedules
             .AnyAsync(s =>
                 s.EmployeeId == vm.EmployeeId
@@ -199,24 +198,27 @@
             vm.FormError = "The schedule could not be found. Refresh the list and try again.";
             return;
         }
+
         entity.EmployeeId = vm.EmployeeId;
         entity.ShiftDate = date;
         entity.StartTime = start;
         entity.EndTime = end;
-        entity.Source = string.IsNullOrWhiteSpace(vm.Source) ? "Manual" : vm.Source;
+        entity.Source = vm.Source ?? "Manual";
 
+        Db.Update(entity);
         await Db.SaveChangesAsync();
+
         Nav.NavigateTo("/schedules", forceLoad: true);
     }
 
-    private class ScheduleVm
+    private sealed class ScheduleVm
     {
         public int ScheduleId { get; set; }
         public int EmployeeId { get; set; }
-        public string ShiftDateText { get; set; } = DateTime.Today.ToString("yyyy-MM-dd");
-        public string StartTimeText { get; set; } = "08:00";
-        public string EndTimeText { get; set; } = "17:00";
-        public string? Source { get; set; } = "Manual";
+        public string ShiftDateText { get; set; } = string.Empty;
+        public string StartTimeText { get; set; } = string.Empty;
+        public string EndTimeText { get; set; } = string.Empty;
+        public string? Source { get; set; }
         public string? FormError { get; set; }
     }
 }

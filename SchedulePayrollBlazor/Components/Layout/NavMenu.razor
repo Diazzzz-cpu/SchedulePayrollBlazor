@@ -5,83 +5,82 @@
 @inject NavigationManager Nav
 @implements IDisposable
 
-<nav class="side-nav">
-    <div class="side-nav-user">
-        <span class="user-name">@(isAuthenticated ? displayName : "Welcome")</span>
-        <span class="user-role">@(isAuthenticated ? roleLabel : "Please sign in")</span>
+<nav class="ps-nav">
+    <div class="ps-nav-user">
+        <span class="ps-nav-name">@(isAuthenticated ? displayName : "Welcome")</span>
+        <span class="ps-nav-role">@(isAuthenticated ? roleLabel : "Please sign in")</span>
     </div>
 
     @if (!isAuthenticated)
     {
-        <div class="side-nav-section">
-            <div class="side-nav-links">
-                <NavLink href="/login" class="side-nav-link" activeClass="active">
-                    <span class="icon">🔐</span>
-                    <span>Login</span>
-                </NavLink>
-            </div>
+        <div class="ps-nav-section">
+            <ul class="ps-nav-list">
+                <li>
+                    <NavLink href="/login" class="ps-nav-link" activeClass="active">Login</NavLink>
+                </li>
+            </ul>
         </div>
     }
     else if (isAdmin)
     {
-        <div class="side-nav-section">
-            <span class="side-nav-title">Admin</span>
-            <div class="side-nav-links">
-                <NavLink href="/admindashboard" class="side-nav-link" activeClass="active" Match="NavLinkMatch.Prefix">
-                    <span class="icon">📊</span>
-                    <span>Dashboard</span>
-                </NavLink>
-                <NavLink href="/employees" class="side-nav-link" activeClass="active">
-                    <span class="icon">👥</span>
-                    <span>Employees</span>
-                </NavLink>
-                <NavLink href="/schedules" class="side-nav-link" activeClass="active">
-                    <span class="icon">📅</span>
-                    <span>Schedules</span>
-                </NavLink>
-                <NavLink href="/payroll" class="side-nav-link" activeClass="active">
-                    <span class="icon">💵</span>
-                    <span>Payroll</span>
-                </NavLink>
-                <NavLink href="/settings" class="side-nav-link" activeClass="active">
-                    <span class="icon">⚙️</span>
-                    <span>Settings</span>
-                </NavLink>
-                <NavLink href="/admin/users" class="side-nav-link" activeClass="active">
-                    <span class="icon">🛠️</span>
-                    <span>User Management</span>
-                </NavLink>
-            </div>
+        <div class="ps-nav-section">
+            <span class="ps-nav-section-title">Management</span>
+            <ul class="ps-nav-list">
+                <li>
+                    <NavLink href="/admindashboard" class="ps-nav-link" activeClass="active" Match="NavLinkMatch.Prefix">Dashboard</NavLink>
+                </li>
+                <li>
+                    <NavLink href="/employees" class="ps-nav-link" activeClass="active">Employees</NavLink>
+                </li>
+                <li>
+                    <NavLink href="/schedules" class="ps-nav-link" activeClass="active">Schedules</NavLink>
+                </li>
+                <li>
+                    <NavLink href="/payroll" class="ps-nav-link" activeClass="active">Payroll</NavLink>
+                </li>
+                <li>
+                    <NavLink href="/settings" class="ps-nav-link" activeClass="active">Settings</NavLink>
+                </li>
+            </ul>
+        </div>
+        <div class="ps-nav-section">
+            <span class="ps-nav-section-title">Account</span>
+            <ul class="ps-nav-list">
+                <li>
+                    <NavLink href="/profile" class="ps-nav-link" activeClass="active">Profile</NavLink>
+                </li>
+            </ul>
         </div>
     }
     else
     {
-        <div class="side-nav-section">
-            <span class="side-nav-title">Employee</span>
-            <div class="side-nav-links">
-                <NavLink href="/userdashboard" class="side-nav-link" activeClass="active" Match="NavLinkMatch.Prefix">
-                    <span class="icon">🏠</span>
-                    <span>Dashboard</span>
-                </NavLink>
-                <NavLink href="/myschedule" class="side-nav-link" activeClass="active">
-                    <span class="icon">📆</span>
-                    <span>My Schedule</span>
-                </NavLink>
-                <NavLink href="/mypayroll" class="side-nav-link" activeClass="active">
-                    <span class="icon">💰</span>
-                    <span>My Payroll</span>
-                </NavLink>
-                <NavLink href="/profile" class="side-nav-link" activeClass="active">
-                    <span class="icon">👤</span>
-                    <span>Profile</span>
-                </NavLink>
-            </div>
+        <div class="ps-nav-section">
+            <span class="ps-nav-section-title">My PaySync</span>
+            <ul class="ps-nav-list">
+                <li>
+                    <NavLink href="/userdashboard" class="ps-nav-link" activeClass="active" Match="NavLinkMatch.Prefix">Dashboard</NavLink>
+                </li>
+                <li>
+                    <NavLink href="/myschedule" class="ps-nav-link" activeClass="active">My Schedule</NavLink>
+                </li>
+                <li>
+                    <NavLink href="/mypayroll" class="ps-nav-link" activeClass="active">My Payroll</NavLink>
+                </li>
+            </ul>
+        </div>
+        <div class="ps-nav-section">
+            <span class="ps-nav-section-title">Account</span>
+            <ul class="ps-nav-list">
+                <li>
+                    <NavLink href="/profile" class="ps-nav-link" activeClass="active">Profile</NavLink>
+                </li>
+            </ul>
         </div>
     }
 
     @if (isAuthenticated)
     {
-        <button class="side-nav-logout" @onclick="Logout">Logout</button>
+        <button class="btn btn-outline-secondary w-100 ps-nav-logout" @onclick="Logout">Sign out</button>
     }
 </nav>
 

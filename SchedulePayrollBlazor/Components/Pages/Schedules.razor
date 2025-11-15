@@ -6,56 +6,62 @@
 @using System.Globalization
 @using SchedulePayrollBlazor.Data.Models
 
-<div class="page">
-    <header class="page-header">
+<div class="ps-page">
+    <div class="ps-page-header">
         <div>
-            <h1 class="page-title">Schedules</h1>
-            <p class="page-subtitle">Review and manage upcoming shift assignments.</p>
+            <h2>Schedules</h2>
+            <p class="ps-subtitle">Review and manage upcoming shift assignments.</p>
         </div>
-        <div class="page-actions">
-            <a class="btn btn-primary" href="/schedules/new">+ Add Schedule</a>
+        <div class="ps-page-actions">
+            <a class="btn btn-primary" href="/schedules/new">Add schedule</a>
         </div>
-    </header>
+    </div>
 
-    <section class="filter-bar">
-        <div class="form-group">
-            <label>Schedule Date</label>
-            <input type="date" value="@dateString" @onchange="OnDateChanged" />
+    <section class="ps-card">
+        <div class="ps-card-header">
+            <h3>Filter by date</h3>
+            <p class="ps-subtitle">Choose a day to view matching shifts.</p>
         </div>
-        <div class="form-actions">
-            <button class="btn btn-secondary" @onclick="() => Load()">Load</button>
+        <div class="row g-3 align-items-end">
+            <div class="col-sm-4 col-12">
+                <label for="schedule-date" class="form-label">Schedule date</label>
+                <input id="schedule-date" class="form-control" type="date" value="@dateString" @onchange="OnDateChanged" />
+            </div>
+            <div class="col-auto">
+                <button class="btn btn-outline-secondary" type="button" @onclick="() => Load()">Load</button>
+            </div>
         </div>
     </section>
 
     @if (items is null)
     {
-        <div class="content-card">
+        <div class="ps-card">
             <div class="loading">Loading...</div>
         </div>
     }
     else if (items.Count == 0)
     {
-        <div class="content-card">
-            <div class="alert alert-info">No schedules found for the selected date.</div>
+        <div class="ps-card">
+            <div class="text-muted">No schedules found for the selected date.</div>
         </div>
     }
     else
     {
-        <section class="content-card">
-            <div class="card-header">
-                <h3>Shift Overview</h3>
-                <p>Found <strong>@items.Count</strong> schedule(s) for @dateString.</p>
+        <section class="ps-card">
+            <div class="ps-card-header">
+                <h3>Shift overview</h3>
+                <p class="ps-subtitle">Found <strong>@items.Count</strong> schedule(s) for @dateString.</p>
             </div>
             <div class="table-responsive">
-                <table>
+                <table class="table table-striped table-hover align-middle">
                     <thead>
                         <tr>
-                            <th>Employee</th>
-                            <th>Start</th>
-                            <th>End</th>
-                            <th>Source</th>
-                            <th>Date</th>
-                            <th>Actions</th>
+                            <th scope="col">Employee</th>
+                            <th scope="col">Start</th>
+                            <th scope="col">End</th>
+                            <th scope="col">Source</th>
+                            <th scope="col">Date</th>
+                            <th scope="col">Actions</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -67,9 +73,11 @@
                                 <td>@s.EndTime.ToString("hh\\:mm")</td>
                                 <td>@s.Source</td>
                                 <td>@s.ShiftDate.ToString("yyyy-MM-dd")</td>
-                                <td class="table-actions">
-                                    <a class="btn btn-outline" href="/schedules/edit/@s.ScheduleId">Edit</a>
-                                    <button type="button" class="btn btn-outline" @onclick="() => DeleteSchedule(s.ScheduleId)">Delete</button>
+                                <td>
+                                    <div class="d-flex gap-2">
+                                        <a class="btn btn-outline-secondary btn-sm" href="/schedules/edit/@s.ScheduleId">Edit</a>
+                                        <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="() => DeleteSchedule(s.ScheduleId)">Delete</button>
+                                    </div>
                                 </td>
                             </tr>
                         }
@@ -94,7 +102,6 @@
 
     private async Task Load()
     {
-        // Parse as DateTime, not DateOnly
         if (!DateTime.TryParseExact(
                 dateString,
                 "yyyy-MM-dd",

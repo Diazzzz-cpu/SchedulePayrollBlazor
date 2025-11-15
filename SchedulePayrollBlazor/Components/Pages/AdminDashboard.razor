@@ -4,93 +4,74 @@
 @using Microsoft.EntityFrameworkCore
 @using SchedulePayrollBlazor.Data.Models
 
-<div class="page">
-    <header class="page-header">
+<div class="ps-page">
+    <div class="ps-page-header">
         <div>
-            <h1 class="page-title">Admin Dashboard</h1>
-            <p class="page-subtitle">Monitor workforce activity and payroll at a glance.</p>
+            <h2>PaySync Admin Dashboard</h2>
+            <p class="ps-subtitle">Monitor workforce activity and payroll at a glance.</p>
         </div>
-    </header>
+    </div>
 
-    <section class="metric-grid">
-        <div class="metric-card blue">
-            <div class="metric-icon">👥</div>
-            <div class="metric-content">
-                <h3>@totalEmployees</h3>
-                <p>Total Employees</p>
-            </div>
+    <div class="ps-stat-grid">
+        <div class="ps-stat-card">
+            <span class="ps-stat-title">Total employees</span>
+            <span class="ps-stat-value">@totalEmployees</span>
         </div>
+        <div class="ps-stat-card">
+            <span class="ps-stat-title">Today's shifts</span>
+            <span class="ps-stat-value">@todaySchedules</span>
+        </div>
+        <div class="ps-stat-card">
+            <span class="ps-stat-title">Next 7 days</span>
+            <span class="ps-stat-value">@upcomingSchedules</span>
+        </div>
+        <div class="ps-stat-card">
+            <span class="ps-stat-title">Open payroll runs</span>
+            <span class="ps-stat-value">@activePayrolls</span>
+        </div>
+    </div>
 
-        <div class="metric-card purple">
-            <div class="metric-icon">📅</div>
-            <div class="metric-content">
-                <h3>@todaySchedules</h3>
-                <p>Today's Shifts</p>
-            </div>
+    <section class="ps-card">
+        <div class="ps-card-header">
+            <h3>Quick actions</h3>
+            <p class="ps-subtitle">Jump straight to the pages you use most.</p>
         </div>
-
-        <div class="metric-card orange">
-            <div class="metric-icon">⏭️</div>
-            <div class="metric-content">
-                <h3>@upcomingSchedules</h3>
-                <p>Shifts Next 7 Days</p>
-            </div>
-        </div>
-
-        <div class="metric-card green">
-            <div class="metric-icon">💰</div>
-            <div class="metric-content">
-                <h3>@activePayrolls</h3>
-                <p>Open Payroll Runs</p>
-            </div>
-        </div>
-    </section>
-
-    <section class="content-card">
-        <div class="card-header">
-            <h3>Quick Actions</h3>
-            <p>Jump directly into the most common workflows.</p>
-        </div>
-        <div class="quick-actions">
-            <a href="/employees" class="quick-card">
-                <div class="quick-icon">👤</div>
-                <h4>Employees</h4>
-                <p>Review and maintain employee records</p>
+        <div class="ps-quick-links">
+            <a href="/employees" class="ps-quick-link">
+                <span class="ps-quick-title">Employees</span>
+                <span class="ps-quick-text">Maintain employee records</span>
             </a>
-            <a href="/schedules" class="quick-card">
-                <div class="quick-icon">📆</div>
-                <h4>Schedules</h4>
-                <p>Plan and edit team schedules</p>
+            <a href="/schedules" class="ps-quick-link">
+                <span class="ps-quick-title">Schedules</span>
+                <span class="ps-quick-text">Plan and review shifts</span>
             </a>
-            <a href="/payroll" class="quick-card">
-                <div class="quick-icon">💵</div>
-                <h4>Payroll</h4>
-                <p>Track payroll progress</p>
+            <a href="/payroll" class="ps-quick-link">
+                <span class="ps-quick-title">Payroll</span>
+                <span class="ps-quick-text">Track payroll progress</span>
             </a>
-            <a href="/settings" class="quick-card">
-                <div class="quick-icon">⚙️</div>
-                <h4>Settings</h4>
-                <p>Manage company configuration</p>
+            <a href="/settings" class="ps-quick-link">
+                <span class="ps-quick-title">Settings</span>
+                <span class="ps-quick-text">Adjust company preferences</span>
             </a>
         </div>
     </section>
 
-    <section class="content-card">
-        <div class="card-header">
-            <h3>Recent Hires</h3>
-            <p>Latest additions to your team.</p>
+    <section class="ps-card">
+        <div class="ps-card-header">
+            <h3>Recent hires</h3>
+            <p class="ps-subtitle">Latest additions to your team.</p>
         </div>
         <div class="table-responsive">
-            <table>
+            <table class="table table-striped table-hover align-middle">
                 <thead>
                     <tr>
-                        <th>Name</th>
-                        <th>Email</th>
-                        <th>Department</th>
-                        <th>Job Title</th>
-                        <th>Employment Type</th>
-                        <th>Start Date</th>
-                        <th>Status</th>
+                        <th scope="col">Name</th>
+                        <th scope="col">Email</th>
+                        <th scope="col">Department</th>
+                        <th scope="col">Job title</th>
+                        <th scope="col">Employment type</th>
+                        <th scope="col">Start date</th>
+                        <th scope="col">Status</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -110,7 +91,7 @@
                                 )
                             </td>
                             <td>
-                                <span class="badge @(employee.IsActive ? "badge-success" : "badge-danger")">
+                                <span class="ps-badge @(employee.IsActive ? "ps-badge-success" : "ps-badge-neutral")">
                                     @(employee.IsActive ? "Active" : "Inactive")
                                 </span>
                             </td>
@@ -121,26 +102,26 @@
         </div>
     </section>
 
-    <section class="content-card">
-        <div class="card-header">
-            <h3>Recent Payroll Activity</h3>
-            <p>Last five payroll events across the organization.</p>
+    <section class="ps-card">
+        <div class="ps-card-header">
+            <h3>Recent payroll activity</h3>
+            <p class="ps-subtitle">The five most recent payroll updates.</p>
         </div>
         @if (recentPayrollRuns.Count == 0)
         {
-            <div class="alert alert-info">No payroll runs recorded yet.</div>
+            <div class="text-muted">No payroll runs recorded yet.</div>
         }
         else
         {
             <div class="table-responsive">
-                <table>
+                <table class="table table-striped table-hover align-middle">
                     <thead>
                         <tr>
-                            <th>Employee</th>
-                            <th>Period</th>
-                            <th>Net Pay</th>
-                            <th>Status</th>
-                            <th>Processed</th>
+                            <th scope="col">Employee</th>
+                            <th scope="col">Period</th>
+                            <th scope="col">Net pay</th>
+                            <th scope="col">Status</th>
+                            <th scope="col">Processed</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -150,7 +131,9 @@
                                 <td>@run.Employee.FullName</td>
                                 <td>@(run.PayPeriod?.PeriodName ?? "Ad hoc")</td>
                                 <td>$@run.NetPay.ToString("N2")</td>
-                                <td><span class="badge @GetStatusClass(run.Status)">@run.Status</span></td>
+                                <td>
+                                    <span class="ps-badge @GetStatusClass(run.Status)">@run.Status</span>
+                                </td>
                                 <td>@run.CreatedAt.ToLocalTime().ToString("MMM dd, yyyy")</td>
                             </tr>
                         }
@@ -173,7 +156,6 @@
     {
         totalEmployees = await Db.Employees.CountAsync(e => e.IsActive);
 
-        // Use DateTime consistently with Schedule.ShiftDate
         var today = DateTime.Today.Date;
 
         todaySchedules = await Db.Schedules
@@ -198,17 +180,18 @@
         recentPayrollRuns = await Db.PayrollRuns
             .Include(p => p.Employee)
                 .ThenInclude(e => e.User)
-            .Include(p => p.PayPeriod)
             .OrderByDescending(p => p.CreatedAt)
             .Take(5)
             .ToListAsync();
     }
 
-    private static string GetStatusClass(string status) => status switch
-    {
-        "Paid" => "badge-success",
-        "Approved" => "badge-info",
-        "Calculated" => "badge-warning",
-        _ => "badge-secondary"
-    };
+    private static string GetStatusClass(string? status)
+        => status switch
+        {
+            "Completed" => "ps-badge-success",
+            "Calculated" => "ps-badge-neutral",
+            "Pending" => "ps-badge-neutral",
+            "Failed" => "ps-badge-danger",
+            _ => "ps-badge-neutral"
+        };
 }

@@ -8,64 +8,78 @@
 @using System.Security.Claims
 @using System.Globalization
 
-<div class="page">
-    <header class="page-header">
+<div class="ps-page">
+    <div class="ps-page-header">
         <div>
-            <h1 class="page-title">My Schedule</h1>
-            <p class="page-subtitle">View your upcoming shifts and plan ahead.</p>
+            <h2>My schedule</h2>
+            <p class="ps-subtitle">View your upcoming shifts and plan ahead.</p>
         </div>
-    </header>
+    </div>
 
-    <section class="filter-bar">
-        <div class="form-group">
-            <label>Select Date</label>
-            <input type="date" value="@dateString" @onchange="OnDateChanged" />
+    <section class="ps-card">
+        <div class="ps-card-header">
+            <h3>Select date</h3>
+            <p class="ps-subtitle">Choose a day to focus your view.</p>
         </div>
-        <div class="form-actions">
-            <button class="btn btn-secondary" @onclick="LoadSchedules">Load</button>
+        <div class="row g-3 align-items-end">
+            <div class="col-sm-4 col-12">
+                <label for="my-schedule-date" class="form-label">Date</label>
+                <input id="my-schedule-date" class="form-control" type="date" value="@dateString" @onchange="OnDateChanged" />
+            </div>
+            <div class="col-auto">
+                <button class="btn btn-outline-secondary" type="button" @onclick="LoadSchedules">Load</button>
+            </div>
         </div>
     </section>
 
     @if (schedules == null)
     {
-        <div class="content-card">
+        <div class="ps-card">
             <div class="loading">Loading...</div>
         </div>
     }
     else if (!schedules.Any())
     {
-        <div class="content-card">
-            <div class="alert alert-info">No schedules found for the selected date.</div>
+        <div class="ps-card">
+            <div class="text-muted">No schedules found for the selected date.</div>
         </div>
     }
     else
     {
-        <section class="schedule-grid">
-            @foreach (var schedule in schedules)
-            {
-                <article class="schedule-card">
-                    <div class="schedule-date">
-                        <div class="date-day">@schedule.ShiftDate.Day</div>
-                        <div class="date-month">@schedule.ShiftDate.ToString("MMM")</div>
-                    </div>
-                    <div class="schedule-details">
-                        <h4>@schedule.ShiftDate.ToString("dddd, MMMM dd, yyyy")</h4>
-                        <div class="schedule-time">
-                            <span class="time-badge">@((DateTime.Today + schedule.StartTime).ToString("hh\\:mm tt"))</span>
-                            <span class="time-separator">→</span>
-                            <span class="time-badge">@((DateTime.Today + schedule.EndTime).ToString("hh\\:mm tt"))</span>
-                        </div>
-                        <div class="schedule-duration">
-                            Duration: @((schedule.EndTime - schedule.StartTime).TotalHours.ToString("F1")) hours
-                        </div>
-                        <div class="schedule-source">
-                            <span class="badge @(schedule.Source == "Manual" ? "badge-primary" : "badge-secondary")">
-                                @schedule.Source
-                            </span>
-                        </div>
-                    </div>
-                </article>
-            }
+        <section class="ps-card">
+            <div class="ps-card-header">
+                <h3>Upcoming shifts</h3>
+                <p class="ps-subtitle">Shifts for the selected day or week.</p>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-striped table-hover align-middle">
+                    <thead>
+                        <tr>
+                            <th scope="col">Date</th>
+                            <th scope="col">Start</th>
+                            <th scope="col">End</th>
+                            <th scope="col">Duration</th>
+                            <th scope="col">Source</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var schedule in schedules)
+                        {
+                            <tr>
+                                <td>@schedule.ShiftDate.ToString("dddd, MMM dd")</td>
+                                <td>@((DateTime.Today + schedule.StartTime).ToString("hh\\:mm tt"))</td>
+                                <td>@((DateTime.Today + schedule.EndTime).ToString("hh\\:mm tt"))</td>
+                                <td>@((schedule.EndTime - schedule.StartTime).TotalHours.ToString("F1")) hrs</td>
+                                <td>
+                                    <span class="ps-badge @(schedule.Source == "Manual" ? "ps-badge-neutral" : "ps-badge-success")">
+                                        @schedule.Source
+                                    </span>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
         </section>
     }
 </div>
@@ -107,7 +121,6 @@
 
     private async Task LoadSchedules()
     {
-        // Try to parse the date as DateTime
         if (!DateTime.TryParseExact(dateString, "yyyy-MM-dd",
                 CultureInfo.InvariantCulture, DateTimeStyles.None, out var date))
         {
@@ -117,13 +130,11 @@
 
         var selectedDate = date.Date;
 
-        // Get schedules for the chosen day
         schedules = await Db.Schedules
             .Where(s => s.EmployeeId == employeeId && s.ShiftDate.Date == selectedDate)
             .OrderBy(s => s.StartTime)
             .ToListAsync();
 
-        // If no schedules for the day, show the entire week
         if (!schedules.Any())
         {
             var startOfWeek = selectedDate.AddDays(-(int)selectedDate.DayOfWeek);

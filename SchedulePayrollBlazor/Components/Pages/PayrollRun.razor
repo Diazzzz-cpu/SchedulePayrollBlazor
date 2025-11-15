@@ -201,11 +201,21 @@
                                             }
                                         </div>
                                         <div class="payroll-adjustments-form">
-                                            <h4>Add adjustment</h4>
                                             <EditForm Model="form" OnValidSubmit="async () => await AddAdjustmentAsync(entry.Id)">
                                                 <DataAnnotationsValidator />
                                                 <ValidationSummary />
-                                                <div class="ps-form-grid">
+                                                <div class="payroll-adjustments-form-header">
+                                                    <h4>Add adjustment</h4>
+                                                    <div class="form-group payroll-label-inline">
+                                                        <label for="@($"label-{entry.Id}")">Label</label>
+                                                        <InputText id="@($"label-{entry.Id}")"
+                                                                   class="form-control"
+                                                                   @bind-Value="form.Label" />
+                                                        <ValidationMessage For="() => form.Label" />
+                                                    </div>
+                                                    <button type="submit" class="btn btn-primary payroll-add-btn">Add adjustment</button>
+                                                </div>
+                                                <div class="ps-form-grid payroll-adjustments-grid">
                                                     <div class="form-group">
                                                         <label for="@($"type-{entry.Id}")">Type</label>
                                                         <InputSelect id="@($"type-{entry.Id}")"
@@ -216,13 +226,6 @@
                                                         </InputSelect>
                                                     </div>
                                                     <div class="form-group">
-                                                        <label for="@($"label-{entry.Id}")">Label</label>
-                                                        <InputText id="@($"label-{entry.Id}")"
-                                                                   class="form-control"
-                                                                   @bind-Value="form.Label" />
-                                                        <ValidationMessage For="() => form.Label" />
-                                                    </div>
-                                                    <div class="form-group">
                                                         <label for="@($"amount-{entry.Id}")">Amount (PHP)</label>
                                                         <InputNumber id="@($"amount-{entry.Id}")"
                                                                      class="form-control"
@@ -230,9 +233,6 @@
                                                                      step="0.01" />
                                                         <ValidationMessage For="() => form.Amount" />
                                                     </div>
-                                                </div>
-                                                <div class="ps-form-actions">
-                                                    <button type="submit" class="btn btn-primary">Add adjustment</button>
                                                 </div>
                                             </EditForm>
                                         </div>

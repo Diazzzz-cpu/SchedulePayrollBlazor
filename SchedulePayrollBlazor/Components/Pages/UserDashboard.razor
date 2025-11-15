@@ -12,7 +12,7 @@
     <div class="ps-page-header">
         <div>
             <h2>Welcome, @employeeName</h2>
-            <p class="ps-subtitle">Your PaySync schedule and payroll snapshot.</p>
+            <p class="ps-subtitle">Your PaySync schedule snapshot.</p>
         </div>
     </div>
 
@@ -24,10 +24,6 @@
         <div class="ps-stat-card">
             <span class="ps-stat-title">Upcoming shifts</span>
             <span class="ps-stat-value">@upcomingShiftCount</span>
-        </div>
-        <div class="ps-stat-card">
-            <span class="ps-stat-title">Last paycheck</span>
-            <span class="ps-stat-value">$@lastPayAmount.ToString("N2")</span>
         </div>
         <div class="ps-stat-card">
             <span class="ps-stat-title">Hours this week</span>
@@ -101,7 +97,6 @@
     private int employeeId;
     private int todayShiftCount;
     private int upcomingShiftCount;
-    private decimal lastPayAmount;
     private double totalHoursThisWeek;
     private List<Shift> upcomingShifts = new();
 
@@ -150,13 +145,6 @@
             .OrderBy(s => s.Start)
             .Take(5)
             .ToListAsync();
-
-        var lastPayroll = await Db.PayrollRuns
-            .Where(p => p.EmployeeId == employeeId)
-            .OrderByDescending(p => p.CreatedAt)
-            .FirstOrDefaultAsync();
-
-        lastPayAmount = lastPayroll?.NetPay ?? 0;
 
         var startOfWeek = GetWeekStart(today);
         var endOfWeek = startOfWeek.AddDays(7);

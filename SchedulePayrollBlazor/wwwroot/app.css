@@ -1625,10 +1625,11 @@ textarea:focus {
 }
 
 .ps-summary-card {
-    background: rgba(15, 23, 42, 0.02);
+    background: var(--ps-surface-alt);
     border: 1px solid var(--ps-border);
     border-radius: 0.75rem;
     padding: 1.25rem;
+    box-shadow: var(--ps-shadow-soft);
 }
 
 .ps-summary-card h4 {

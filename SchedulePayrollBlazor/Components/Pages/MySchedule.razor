@@ -8,38 +8,42 @@
 @using System.Security.Claims
 @using System.Globalization
 
-<div class="page-container">
-    <div class="page-header">
-        <h2>My Schedule</h2>
-        <p>View your work schedule</p>
-    </div>
-
-    <div class="filter-section">
-        <div class="d-flex align-items-center gap-3">
-            <div>
-                <label class="form-label">Select Date</label>
-                <input type="date" class="form-control" value="@dateString" @onchange="OnDateChanged" />
-            </div>
-            <div class="align-self-end">
-                <button class="btn btn-secondary" @onclick="LoadSchedules">Load</button>
-            </div>
+<div class="page">
+    <header class="page-header">
+        <div>
+            <h1 class="page-title">My Schedule</h1>
+            <p class="page-subtitle">View your upcoming shifts and plan ahead.</p>
         </div>
-    </div>
+    </header>
+
+    <section class="filter-bar">
+        <div class="form-group">
+            <label>Select Date</label>
+            <input type="date" value="@dateString" @onchange="OnDateChanged" />
+        </div>
+        <div class="form-actions">
+            <button class="btn btn-secondary" @onclick="LoadSchedules">Load</button>
+        </div>
+    </section>
 
     @if (schedules == null)
     {
-        <div class="loading">Loading...</div>
+        <div class="content-card">
+            <div class="loading">Loading...</div>
+        </div>
     }
     else if (!schedules.Any())
     {
-        <div class="alert alert-info">No schedules found for the selected date.</div>
+        <div class="content-card">
+            <div class="alert alert-info">No schedules found for the selected date.</div>
+        </div>
     }
     else
     {
-        <div class="schedule-grid">
+        <section class="schedule-grid">
             @foreach (var schedule in schedules)
             {
-                <div class="schedule-card">
+                <article class="schedule-card">
                     <div class="schedule-date">
                         <div class="date-day">@schedule.ShiftDate.Day</div>
                         <div class="date-month">@schedule.ShiftDate.ToString("MMM")</div>
@@ -47,9 +51,9 @@
                     <div class="schedule-details">
                         <h4>@schedule.ShiftDate.ToString("dddd, MMMM dd, yyyy")</h4>
                         <div class="schedule-time">
-                            <span class="time-badge">🕐 @(DateTime.Today.Add(schedule.StartTime).ToString("hh\\:mm tt"))</span>
+                            <span class="time-badge">@((DateTime.Today + schedule.StartTime).ToString("hh\\:mm tt"))</span>
                             <span class="time-separator">→</span>
-                            <span class="time-badge">🕐 @(DateTime.Today.Add(schedule.EndTime).ToString("hh\\:mm tt"))</span>
+                            <span class="time-badge">@((DateTime.Today + schedule.EndTime).ToString("hh\\:mm tt"))</span>
                         </div>
                         <div class="schedule-duration">
                             Duration: @((schedule.EndTime - schedule.StartTime).TotalHours.ToString("F1")) hours
@@ -60,9 +64,9 @@
                             </span>
                         </div>
                     </div>
-                </div>
+                </article>
             }
-        </div>
+        </section>
     }
 </div>
 

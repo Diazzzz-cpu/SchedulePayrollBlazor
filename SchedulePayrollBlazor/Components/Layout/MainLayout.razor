@@ -4,23 +4,30 @@
     <AuthorizeView>
         <Authorized>
             <aside class="app-sidebar">
-                <div class="app-brand">
-                    <span class="app-title">SchedulePayrollBlazor</span>
-                    <span class="app-subtitle">Scheduler & Payroll</span>
+                <div class="sidebar-brand">
+                    <span class="sidebar-title">SchedulePayroll</span>
+                    <span class="sidebar-subtitle">Scheduling &amp; Payroll Hub</span>
                 </div>
 
                 <NavMenu />
             </aside>
         </Authorized>
         <NotAuthorized>
-            <aside class="app-sidebar guest-sidebar">
-                <div class="app-brand">
-                    <span class="app-title">SchedulePayrollBlazor</span>
-                    <span class="app-subtitle">Please sign in</span>
+            <aside class="app-sidebar">
+                <div class="sidebar-brand">
+                    <span class="sidebar-title">SchedulePayroll</span>
+                    <span class="sidebar-subtitle">Sign in to continue</span>
                 </div>
 
                 <nav class="side-nav">
-                    <NavLink href="/login" class="side-link" activeClass="active">Login</NavLink>
+                    <div class="side-nav-section">
+                        <div class="side-nav-links">
+                            <NavLink href="/login" class="side-nav-link" activeClass="active">
+                                <span class="icon">🔐</span>
+                                <span>Login</span>
+                            </NavLink>
+                        </div>
+                    </div>
                 </nav>
             </aside>
         </NotAuthorized>
@@ -28,12 +35,14 @@
 
     <main class="app-main">
         <header class="app-topbar">
-            <span>Welcome to SchedulePayrollBlazor</span>
-            <a href="https://learn.microsoft.com/aspnet/core/" target="_blank">About</a>
+            <span>SchedulePayrollBlazor</span>
+            <a href="https://learn.microsoft.com/aspnet/core/" target="_blank">Product documentation</a>
         </header>
 
         <section class="app-content">
-            @Body
+            <div class="content-wrapper">
+                @Body
+            </div>
         </section>
     </main>
 </div>

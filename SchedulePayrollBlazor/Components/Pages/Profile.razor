@@ -9,17 +9,21 @@
 
 @if (profile is null)
 {
-    <div class="loading">Loading profile...</div>
+    <div class="content-card">
+        <div class="loading">Loading profile...</div>
+    </div>
 }
 else
 {
-    <div class="page-container">
-        <div class="page-header">
-            <h2>Profile</h2>
-            <p>Manage your personal and employment details</p>
-        </div>
+    <div class="page">
+        <header class="page-header">
+            <div>
+                <h1 class="page-title">Profile</h1>
+                <p class="page-subtitle">Manage your personal and employment details.</p>
+            </div>
+        </header>
 
-        <div class="profile-card">
+        <section class="profile-card">
             <div class="profile-section">
                 <h4>Account</h4>
                 <dl>
@@ -37,35 +41,32 @@ else
                 </dl>
             </div>
 
-            @if (!string.IsNullOrWhiteSpace(profile.JobTitle))
-            {
-                <div class="profile-section">
-                    <h4>Employment</h4>
-                    <dl>
-                        <dt>Job Title</dt>
-                        <dd>@profile.JobTitle</dd>
+            <div class="profile-section">
+                <h4>Employment</h4>
+                <dl>
+                    <dt>Job Title</dt>
+                    <dd>@DisplayOrFallback(profile.JobTitle)</dd>
 
-                        <dt>Department</dt>
-                        <dd>@profile.Department</dd>
+                    <dt>Department</dt>
+                    <dd>@DisplayOrFallback(profile.Department)</dd>
 
-                        <dt>Employment Type</dt>
-                        <dd>@profile.EmploymentType</dd>
+                    <dt>Employment Type</dt>
+                    <dd>@DisplayOrFallback(profile.EmploymentType)</dd>
 
-                        <dt>Start Date</dt>
-                        <dd>
-                            @(
-                                                profile.StartDate.HasValue
-                                                ? profile.StartDate.Value.ToString("MMM dd, yyyy")
-                                                : "-"
-                                                )
+                    <dt>Start Date</dt>
+                    <dd>
+                        @(
+                            profile.StartDate.HasValue
+                                ? profile.StartDate.Value.ToString("MMM dd, yyyy")
+                                : "-"
+                        )
                     </dd>
 
-                        <dt>Location</dt>
-                        <dd>@profile.Location</dd>
-                    </dl>
-                </div>
-                }
-        </div>
+                    <dt>Location</dt>
+                    <dd>@DisplayOrFallback(profile.Location)</dd>
+                </dl>
+            </div>
+        </section>
     </div>
 }
 
@@ -130,6 +131,9 @@ else
             Location = user.Employee?.Location ?? string.Empty
         };
     }
+
+    private static string DisplayOrFallback(string value)
+        => string.IsNullOrWhiteSpace(value) ? "-" : value;
 
     private sealed class ProfileViewModel
     {

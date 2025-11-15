@@ -4,56 +4,78 @@
 @using Microsoft.EntityFrameworkCore
 @using SchedulePayrollBlazor.Data.Models
 
-<h3>Employees</h3>
+<div class="page">
+    <header class="page-header">
+        <div>
+            <h1 class="page-title">Employees</h1>
+            <p class="page-subtitle">Manage employee records and workforce details.</p>
+        </div>
+        <div class="page-actions">
+            <button class="btn btn-primary" type="button">+ Add Employee</button>
+        </div>
+    </header>
 
-@if (employees is null)
-{
-    <p>Loading…</p>
-}
-else if (employees.Count == 0)
-{
-    <div class="alert alert-info">No employees have been added yet.</div>
-}
-else
-{
-    <table class="table table-striped">
-        <thead>
-            <tr>
-                <th>Name</th>
-                <th>Email</th>
-                <th>Department</th>
-                <th>Job Title</th>
-                <th>Employment Type</th>
-                <th>Start Date</th>
-                <th>Status</th>
-            </tr>
-        </thead>
-        <tbody>
-            @foreach (var employee in employees)
-            {
-                <tr>
-                    <td>@employee.FullName</td>
-                    <td>@employee.User.Email</td>
-                    <td>@employee.Department</td>
-                    <td>@employee.JobTitle</td>
-                    <td>@employee.EmploymentType</td>
-                    <td>
-                        @(
+    @if (employees is null)
+    {
+        <div class="content-card">
+            <div class="loading">Loading…</div>
+        </div>
+    }
+    else if (employees.Count == 0)
+    {
+        <div class="content-card">
+            <div class="alert alert-info">No employees have been added yet.</div>
+        </div>
+    }
+    else
+    {
+        <section class="content-card">
+            <div class="card-header">
+                <h3>Employee Directory</h3>
+                <p>Active and inactive employee accounts.</p>
+            </div>
+            <div class="table-responsive">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Email</th>
+                            <th>Department</th>
+                            <th>Job Title</th>
+                            <th>Employment Type</th>
+                            <th>Start Date</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var employee in employees)
+                        {
+                            <tr>
+                                <td>@employee.FullName</td>
+                                <td>@employee.User.Email</td>
+                                <td>@employee.Department</td>
+                                <td>@employee.JobTitle</td>
+                                <td>@employee.EmploymentType</td>
+                                <td>
+                                    @(
                                         employee.StartDate.HasValue
-                                        ? employee.StartDate.Value.ToString("MMM dd, yyyy")
-                                        : "-"
-                                        )
-                </td>
-                <td>
-                    <span class="badge @(employee.IsActive ? "badge-success" : "badge-danger")">
-                        @(employee.IsActive ? "Active" : "Inactive")
-                    </span>
-                </td>
-            </tr>
-                }
-        </tbody>
-    </table>
-}
+                                            ? employee.StartDate.Value.ToString("MMM dd, yyyy")
+                                            : "-"
+                                    )
+                                </td>
+                                <td>
+                                    <span class="badge @(employee.IsActive ? "badge-success" : "badge-danger")">
+                                        @(employee.IsActive ? "Active" : "Inactive")
+                                    </span>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    }
+</div>
 
 @code {
     private List<Employee>? employees;

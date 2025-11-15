@@ -1,6 +1,7 @@
 @page "/employees"
 @attribute [Authorize(Roles = "Admin")]
 @inject AppDbContext Db
+@inject AdminUserService UserService
 @using Microsoft.EntityFrameworkCore
 @using SchedulePayrollBlazor.Data.Models
 
@@ -11,9 +12,35 @@
             <p class="ps-subtitle">Manage employee records and workforce details.</p>
         </div>
         <div class="ps-page-actions">
-            <button class="btn btn-primary" type="button">Add employee</button>
+            <button class="btn btn-primary" type="button" @onclick="OpenAddEmployeeDialog">Add employee</button>
         </div>
     </div>
+
+    @if (!string.IsNullOrWhiteSpace(pageSuccessMessage))
+    {
+        <div class="ps-alert ps-alert-success" role="status">
+            <div>
+                <strong>Success:</strong> @pageSuccessMessage
+                @if (!string.IsNullOrWhiteSpace(generatedPassword))
+                {
+                    <div class="ps-alert-note">
+                        Temporary password: <code>@generatedPassword</code>
+                    </div>
+                }
+            </div>
+            <button type="button" class="ps-alert-close" @onclick="() => DismissAlert(true)" aria-label="Dismiss success message">&times;</button>
+        </div>
+    }
+
+    @if (!string.IsNullOrWhiteSpace(pageErrorMessage))
+    {
+        <div class="ps-alert ps-alert-danger" role="alert">
+            <div>
+                <strong>Error:</strong> @pageErrorMessage
+            </div>
+            <button type="button" class="ps-alert-close" @onclick="() => DismissAlert(false)" aria-label="Dismiss error message">&times;</button>
+        </div>
+    }
 
     @if (employees is null)
     {
@@ -75,14 +102,226 @@
             </div>
         </section>
     }
+
+    @if (showAddEmployeeDialog)
+    {
+        <div class="ps-modal-backdrop" role="presentation">
+            <div class="ps-modal" role="dialog" aria-modal="true" aria-labelledby="addEmployeeTitle">
+                <div class="ps-modal-header">
+                    <div>
+                        <h3 id="addEmployeeTitle">Add employee</h3>
+                        <p class="ps-subtitle">Create a new workforce account and linked employee record.</p>
+                    </div>
+                    <button type="button" class="ps-modal-close" @onclick="CloseAddEmployeeDialog" aria-label="Close add employee dialog">&times;</button>
+                </div>
+                <div class="ps-modal-body">
+                    <EditForm Model="createModel" OnValidSubmit="HandleCreateEmployeeAsync">
+                        <DataAnnotationsValidator />
+                        <ValidationSummary />
+
+                        @if (!string.IsNullOrWhiteSpace(dialogError))
+                        {
+                            <div class="ps-alert ps-alert-danger" role="alert">
+                                <div>@dialogError</div>
+                            </div>
+                        }
+
+                        <div class="ps-form-grid">
+                            <div class="form-group">
+                                <label for="employee-email">Email</label>
+                                <InputText id="employee-email" class="form-control" @bind-Value="createModel.Email" type="email" autocomplete="email" />
+                                <ValidationMessage For="() => createModel.Email" />
+                            </div>
+                            <div class="form-group">
+                                <label for="employee-role">Role</label>
+                                <InputSelect id="employee-role" class="form-select" @bind-Value="createModel.Role">
+                                    @foreach (var option in roleOptions)
+                                    {
+                                        <option value="@option">@option</option>
+                                    }
+                                </InputSelect>
+                                <ValidationMessage For="() => createModel.Role" />
+                            </div>
+                        </div>
+
+                        <div class="ps-form-grid">
+                            <div class="form-group">
+                                <label for="employee-first-name">First name</label>
+                                <InputText id="employee-first-name" class="form-control" @bind-Value="createModel.FirstName" autocomplete="given-name" />
+                                <ValidationMessage For="() => createModel.FirstName" />
+                            </div>
+                            <div class="form-group">
+                                <label for="employee-last-name">Last name</label>
+                                <InputText id="employee-last-name" class="form-control" @bind-Value="createModel.LastName" autocomplete="family-name" />
+                                <ValidationMessage For="() => createModel.LastName" />
+                            </div>
+                        </div>
+
+                        <div class="ps-form-grid">
+                            <div class="form-group">
+                                <label for="employee-department">Department</label>
+                                <InputText id="employee-department" class="form-control" @bind-Value="createModel.Department" autocomplete="organization" />
+                            </div>
+                            <div class="form-group">
+                                <label for="employee-job-title">Job title</label>
+                                <InputText id="employee-job-title" class="form-control" @bind-Value="createModel.JobTitle" autocomplete="organization-title" />
+                            </div>
+                        </div>
+
+                        <div class="ps-form-grid">
+                            <div class="form-group">
+                                <label for="employee-employment-type">Employment type</label>
+                                <InputSelect id="employee-employment-type" class="form-select" @bind-Value="createModel.EmploymentType">
+                                    @foreach (var option in employmentTypeOptions)
+                                    {
+                                        <option value="@option.Value">@option.Label</option>
+                                    }
+                                </InputSelect>
+                            </div>
+                            <div class="form-group">
+                                <label for="employee-start-date">Start date</label>
+                                <InputDate id="employee-start-date" class="form-control" @bind-Value="createModel.StartDate" />
+                            </div>
+                            <div class="form-group">
+                                <label for="employee-location">Location</label>
+                                <InputText id="employee-location" class="form-control" @bind-Value="createModel.Location" />
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="employee-password">Initial password <span class="ps-muted">(leave blank to auto-generate)</span></label>
+                            <InputText id="employee-password" class="form-control" @bind-Value="createModel.Password" type="password" autocomplete="new-password" />
+                        </div>
+
+                        <div class="ps-form-actions">
+                            <button type="submit" class="btn btn-primary" disabled="@isSubmitting">
+                                @(isSubmitting ? "Creating…" : "Create employee")
+                            </button>
+                            <button type="button" class="btn btn-outline-secondary" @onclick="CloseAddEmployeeDialog" disabled="@isSubmitting">
+                                Cancel
+                            </button>
+                        </div>
+                    </EditForm>
+                </div>
+            </div>
+        </div>
+    }
 </div>
 
 @code {
     private List<Employee>? employees;
+    private AdminUserFormModel createModel = new();
+    private bool showAddEmployeeDialog;
+    private bool isSubmitting;
+    private string? pageSuccessMessage;
+    private string? pageErrorMessage;
+    private string? generatedPassword;
+    private string? dialogError;
+
+    private readonly string[] roleOptions = new[] { "Employee", "Admin" };
+
+    private readonly (string Value, string Label)[] employmentTypeOptions = new[]
+    {
+        ("FullTime", "Full-time"),
+        ("PartTime", "Part-time"),
+        ("Contract", "Contract"),
+        ("Intern", "Intern"),
+        ("Seasonal", "Seasonal"),
+        ("Temporary", "Temporary")
+    };
 
     protected override async Task OnInitializedAsync()
-        => employees = await Db.Employees
-            .Include(e => e.User)
-            .OrderBy(e => e.FullName)
-            .ToListAsync();
+    {
+        ResetCreateForm();
+        await LoadEmployeesAsync();
+    }
+
+    private async Task LoadEmployeesAsync()
+    {
+        pageErrorMessage = null;
+
+        try
+        {
+            employees = await Db.Employees
+                .Include(e => e.User)
+                .OrderBy(e => e.FullName)
+                .ToListAsync();
+        }
+        catch
+        {
+            pageErrorMessage = "We couldn't load the employees right now. Please refresh to try again.";
+            employees = new List<Employee>();
+        }
+    }
+
+    private void OpenAddEmployeeDialog()
+    {
+        ResetCreateForm();
+        dialogError = null;
+        generatedPassword = null;
+        showAddEmployeeDialog = true;
+    }
+
+    private void CloseAddEmployeeDialog()
+    {
+        showAddEmployeeDialog = false;
+        isSubmitting = false;
+        dialogError = null;
+    }
+
+    private async Task HandleCreateEmployeeAsync()
+    {
+        if (isSubmitting)
+        {
+            return;
+        }
+
+        isSubmitting = true;
+        dialogError = null;
+
+        var createdName = $"{createModel.FirstName} {createModel.LastName}".Trim();
+        var (success, errorMessage, password) = await UserService.CreateUserAsync(createModel);
+
+        if (success)
+        {
+            pageSuccessMessage = string.IsNullOrWhiteSpace(createdName)
+                ? "The employee was added successfully."
+                : $"{createdName} was added successfully.";
+            pageErrorMessage = null;
+            generatedPassword = password;
+
+            CloseAddEmployeeDialog();
+            ResetCreateForm();
+            await LoadEmployeesAsync();
+        }
+        else
+        {
+            dialogError = string.IsNullOrWhiteSpace(errorMessage)
+                ? "Unable to create the employee. Please try again."
+                : errorMessage;
+        }
+
+        isSubmitting = false;
+    }
+
+    private void ResetCreateForm()
+        => createModel = new AdminUserFormModel
+        {
+            Role = roleOptions[0],
+            EmploymentType = employmentTypeOptions[0].Value,
+            StartDate = DateTime.Today
+        };
+
+    private void DismissAlert(bool dismissSuccess)
+    {
+        if (dismissSuccess)
+        {
+            pageSuccessMessage = null;
+            generatedPassword = null;
+        }
+        else
+        {
+            pageErrorMessage = null;
+        }
+    }
 }

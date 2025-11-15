@@ -7,83 +7,69 @@
 @using SchedulePayrollBlazor.Data.Models
 @using System.Security.Claims
 
-<div class="page">
-    <header class="page-header">
+<div class="ps-page">
+    <div class="ps-page-header">
         <div>
-            <h1 class="page-title">Welcome, @employeeName!</h1>
-            <p class="page-subtitle">Your schedule and payroll snapshot</p>
+            <h2>Welcome, @employeeName</h2>
+            <p class="ps-subtitle">Your PaySync schedule and payroll snapshot.</p>
         </div>
-    </header>
+    </div>
 
-    <section class="metric-grid">
-        <div class="metric-card purple">
-            <div class="metric-icon">📅</div>
-            <div class="metric-content">
-                <h3>@todaySchedules</h3>
-                <p>Today's Shifts</p>
-            </div>
+    <div class="ps-stat-grid">
+        <div class="ps-stat-card">
+            <span class="ps-stat-title">Today's shifts</span>
+            <span class="ps-stat-value">@todaySchedules</span>
         </div>
+        <div class="ps-stat-card">
+            <span class="ps-stat-title">Upcoming shifts</span>
+            <span class="ps-stat-value">@upcomingSchedules</span>
+        </div>
+        <div class="ps-stat-card">
+            <span class="ps-stat-title">Last paycheck</span>
+            <span class="ps-stat-value">$@lastPayAmount.ToString("N2")</span>
+        </div>
+        <div class="ps-stat-card">
+            <span class="ps-stat-title">Hours this week</span>
+            <span class="ps-stat-value">@totalHoursThisWeek.ToString("F1")</span>
+        </div>
+    </div>
 
-        <div class="metric-card blue">
-            <div class="metric-icon">⏰</div>
-            <div class="metric-content">
-                <h3>@upcomingSchedules</h3>
-                <p>Upcoming Shifts</p>
-            </div>
+    <section class="ps-card">
+        <div class="ps-card-header">
+            <h3>Quick links</h3>
+            <p class="ps-subtitle">Access the areas you need most often.</p>
         </div>
-
-        <div class="metric-card green">
-            <div class="metric-icon">💰</div>
-            <div class="metric-content">
-                <h3>$@lastPayAmount.ToString("N2")</h3>
-                <p>Last Paycheck</p>
-            </div>
-        </div>
-
-        <div class="metric-card orange">
-            <div class="metric-icon">📊</div>
-            <div class="metric-content">
-                <h3>@totalHoursThisWeek</h3>
-                <p>Hours This Week</p>
-            </div>
-        </div>
-    </section>
-
-    <section class="content-card">
-        <div class="card-header">
-            <h3>Quick Actions</h3>
-            <p>Access the tools you need most often.</p>
-        </div>
-        <div class="quick-actions">
-            <a href="/myschedule" class="quick-card">
-                <div class="quick-icon">📅</div>
-                <h4>My Schedule</h4>
-                <p>View your work schedule</p>
+        <div class="ps-quick-links">
+            <a href="/myschedule" class="ps-quick-link">
+                <span class="ps-quick-title">My schedule</span>
+                <span class="ps-quick-text">Review upcoming shifts</span>
             </a>
-
-            <a href="/mypayroll" class="quick-card">
-                <div class="quick-icon">💰</div>
-                <h4>My Payroll</h4>
-                <p>Review pay history and details</p>
+            <a href="/mypayroll" class="ps-quick-link">
+                <span class="ps-quick-title">My payroll</span>
+                <span class="ps-quick-text">View recent pay details</span>
+            </a>
+            <a href="/profile" class="ps-quick-link">
+                <span class="ps-quick-title">Profile</span>
+                <span class="ps-quick-text">Check your account information</span>
             </a>
         </div>
     </section>
 
-    <section class="content-card">
-        <div class="card-header">
-            <h3>Upcoming Shifts</h3>
-            <p>Stay prepared for your next assignments.</p>
+    <section class="ps-card">
+        <div class="ps-card-header">
+            <h3>Upcoming shifts</h3>
+            <p class="ps-subtitle">Stay prepared for what's next.</p>
         </div>
         @if (upcomingShifts.Any())
         {
             <div class="table-responsive">
-                <table>
+                <table class="table table-striped table-hover align-middle">
                     <thead>
                         <tr>
-                            <th>Date</th>
-                            <th>Start Time</th>
-                            <th>End Time</th>
-                            <th>Duration</th>
+                            <th scope="col">Date</th>
+                            <th scope="col">Start</th>
+                            <th scope="col">End</th>
+                            <th scope="col">Duration</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -102,7 +88,7 @@
         }
         else
         {
-            <div class="alert alert-info">No upcoming shifts scheduled.</div>
+            <div class="text-muted">No upcoming shifts scheduled.</div>
         }
     </section>
 </div>
@@ -143,7 +129,6 @@
             return;
         }
 
-        // Use DateTime consistently
         var today = DateTime.Today.Date;
 
         todaySchedules = await Db.Schedules
@@ -172,7 +157,6 @@
 
         lastPayAmount = lastPayroll?.NetPay ?? 0;
 
-        // Start/end of current week (Sunday-based)
         var startOfWeek = today.AddDays(-(int)DateTime.Today.DayOfWeek);
         var endOfWeek = startOfWeek.AddDays(7);
 

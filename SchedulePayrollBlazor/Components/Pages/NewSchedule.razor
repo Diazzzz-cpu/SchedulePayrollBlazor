@@ -6,49 +6,50 @@
 @using System.Globalization
 @using SchedulePayrollBlazor.Data.Models
 
-<div class="page">
-    <header class="page-header">
+<div class="ps-page">
+    <div class="ps-page-header">
         <div>
-            <h1 class="page-title">New Schedule</h1>
-            <p class="page-subtitle">Create a shift assignment for an employee.</p>
+            <h2>New schedule</h2>
+            <p class="ps-subtitle">Create a shift assignment for an employee.</p>
         </div>
-        <div class="page-actions">
-            <a class="btn btn-outline" href="/schedules">Back to schedules</a>
+        <div class="ps-page-actions">
+            <a class="btn btn-outline-secondary" href="/schedules">Back to schedules</a>
         </div>
-    </header>
+    </div>
 
     @if (employees is null)
     {
-        <div class="content-card">
+        <div class="ps-card">
             <div class="loading">Loading…</div>
         </div>
     }
     else if (employees.Count == 0)
     {
-        <div class="content-card">
-            <div class="alert alert-warning">Add employees before creating schedules.</div>
+        <div class="ps-card">
+            <div class="text-muted">Add employees before creating schedules.</div>
         </div>
     }
     else
     {
-        <section class="content-card">
-            <div class="card-header">
-                <h3>Shift Details</h3>
-                <p>Select the teammate, date, and working hours.</p>
+        <section class="ps-card">
+            <div class="ps-card-header">
+                <h3>Shift details</h3>
+                <p class="ps-subtitle">Select the teammate, date, and working hours.</p>
             </div>
             <EditForm Model="vm"
                       OnValidSubmit="HandleValidSubmit"
                       FormName="NewScheduleForm">
                 <DataAnnotationsValidator />
                 <ValidationSummary />
+
                 @if (!string.IsNullOrWhiteSpace(vm.FormError))
                 {
-                    <div class="alert alert-danger">@vm.FormError</div>
+                    <div class="alert alert-danger" role="alert">@vm.FormError</div>
                 }
 
-                <div class="form-group">
-                    <label>Employee</label>
-                    <select value="@vm.EmployeeId" @onchange="OnEmpChanged">
+                <div class="mb-3">
+                    <label for="schedule-employee" class="form-label">Employee</label>
+                    <select id="schedule-employee" class="form-select" value="@vm.EmployeeId" @onchange="OnEmpChanged">
                         @foreach (var e in employees)
                         {
                             <option value="@e.EmployeeId">@e.FullName (@e.User.Email)</option>
@@ -56,32 +57,32 @@
                     </select>
                 </div>
 
-                <div class="form-row">
-                    <div class="form-group">
-                        <label>Date</label>
-                        <input type="date" value="@vm.ShiftDateText" @onchange="OnDateChanged" />
+                <div class="row g-3">
+                    <div class="col-md-4 col-12">
+                        <label for="schedule-date" class="form-label">Date</label>
+                        <input id="schedule-date" type="date" class="form-control" value="@vm.ShiftDateText" @onchange="OnDateChanged" />
                     </div>
-                    <div class="form-group">
-                        <label>Start Time</label>
-                        <input type="time" value="@vm.StartTimeText" step="60" @onchange="OnStartChanged" />
+                    <div class="col-md-4 col-12">
+                        <label for="schedule-start" class="form-label">Start time</label>
+                        <input id="schedule-start" type="time" class="form-control" value="@vm.StartTimeText" step="60" @onchange="OnStartChanged" />
                     </div>
-                    <div class="form-group">
-                        <label>End Time</label>
-                        <input type="time" value="@vm.EndTimeText" step="60" @onchange="OnEndChanged" />
+                    <div class="col-md-4 col-12">
+                        <label for="schedule-end" class="form-label">End time</label>
+                        <input id="schedule-end" type="time" class="form-control" value="@vm.EndTimeText" step="60" @onchange="OnEndChanged" />
                     </div>
                 </div>
 
-                <div class="form-group">
-                    <label>Source</label>
-                    <select value="@vm.Source" @onchange="OnSourceChanged">
+                <div class="mb-3 mt-3">
+                    <label for="schedule-source" class="form-label">Source</label>
+                    <select id="schedule-source" class="form-select" value="@vm.Source" @onchange="OnSourceChanged">
                         <option>Manual</option>
                         <option>Auto</option>
                     </select>
                 </div>
 
-                <div class="form-actions">
-                    <button class="btn btn-primary" type="submit">Save Schedule</button>
-                    <a class="btn btn-secondary" href="/schedules">Cancel</a>
+                <div class="ps-form-actions">
+                    <button class="btn btn-primary" type="submit">Save schedule</button>
+                    <a class="btn btn-outline-secondary" href="/schedules">Cancel</a>
                 </div>
             </EditForm>
         </section>

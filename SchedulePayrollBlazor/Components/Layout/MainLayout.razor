@@ -1,50 +1,49 @@
 @inherits LayoutComponentBase
 
-<div class="app-shell">
+<div class="ps-app">
     <AuthorizeView>
         <Authorized>
-            <aside class="app-sidebar">
-                <div class="sidebar-brand">
-                    <span class="sidebar-title">SchedulePayroll</span>
-                    <span class="sidebar-subtitle">Scheduling &amp; Payroll Hub</span>
+            <aside class="ps-sidebar">
+                <div class="ps-brand">
+                    <span class="ps-brand-name">PaySync</span>
+                    <span class="ps-brand-subtitle">Payroll &amp; Scheduling</span>
                 </div>
 
                 <NavMenu />
             </aside>
         </Authorized>
         <NotAuthorized>
-            <aside class="app-sidebar">
-                <div class="sidebar-brand">
-                    <span class="sidebar-title">SchedulePayroll</span>
-                    <span class="sidebar-subtitle">Sign in to continue</span>
+            <aside class="ps-sidebar ps-sidebar-compact">
+                <div class="ps-brand">
+                    <span class="ps-brand-name">PaySync</span>
+                    <span class="ps-brand-subtitle">Sign in to continue</span>
                 </div>
 
-                <nav class="side-nav">
-                    <div class="side-nav-section">
-                        <div class="side-nav-links">
-                            <NavLink href="/login" class="side-nav-link" activeClass="active">
-                                <span class="icon">🔐</span>
-                                <span>Login</span>
-                            </NavLink>
-                        </div>
+                <nav class="ps-nav">
+                    <div class="ps-nav-section">
+                        <ul class="ps-nav-list">
+                            <li>
+                                <NavLink href="/login" class="ps-nav-link" activeClass="active">Login</NavLink>
+                            </li>
+                        </ul>
                     </div>
                 </nav>
             </aside>
         </NotAuthorized>
     </AuthorizeView>
 
-    <main class="app-main">
-        <header class="app-topbar">
-            <span>SchedulePayrollBlazor</span>
-            <a href="https://learn.microsoft.com/aspnet/core/" target="_blank">Product documentation</a>
+    <div class="ps-main">
+        <header class="ps-topbar">
+            <span class="fw-semibold">PaySync</span>
+            <span class="text-muted small">Internal payroll &amp; scheduling</span>
         </header>
 
-        <section class="app-content">
-            <div class="content-wrapper">
+        <main class="ps-content">
+            <div class="ps-content-inner">
                 @Body
             </div>
-        </section>
-    </main>
+        </main>
+    </div>
 </div>
 
 <div id="blazor-error-ui" data-nosnippet>

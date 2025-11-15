@@ -90,10 +90,10 @@
                                     </div>
                                 </td>
                                 <td>@string.Format("{0:N2} hrs", entry.TotalHoursWorked)</td>
-                                <td>@($"₱{entry.BasePay:N2}")</td>
-                                <td class="text-danger">@($"₱{entry.TotalDeductions:N2}")</td>
-                                <td class="text-success">@($"₱{entry.TotalBonuses:N2}")</td>
-                                <td><strong>@($"₱{entry.NetPay:N2}")</strong></td>
+                                <td>₱@entry.BasePay.ToString("N2")</td>
+                                <td class="text-danger">₱@entry.TotalDeductions.ToString("N2")</td>
+                                <td class="text-success">₱@entry.TotalBonuses.ToString("N2")</td>
+                                <td><strong>₱@entry.NetPay.ToString("N2")</strong></td>
                                 <td class="payroll-processed-cell">
                                     <div class="processed-wrapper">
                                         <span class="processed-date">
@@ -116,7 +116,7 @@
                                                 <li>
                                                     <span class="badge @(IsBonus(adjustment) ? "badge-success" : "badge-danger")">@adjustment.Type</span>
                                                     <span class="adjustment-label">@adjustment.Label</span>
-                                                    <span class="adjustment-amount">@($"₱{adjustment.Amount:N2}")</span>
+                                                    <span class="adjustment-amount">₱@adjustment.Amount.ToString("N2")</span>
                                                 </li>
                                             }
                                         </ul>

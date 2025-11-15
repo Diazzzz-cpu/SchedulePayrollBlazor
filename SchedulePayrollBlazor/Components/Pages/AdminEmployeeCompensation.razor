@@ -173,7 +173,7 @@
     private static string FormatCurrency(decimal? value)
     {
         return value.HasValue && value.Value > 0
-            ? $"₱{value.Value:N2}"
+            ? $"₱{value.Value.ToString("N2")}" 
             : "—";
     }
 

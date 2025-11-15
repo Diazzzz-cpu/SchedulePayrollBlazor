@@ -1,8 +1,9 @@
 @page "/employees"
 @attribute [Authorize(Roles = "Admin")]
-@inject AppDbContext Db
+@inject IEmployeeService EmployeeService
 @inject AdminUserService UserService
-@using Microsoft.EntityFrameworkCore
+@using Microsoft.AspNetCore.Components.Authorization
+@using SchedulePayrollBlazor.Components.Pages.Models
 @using SchedulePayrollBlazor.Data.Models
 
 <div class="ps-page">
@@ -72,6 +73,10 @@
                             <th scope="col">Employment type</th>
                             <th scope="col">Start date</th>
                             <th scope="col">Status</th>
+                            @if (_isAdmin)
+                            {
+                                <th scope="col" class="text-end">Actions</th>
+                            }
                         </tr>
                     </thead>
                     <tbody>
@@ -79,24 +84,32 @@
                         {
                             <tr>
                                 <td>@employee.FullName</td>
-                                <td>@employee.User.Email</td>
-                                <td>@employee.Department</td>
-                                <td>@employee.JobTitle</td>
-                                <td>@employee.EmploymentType</td>
+                                <td>@employee.User?.Email</td>
+                                <td>@(string.IsNullOrWhiteSpace(employee.Department) ? "-" : employee.Department)</td>
+                                <td>@(string.IsNullOrWhiteSpace(employee.JobTitle) ? "-" : employee.JobTitle)</td>
+                                <td>@FormatEmploymentType(employee.EmploymentType)</td>
                                 <td>
-                                @(
-                                    employee.StartDate.HasValue
-                                        ? employee.StartDate.Value.ToString("MMM dd, yyyy")
-                                        : "-"
-                                )
-                            </td>
-                            <td>
-                                <span class="badge @(employee.IsActive ? "badge-success" : "badge-secondary")">
-                                    @(employee.IsActive ? "Active" : "Inactive")
-                                </span>
-                            </td>
-                        </tr>
-                    }
+                                    @(
+                                        employee.StartDate.HasValue
+                                            ? employee.StartDate.Value.ToString("MMM dd, yyyy")
+                                            : "-"
+                                    )
+                                </td>
+                                <td>
+                                    <span class="badge @(employee.IsActive ? "badge-success" : "badge-secondary")">
+                                        @(employee.IsActive ? "Active" : "Inactive")
+                                    </span>
+                                </td>
+                                @if (_isAdmin)
+                                {
+                                    <td class="ps-table-actions">
+                                        <button class="ps-button ps-button-ghost" type="button" @onclick="() => BeginEditAsync(employee.EmployeeId)">
+                                            Edit
+                                        </button>
+                                    </td>
+                                }
+                            </tr>
+                        }
                     </tbody>
                 </table>
             </div>
@@ -206,34 +219,160 @@
             </div>
         </div>
     }
+
+    @if (showEditDialog && editModel is not null)
+    {
+        <div class="ps-modal-backdrop" role="presentation">
+            <div class="ps-modal" role="dialog" aria-modal="true" aria-labelledby="editEmployeeTitle">
+                <div class="ps-modal-header">
+                    <div>
+                        <h3 id="editEmployeeTitle">Edit employee</h3>
+                        <p class="ps-subtitle">Update employment details and access.</p>
+                    </div>
+                    <button type="button" class="ps-modal-close" @onclick="CloseEditDialog" aria-label="Close edit employee dialog">&times;</button>
+                </div>
+                <div class="ps-modal-body">
+                    <EditForm Model="editModel" OnValidSubmit="SaveEditAsync">
+                        <DataAnnotationsValidator />
+                        <ValidationSummary />
+
+                        @if (!string.IsNullOrWhiteSpace(editError))
+                        {
+                            <div class="ps-alert ps-alert-danger" role="alert">
+                                <div>@editError</div>
+                            </div>
+                        }
+
+                        <div class="ps-form-grid">
+                            <div class="form-group">
+                                <label>First name</label>
+                                <InputText class="form-control" @bind-Value="editModel.FirstName" readonly />
+                            </div>
+                            <div class="form-group">
+                                <label>Last name</label>
+                                <InputText class="form-control" @bind-Value="editModel.LastName" readonly />
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Email</label>
+                            <InputText class="form-control" @bind-Value="editModel.Email" readonly />
+                        </div>
+
+                        <div class="ps-form-grid">
+                            <div class="form-group">
+                                <label for="edit-department">Department</label>
+                                <InputText id="edit-department" class="form-control" @bind-Value="editModel.Department" />
+                                <ValidationMessage For="() => editModel.Department" />
+                            </div>
+                            <div class="form-group">
+                                <label for="edit-job-title">Job title</label>
+                                <InputText id="edit-job-title" class="form-control" @bind-Value="editModel.JobTitle" />
+                                <ValidationMessage For="() => editModel.JobTitle" />
+                            </div>
+                        </div>
+
+                        <div class="ps-form-grid">
+                            <div class="form-group">
+                                <label for="edit-employment-type">Employment type</label>
+                                <InputSelect id="edit-employment-type" class="form-select" @bind-Value="editModel.EmploymentType" TValue="EmploymentType">
+                                    @foreach (var option in employmentTypeEditOptions)
+                                    {
+                                        <option value="@option.Value">@option.Label</option>
+                                    }
+                                </InputSelect>
+                            </div>
+                            <div class="form-group">
+                                <label for="edit-start-date">Start date</label>
+                                <InputDate id="edit-start-date" class="form-control" @bind-Value="editModel.StartDate" TValue="DateTime" />
+                            </div>
+                            <div class="form-group align-items-end">
+                                <div class="form-check">
+                                    <InputCheckbox id="edit-is-active" class="form-check-input" @bind-Value="editModel.IsActive" />
+                                    <label class="form-check-label" for="edit-is-active">Active</label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="ps-form-grid">
+                            <div class="form-group">
+                                <label for="edit-password">New password <span class="ps-muted">(leave blank to keep current)</span></label>
+                                <InputText id="edit-password" class="form-control" @bind-Value="editModel.NewPassword" type="password" autocomplete="new-password" />
+                            </div>
+                            <div class="form-group">
+                                <label for="edit-password-confirm">Confirm password</label>
+                                <InputText id="edit-password-confirm" class="form-control" @bind-Value="editModel.ConfirmPassword" type="password" autocomplete="new-password" />
+                            </div>
+                        </div>
+
+                        <div class="ps-form-actions">
+                            <button type="submit" class="btn btn-primary" disabled="@isEditSubmitting">
+                                @(isEditSubmitting ? "Saving…" : "Save changes")
+                            </button>
+                            <button type="button" class="btn btn-outline-secondary" @onclick="CloseEditDialog" disabled="@isEditSubmitting">
+                                Cancel
+                            </button>
+                        </div>
+                    </EditForm>
+                </div>
+            </div>
+        </div>
+    }
 </div>
 
 @code {
+    [CascadingParameter]
+    private Task<AuthenticationState>? AuthenticationStateTask { get; set; }
+
     private List<Employee>? employees;
     private AdminUserFormModel createModel = new();
+    private EmployeeEditModel? editModel;
     private bool showAddEmployeeDialog;
+    private bool showEditDialog;
     private bool isSubmitting;
+    private bool isEditSubmitting;
+    private bool _isAdmin;
     private string? pageSuccessMessage;
     private string? pageErrorMessage;
     private string? generatedPassword;
     private string? dialogError;
+    private string? editError;
 
     private readonly string[] roleOptions = new[] { "Employee", "Admin" };
 
     private readonly (string Value, string Label)[] employmentTypeOptions = new[]
     {
-        ("FullTime", "Full-time"),
-        ("PartTime", "Part-time"),
-        ("Contract", "Contract"),
-        ("Intern", "Intern"),
-        ("Seasonal", "Seasonal"),
-        ("Temporary", "Temporary")
+        (EmploymentType.FullTime.ToString(), "Full-time"),
+        (EmploymentType.PartTime.ToString(), "Part-time"),
+        (EmploymentType.Contractor.ToString(), "Contractor"),
+        (EmploymentType.Intern.ToString(), "Intern")
+    };
+
+    private readonly (EmploymentType Value, string Label)[] employmentTypeEditOptions = new[]
+    {
+        (EmploymentType.FullTime, "Full-time"),
+        (EmploymentType.PartTime, "Part-time"),
+        (EmploymentType.Contractor, "Contractor"),
+        (EmploymentType.Intern, "Intern")
     };
 
     protected override async Task OnInitializedAsync()
     {
         ResetCreateForm();
+        await DetermineAdminAsync();
         await LoadEmployeesAsync();
+    }
+
+    private async Task DetermineAdminAsync()
+    {
+        if (AuthenticationStateTask is null)
+        {
+            _isAdmin = false;
+            return;
+        }
+
+        var authState = await AuthenticationStateTask;
+        _isAdmin = authState.User.IsInRole("Admin");
     }
 
     private async Task LoadEmployeesAsync()
@@ -242,10 +381,7 @@
 
         try
         {
-            employees = await Db.Employees
-                .Include(e => e.User)
-                .OrderBy(e => e.FullName)
-                .ToListAsync();
+            employees = await EmployeeService.GetAllAsync();
         }
         catch
         {
@@ -310,6 +446,122 @@
             Role = roleOptions[0],
             EmploymentType = employmentTypeOptions[0].Value,
             StartDate = DateTime.Today
+        };
+
+    private async Task BeginEditAsync(int employeeId)
+    {
+        editError = null;
+        editModel = null;
+
+        var employee = await EmployeeService.GetByIdAsync(employeeId);
+        if (employee is null)
+        {
+            pageErrorMessage = "We couldn't find that employee.";
+            return;
+        }
+
+        editModel = new EmployeeEditModel
+        {
+            EmployeeId = employee.EmployeeId,
+            FirstName = employee.User?.FirstName ?? string.Empty,
+            LastName = employee.User?.LastName ?? string.Empty,
+            Email = employee.User?.Email ?? string.Empty,
+            Department = employee.Department ?? string.Empty,
+            JobTitle = employee.JobTitle ?? string.Empty,
+            EmploymentType = employee.EmploymentType,
+            StartDate = (employee.StartDate ?? DateTime.Today).Date,
+            IsActive = employee.IsActive,
+            NewPassword = null,
+            ConfirmPassword = null
+        };
+
+        showEditDialog = true;
+    }
+
+    private void CloseEditDialog()
+    {
+        showEditDialog = false;
+        isEditSubmitting = false;
+        editError = null;
+        editModel = null;
+    }
+
+    private async Task SaveEditAsync()
+    {
+        if (editModel is null || isEditSubmitting)
+        {
+            return;
+        }
+
+        editError = null;
+
+        var trimmedPassword = string.IsNullOrWhiteSpace(editModel.NewPassword)
+            ? null
+            : editModel.NewPassword.Trim();
+
+        if (!string.IsNullOrEmpty(trimmedPassword) && trimmedPassword.Length < 6)
+        {
+            editError = "Passwords must be at least 6 characters long.";
+            return;
+        }
+
+        if (editModel.StartDate < new DateTime(1970, 1, 1) || editModel.StartDate > DateTime.Today.AddYears(2))
+        {
+            editError = "Please choose a sensible start date.";
+            return;
+        }
+
+        isEditSubmitting = true;
+
+        try
+        {
+            var employee = await EmployeeService.GetByIdAsync(editModel.EmployeeId);
+            if (employee is null)
+            {
+                editError = "We couldn't find that employee anymore.";
+                isEditSubmitting = false;
+                return;
+            }
+
+            employee.Department = editModel.Department?.Trim();
+            employee.JobTitle = editModel.JobTitle?.Trim();
+            employee.EmploymentType = editModel.EmploymentType;
+            employee.StartDate = editModel.StartDate;
+            employee.IsActive = editModel.IsActive;
+
+            if (employee.User is not null)
+            {
+                employee.User.FirstName = editModel.FirstName;
+                employee.User.LastName = editModel.LastName;
+                employee.User.Email = editModel.Email;
+            }
+
+            employee.FullName = $"{employee.User?.FirstName} {employee.User?.LastName}".Trim();
+
+            await EmployeeService.UpdateAsync(employee, trimmedPassword);
+
+            pageSuccessMessage = $"{employee.FullName} was updated successfully.";
+            pageErrorMessage = null;
+
+            await LoadEmployeesAsync();
+            CloseEditDialog();
+        }
+        catch
+        {
+            editError = "We couldn't save the employee right now. Please try again.";
+        }
+
+        isEditSubmitting = false;
+    }
+
+    private static string FormatEmploymentType(EmploymentType type)
+        => type switch
+        {
+            EmploymentType.FullTime => "Full-time",
+            EmploymentType.PartTime => "Part-time",
+            EmploymentType.Contractor => "Contractor",
+            EmploymentType.Intern => "Intern",
+            _ => type.ToString()
         };
 
     private void DismissAlert(bool dismissSuccess)

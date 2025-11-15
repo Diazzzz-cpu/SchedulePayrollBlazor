@@ -598,6 +598,44 @@ small {
     border-bottom: none;
 }
 
+.ps-table-actions {
+    text-align: right;
+    white-space: nowrap;
+}
+
+.ps-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.35rem;
+    padding: 0.45rem 0.95rem;
+    border-radius: 0.65rem;
+    border: 1px solid transparent;
+    background: transparent;
+    font-weight: 500;
+    font-size: 0.95rem;
+    color: var(--ps-text);
+    cursor: pointer;
+    transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease;
+}
+
+.ps-button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.ps-button-ghost {
+    border-color: var(--ps-border);
+    color: var(--ps-primary);
+}
+
+.ps-button-ghost:hover,
+.ps-button-ghost:focus {
+    border-color: var(--ps-primary);
+    background: rgba(59, 130, 246, 0.1);
+    color: var(--ps-primary);
+}
+
 .ps-table td[data-align="center"],
 .ps-table th[data-align="center"] {
     text-align: center;
@@ -996,6 +1034,31 @@ textarea:focus {
 
 .ps-form-grid .form-group {
     margin-bottom: 0;
+}
+
+.form-check {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding-top: 0.75rem;
+}
+
+.form-check-input {
+    width: 1.1rem;
+    height: 1.1rem;
+    border-radius: 0.35rem;
+    border: 1px solid var(--ps-border);
+    background: var(--ps-surface-alt);
+}
+
+.form-check-input:checked {
+    background: var(--ps-primary);
+    border-color: var(--ps-primary);
+}
+
+.form-check-label {
+    color: var(--ps-text);
+    font-weight: 500;
 }
 
 .ps-muted {

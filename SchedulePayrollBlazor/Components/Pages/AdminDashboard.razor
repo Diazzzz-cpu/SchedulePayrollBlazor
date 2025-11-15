@@ -82,7 +82,7 @@
                             <td>@employee.User.Email</td>
                             <td>@employee.Department</td>
                             <td>@employee.JobTitle</td>
-                            <td>@employee.EmploymentType</td>
+                            <td>@FormatEmploymentType(employee.EmploymentType)</td>
                             <td>
                                 @(
                                     employee.StartDate.HasValue
@@ -184,6 +184,16 @@
             .Take(5)
             .ToListAsync();
     }
+
+    private static string FormatEmploymentType(EmploymentType type)
+        => type switch
+        {
+            EmploymentType.FullTime => "Full-time",
+            EmploymentType.PartTime => "Part-time",
+            EmploymentType.Contractor => "Contractor",
+            EmploymentType.Intern => "Intern",
+            _ => type.ToString()
+        };
 
     private static string GetStatusClass(string? status)
         => status switch

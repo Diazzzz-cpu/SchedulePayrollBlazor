@@ -5,6 +5,14 @@ using System.ComponentModel.DataAnnotations.Schema;
 
 namespace SchedulePayrollBlazor.Data.Models;
 
+public enum EmploymentType
+{
+    FullTime,
+    PartTime,
+    Contractor,
+    Intern
+}
+
 [Table("employees")]
 public class Employee
 {
@@ -23,34 +31,69 @@ public class Employee
 
     [Column("department")]
     public string? Department { get; set; }
+        = string.Empty;
 
     [Column("job_title")]
     public string? JobTitle { get; set; }
+        = string.Empty;
 
-    // e.g. "FullTime", "PartTime"
     [Column("employment_type")]
-    public string? EmploymentType { get; set; }
+    public string EmploymentTypeValue { get; set; }
+        = EmploymentType.FullTime.ToString();
+
+    [NotMapped]
+    public EmploymentType EmploymentType
+    {
+        get => Enum.TryParse<EmploymentType>(EmploymentTypeValue, true, out var parsed)
+            ? parsed
+            : EmploymentType.FullTime;
+        set => EmploymentTypeValue = value.ToString();
+    }
 
     // Nullable so we can safely use HasValue / ??
     [Column("start_date")]
     public DateTime? StartDate { get; set; }
+        = null;
 
     // Used by AdminUserService, Profile, AdminDashboard
     [Column("location")]
     public string? Location { get; set; }
+        = string.Empty;
 
     [Column("is_active")]
     public bool IsActive { get; set; } = true;
 
+    [NotMapped]
+    public string PasswordHash
+    {
+        get => User?.PasswordHash ?? string.Empty;
+        set
+        {
+            if (User is not null)
+            {
+                User.PasswordHash = value;
+            }
+        }
+    }
+
     // Navigation to User
     [ForeignKey(nameof(UserId))]
     public User? User { get; set; }
+        = default!;
 
     // Navigation to EmployeeProfile (used in AppDbContext)
     public EmployeeProfile? Profile { get; set; }
+        = default!;
 
-    public ICollection<EmployeeComponent> EmployeeComponents { get; set; } = new List<EmployeeComponent>();
-    public ICollection<PayrollRun> PayrollRuns { get; set; } = new List<PayrollRun>();
-    public ICollection<Schedule> Schedules { get; set; } = new List<Schedule>();
-    public ICollection<TimeLog> TimeLogs { get; set; } = new List<TimeLog>();
+    public ICollection<EmployeeComponent> EmployeeComponents { get; set; }
+        = new List<EmployeeComponent>();
+
+    public ICollection<PayrollRun> PayrollRuns { get; set; }
+        = new List<PayrollRun>();
+
+    public ICollection<Schedule> Schedules { get; set; }
+        = new List<Schedule>();
+
+    public ICollection<TimeLog> TimeLogs { get; set; }
+        = new List<TimeLog>();
 }

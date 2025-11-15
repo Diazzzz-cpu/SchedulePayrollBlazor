@@ -132,7 +132,9 @@ else
 
             Department = user.Employee?.Department ?? string.Empty,
             JobTitle = user.Employee?.JobTitle ?? string.Empty,
-            EmploymentType = user.Employee?.EmploymentType ?? string.Empty,
+            EmploymentType = user.Employee is null
+                ? string.Empty
+                : FormatEmploymentType(user.Employee.EmploymentType),
             StartDate = user.Employee?.StartDate,
             Location = user.Employee?.Location ?? string.Empty
         };
@@ -140,6 +142,16 @@ else
 
     private static string DisplayOrFallback(string value)
         => string.IsNullOrWhiteSpace(value) ? "-" : value;
+
+    private static string FormatEmploymentType(EmploymentType type)
+        => type switch
+        {
+            EmploymentType.FullTime => "Full-time",
+            EmploymentType.PartTime => "Part-time",
+            EmploymentType.Contractor => "Contractor",
+            EmploymentType.Intern => "Intern",
+            _ => type.ToString()
+        };
 
     private sealed class ProfileViewModel
     {

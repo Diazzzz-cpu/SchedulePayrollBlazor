@@ -170,7 +170,7 @@ public class PayrollService : IPayrollService
             .Include(pe => pe.PayrollPeriod)
             .Include(pe => pe.Adjustments)
             .Where(pe => pe.PayrollPeriodId == payrollPeriodId)
-            .OrderBy(pe => pe.Employee.FullName)
+            .OrderBy(pe => pe.Employee == null ? string.Empty : pe.Employee.FullName)
             .ToListAsync();
     }
 
@@ -192,7 +192,7 @@ public class PayrollService : IPayrollService
             .Include(pe => pe.PayrollPeriod)
             .Include(pe => pe.Adjustments)
             .Where(pe => pe.PayrollPeriodId == payrollPeriodId)
-            .OrderBy(pe => pe.Employee.FullName)
+            .OrderBy(pe => pe.Employee == null ? string.Empty : pe.Employee.FullName)
             .ToListAsync();
     }
 

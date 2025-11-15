@@ -27,21 +27,21 @@
                 <input id="my-schedule-date" class="form-control" type="date" value="@dateString" @onchange="OnDateChanged" />
             </div>
             <div class="col-auto">
-                <button class="btn btn-outline-secondary" type="button" @onclick="LoadSchedules">Load</button>
+                <button class="btn btn-outline-secondary" type="button" @onclick="LoadShifts">Load</button>
             </div>
         </div>
     </section>
 
-    @if (schedules == null)
+    @if (shifts == null)
     {
         <div class="ps-card">
             <div class="loading">Loading...</div>
         </div>
     }
-    else if (!schedules.Any())
+    else if (!shifts.Any())
     {
         <div class="ps-card">
-            <div class="text-muted">No schedules found for the selected date.</div>
+            <div class="text-muted">No shifts found for the selected date.</div>
         </div>
     }
     else
@@ -59,22 +59,18 @@
                             <th scope="col">Start</th>
                             <th scope="col">End</th>
                             <th scope="col">Duration</th>
-                            <th scope="col">Source</th>
+                            <th scope="col">Group</th>
                         </tr>
                     </thead>
                     <tbody>
-                        @foreach (var schedule in schedules)
+                        @foreach (var shift in shifts)
                         {
                             <tr>
-                                <td>@schedule.ShiftDate.ToString("dddd, MMM dd")</td>
-                                <td>@((DateTime.Today + schedule.StartTime).ToString("hh\\:mm tt"))</td>
-                                <td>@((DateTime.Today + schedule.EndTime).ToString("hh\\:mm tt"))</td>
-                                <td>@((schedule.EndTime - schedule.StartTime).TotalHours.ToString("F1")) hrs</td>
-                                <td>
-                                    <span class="ps-badge @(schedule.Source == "Manual" ? "ps-badge-neutral" : "ps-badge-success")">
-                                        @schedule.Source
-                                    </span>
-                                </td>
+                                <td>@shift.Start.ToString("dddd, MMM dd")</td>
+                                <td>@shift.Start.ToString("hh:mm tt", CultureInfo.InvariantCulture)</td>
+                                <td>@shift.End.ToString("hh:mm tt", CultureInfo.InvariantCulture)</td>
+                                <td>@((shift.End - shift.Start).TotalHours.ToString("F1")) hrs</td>
+                                <td>@(string.IsNullOrWhiteSpace(shift.GroupName) ? "Unassigned" : shift.GroupName)</td>
                             </tr>
                         }
                     </tbody>
@@ -87,7 +83,7 @@
 @code {
     private int employeeId;
     private string dateString = DateTime.Today.ToString("yyyy-MM-dd");
-    private List<Schedule>? schedules;
+    private List<Shift>? shifts;
 
     protected override async Task OnInitializedAsync()
     {
@@ -105,7 +101,7 @@
 
         if (int.TryParse(empIdClaim, out employeeId))
         {
-            await LoadSchedules();
+            await LoadShifts();
         }
         else
         {
@@ -119,35 +115,40 @@
         return Task.CompletedTask;
     }
 
-    private async Task LoadSchedules()
+    private async Task LoadShifts()
     {
         if (!DateTime.TryParseExact(dateString, "yyyy-MM-dd",
                 CultureInfo.InvariantCulture, DateTimeStyles.None, out var date))
         {
-            schedules = new();
+            shifts = new();
             return;
         }
 
         var selectedDate = date.Date;
 
-        schedules = await Db.Schedules
-            .Where(s => s.EmployeeId == employeeId && s.ShiftDate.Date == selectedDate)
-            .OrderBy(s => s.StartTime)
+        shifts = await Db.Shifts
+            .Where(s => s.EmployeeId == employeeId && s.Start.Date == selectedDate)
+            .OrderBy(s => s.Start)
             .ToListAsync();
 
-        if (!schedules.Any())
+        if (!shifts.Any())
         {
-            var startOfWeek = selectedDate.AddDays(-(int)selectedDate.DayOfWeek);
+            var startOfWeek = GetWeekStart(selectedDate);
             var endOfWeek = startOfWeek.AddDays(7);
 
-            schedules = await Db.Schedules
+            shifts = await Db.Shifts
                 .Where(s =>
                     s.EmployeeId == employeeId &&
-                    s.ShiftDate.Date >= startOfWeek &&
-                    s.ShiftDate.Date < endOfWeek)
-                .OrderBy(s => s.ShiftDate)
-                .ThenBy(s => s.StartTime)
+                    s.Start >= startOfWeek &&
+                    s.Start < endOfWeek)
+                .OrderBy(s => s.Start)
                 .ToListAsync();
         }
+    }
+
+    private static DateTime GetWeekStart(DateTime date)
+    {
+        var diff = (7 + (date.DayOfWeek - DayOfWeek.Sunday)) % 7;
+        return date.Date.AddDays(-diff);
     }
 }

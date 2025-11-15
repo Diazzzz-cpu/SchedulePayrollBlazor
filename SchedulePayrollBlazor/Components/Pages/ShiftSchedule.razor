@@ -159,7 +159,7 @@
     private int? _selectedEmployeeId;
     private string? _searchText;
     private int? _currentEmployeeId;
-    private List<string> _groups = new() { "All", "IT Department", "Operations", "Support" };
+    private List<string> _groups = new() { "All" };
     private List<(int Id, string Name, string Group)> _employees = new();
     private bool _isModalOpen;
     private bool _isNewShift;
@@ -217,33 +217,51 @@
 
     private async Task LoadEmployeesAsync()
     {
+        List<(int Id, string Name, string Group)> employees;
+
         try
         {
-            // use the injected scoped DbContext
             var records = await Db.Employees
                 .AsNoTracking()
                 .OrderBy(e => e.FullName)
                 .Select(e => new { e.EmployeeId, e.FullName, e.Department })
                 .ToListAsync();
 
-            if (records.Count > 0)
-            {
-                _employees = records
-                    .Select(e => (e.EmployeeId,
-                        string.IsNullOrWhiteSpace(e.FullName) ? $"Employee {e.EmployeeId}" : e.FullName,
-                        string.IsNullOrWhiteSpace(e.Department) ? "General" : e.Department!))
-                    .ToList();
-            }
-            else
-            {
-                _employees = BuildSampleEmployees();
-            }
+            employees = records
+                .Select(e => (e.EmployeeId,
+                    string.IsNullOrWhiteSpace(e.FullName) ? $"Employee {e.EmployeeId}" : e.FullName!,
+                    string.IsNullOrWhiteSpace(e.Department) ? string.Empty : e.Department!))
+                .ToList();
         }
         catch
         {
-            // fall back to sample list if DB query fails
-            _employees = BuildSampleEmployees();
+            employees = new();
         }
+
+        if (!_isAdmin && _currentEmployeeId.HasValue)
+        {
+            var self = employees.FirstOrDefault(e => e.Id == _currentEmployeeId.Value);
+            if (self != default)
+            {
+                _employees = new List<(int, string, string)> { self };
+                _selectedEmployeeId = self.Id;
+                SelectedGroup = string.IsNullOrWhiteSpace(self.Group) ? null : self.Group;
+                _groups = string.IsNullOrWhiteSpace(self.Group)
+                    ? new List<string>()
+                    : new List<string> { self.Group };
+            }
+            else
+            {
+                _employees = new();
+                _selectedEmployeeId = null;
+                SelectedGroup = null;
+                _groups = new List<string>();
+            }
+
+            return;
+        }
+
+        _employees = employees;
 
         var groupSet = new SortedSet<string>(StringComparer.OrdinalIgnoreCase) { "All" };
         foreach (var employee in _employees)
@@ -263,19 +281,14 @@
         {
             SelectedGroup = _selectedGroup ?? "All";
         }
-        else if (_currentEmployeeId.HasValue)
+        else
         {
-            var self = _employees.FirstOrDefault(e => e.Id == _currentEmployeeId.Value);
-            if (self != default)
-            {
-                _employees = new List<(int, string, string)> { self };
-                SelectedGroup = self.Group;
-                _selectedEmployeeId = self.Id;
-            }
-            else
-            {
-                SelectedGroup = null;
-            }
+            SelectedGroup = _groups.FirstOrDefault(g => !string.Equals(g, "All", StringComparison.OrdinalIgnoreCase));
+        }
+
+        if (!_isAdmin)
+        {
+            _selectedEmployeeId = null;
         }
     }
 
@@ -402,15 +415,6 @@
         return date.Date.AddDays(-diff);
     }
 
-    private static List<(int Id, string Name, string Group)> BuildSampleEmployees() => new()
-    {
-        (1, "Ulysses Dela Pena", "IT Department"),
-        (2, "Maria Santos", "Operations"),
-        (3, "Jacob Lee", "Support"),
-        (4, "Avery Quinn", "IT Department"),
-        (5, "Lena Ortiz", "Operations")
-    };
-
     private string GetWeekRangeLabel()
     {
         var end = _weekStart.AddDays(6);
@@ -424,7 +428,7 @@
 
     private void CreateShift()
     {
-        if (!_isAdmin)
+        if (!_isAdmin || _employees.Count == 0)
         {
             return;
         }
@@ -433,9 +437,23 @@
         var defaultStart = targetDate.AddHours(9);
         var defaultEnd = defaultStart.AddHours(8);
 
-        var employeeId = _selectedEmployeeId
-            ?? _employees.FirstOrDefault(e => _selectedGroup is null || _selectedGroup == "All" || string.Equals(e.Group, _selectedGroup, StringComparison.OrdinalIgnoreCase)).Id;
+        var selectedEmployee = _employees.FirstOrDefault(e =>
+            _selectedEmployeeId.HasValue && e.Id == _selectedEmployeeId.Value);
 
+        if (selectedEmployee == default)
+        {
+            selectedEmployee = _employees.FirstOrDefault(e =>
+                _selectedGroup is null ||
+                _selectedGroup == "All" ||
+                string.Equals(e.Group, _selectedGroup, StringComparison.OrdinalIgnoreCase));
+        }
+
+        if (selectedEmployee == default)
+        {
+            selectedEmployee = _employees[0];
+        }
+
+        var employeeId = selectedEmployee.Id;
         var employeeName = ResolveEmployeeName(employeeId);
         var group = ResolveGroupForEmployee(employeeId) ?? (_selectedGroup is null || _selectedGroup == "All" ? null : _selectedGroup);
 

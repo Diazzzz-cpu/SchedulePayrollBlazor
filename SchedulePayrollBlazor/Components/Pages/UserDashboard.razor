@@ -5,6 +5,7 @@
 @inject NavigationManager Nav
 @using Microsoft.EntityFrameworkCore
 @using SchedulePayrollBlazor.Data.Models
+@using System.Globalization
 @using System.Security.Claims
 
 <div class="ps-page">
@@ -18,11 +19,11 @@
     <div class="ps-stat-grid">
         <div class="ps-stat-card">
             <span class="ps-stat-title">Today's shifts</span>
-            <span class="ps-stat-value">@todaySchedules</span>
+            <span class="ps-stat-value">@todayShiftCount</span>
         </div>
         <div class="ps-stat-card">
             <span class="ps-stat-title">Upcoming shifts</span>
-            <span class="ps-stat-value">@upcomingSchedules</span>
+            <span class="ps-stat-value">@upcomingShiftCount</span>
         </div>
         <div class="ps-stat-card">
             <span class="ps-stat-title">Last paycheck</span>
@@ -70,16 +71,18 @@
                             <th scope="col">Start</th>
                             <th scope="col">End</th>
                             <th scope="col">Duration</th>
+                            <th scope="col">Group</th>
                         </tr>
                     </thead>
                     <tbody>
                         @foreach (var shift in upcomingShifts)
                         {
                             <tr>
-                                <td>@shift.ShiftDate.ToString("MMM dd, yyyy")</td>
-                                <td>@((DateTime.Today + shift.StartTime).ToString("hh\\:mm"))</td>
-                                <td>@((DateTime.Today + shift.EndTime).ToString("hh\\:mm"))</td>
-                                <td>@((shift.EndTime - shift.StartTime).TotalHours.ToString("F1")) hours</td>
+                                <td>@shift.Start.ToString("MMM dd, yyyy")</td>
+                                <td>@shift.Start.ToString("hh:mm tt", CultureInfo.InvariantCulture)</td>
+                                <td>@shift.End.ToString("hh:mm tt", CultureInfo.InvariantCulture)</td>
+                                <td>@((shift.End - shift.Start).TotalHours.ToString("F1")) hours</td>
+                                <td>@(string.IsNullOrWhiteSpace(shift.GroupName) ? "Unassigned" : shift.GroupName)</td>
                             </tr>
                         }
                     </tbody>
@@ -96,11 +99,11 @@
 @code {
     private string employeeName = "";
     private int employeeId;
-    private int todaySchedules;
-    private int upcomingSchedules;
+    private int todayShiftCount;
+    private int upcomingShiftCount;
     private decimal lastPayAmount;
     private double totalHoursThisWeek;
-    private List<Schedule> upcomingShifts = new();
+    private List<Shift> upcomingShifts = new();
 
     protected override async Task OnInitializedAsync()
     {
@@ -130,23 +133,21 @@
         }
 
         var today = DateTime.Today.Date;
-
-        todaySchedules = await Db.Schedules
-            .CountAsync(s => s.EmployeeId == employeeId && s.ShiftDate.Date == today);
-
         var tomorrow = today.AddDays(1);
-        var nextWeek = today.AddDays(7);
+        var weekEndExclusive = tomorrow.AddDays(7);
 
-        upcomingSchedules = await Db.Schedules
+        todayShiftCount = await Db.Shifts
+            .CountAsync(s => s.EmployeeId == employeeId && s.Start >= today && s.Start < tomorrow);
+
+        upcomingShiftCount = await Db.Shifts
             .CountAsync(s =>
                 s.EmployeeId == employeeId &&
-                s.ShiftDate.Date >= tomorrow &&
-                s.ShiftDate.Date <= nextWeek);
+                s.Start >= tomorrow &&
+                s.Start < weekEndExclusive);
 
-        upcomingShifts = await Db.Schedules
-            .Where(s => s.EmployeeId == employeeId && s.ShiftDate.Date >= today)
-            .OrderBy(s => s.ShiftDate)
-            .ThenBy(s => s.StartTime)
+        upcomingShifts = await Db.Shifts
+            .Where(s => s.EmployeeId == employeeId && s.Start >= today)
+            .OrderBy(s => s.Start)
             .Take(5)
             .ToListAsync();
 
@@ -157,16 +158,22 @@
 
         lastPayAmount = lastPayroll?.NetPay ?? 0;
 
-        var startOfWeek = today.AddDays(-(int)DateTime.Today.DayOfWeek);
+        var startOfWeek = GetWeekStart(today);
         var endOfWeek = startOfWeek.AddDays(7);
 
-        var weekSchedules = await Db.Schedules
+        var weekShifts = await Db.Shifts
             .Where(s =>
                 s.EmployeeId == employeeId &&
-                s.ShiftDate.Date >= startOfWeek &&
-                s.ShiftDate.Date < endOfWeek)
+                s.Start >= startOfWeek &&
+                s.Start < endOfWeek)
             .ToListAsync();
 
-        totalHoursThisWeek = weekSchedules.Sum(s => (s.EndTime - s.StartTime).TotalHours);
+        totalHoursThisWeek = weekShifts.Sum(s => (s.End - s.Start).TotalHours);
+    }
+
+    private static DateTime GetWeekStart(DateTime date)
+    {
+        var diff = (7 + (date.DayOfWeek - DayOfWeek.Sunday)) % 7;
+        return date.Date.AddDays(-diff);
     }
 }

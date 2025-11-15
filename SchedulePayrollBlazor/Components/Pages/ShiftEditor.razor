@@ -168,8 +168,11 @@
 
     private void ConfigureEditContext()
     {
-        _editContext?.OnValidationRequested -= HandleValidationRequested;
-        _editContext?.OnFieldChanged -= HandleFieldChanged;
+        if (_editContext != null)
+        {
+            _editContext.OnValidationRequested -= HandleValidationRequested;
+            _editContext.OnFieldChanged -= HandleFieldChanged;
+        }
 
         _editContext = new EditContext(_form);
         _validationMessages = new ValidationMessageStore(_editContext);

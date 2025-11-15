@@ -1,4 +1,7 @@
 @inherits LayoutComponentBase
+@using Microsoft.JSInterop
+
+@inject IJSRuntime JS
 
 <div class="ps-app">
     <AuthorizeView>
@@ -38,7 +41,17 @@
                 <span class="ps-topbar-title">PaySync</span>
                 <span class="ps-topbar-tagline">Integrated workforce hub</span>
             </div>
-            <div class="ps-topbar-meta">Internal payroll &amp; scheduling</div>
+            <div class="ps-topbar-actions">
+                <div class="ps-topbar-meta">Internal payroll &amp; scheduling</div>
+                <button type="button"
+                        class="ps-theme-toggle"
+                        @onclick="ToggleTheme"
+                        aria-pressed="@_isDark.ToString().ToLowerInvariant()"
+                        aria-label="@ThemeButtonAriaLabel"
+                        title="Toggle light or dark theme">
+                    @ThemeButtonLabel
+                </button>
+            </div>
         </header>
 
         <main class="ps-content">
@@ -54,3 +67,56 @@
     <a href="." class="reload">Reload</a>
     <span class="dismiss">🗙</span>
 </div>
+
+@code {
+    private bool _isDark;
+    private bool _initialized;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await InitializeThemeAsync();
+            StateHasChanged();
+        }
+    }
+
+    private async Task ToggleTheme()
+    {
+        if (!_initialized)
+        {
+            await InitializeThemeAsync();
+            StateHasChanged();
+            return;
+        }
+
+        try
+        {
+            var theme = await JS.InvokeAsync<string>("paySyncTheme.toggle");
+            _isDark = string.Equals(theme, "dark", StringComparison.OrdinalIgnoreCase);
+        }
+        catch (JSException)
+        {
+            _isDark = !_isDark;
+        }
+        StateHasChanged();
+    }
+
+    private async Task InitializeThemeAsync()
+    {
+        try
+        {
+            var theme = await JS.InvokeAsync<string>("paySyncTheme.init");
+            _isDark = string.Equals(theme, "dark", StringComparison.OrdinalIgnoreCase);
+        }
+        catch (JSException)
+        {
+            _isDark = false;
+        }
+
+        _initialized = true;
+    }
+
+    private string ThemeButtonLabel => _isDark ? "☀ Light mode" : "🌙 Dark mode";
+    private string ThemeButtonAriaLabel => _isDark ? "Switch to light theme" : "Switch to dark theme";
+}

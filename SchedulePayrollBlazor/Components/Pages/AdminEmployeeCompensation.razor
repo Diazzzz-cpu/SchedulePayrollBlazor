@@ -80,25 +80,43 @@
                                                     <label>Structure</label>
                                                     <InputRadioGroup @bind-Value="row.EditModel.IsHourly">
                                                         <div class="form-check">
-                                                            <InputRadio class="form-check-input" id="hourly-@row.Employee.EmployeeId" Value="true" />
-                                                            <label class="form-check-label" for="hourly-@row.Employee.EmployeeId">Hourly</label>
+                                                            <InputRadio class="form-check-input"
+                                                                        id="@($"hourly-{row.Employee.EmployeeId}")"
+                                                                        Value="true" />
+                                                            <label class="form-check-label"
+                                                                   for="@($"hourly-{row.Employee.EmployeeId}")">
+                                                                Hourly
+                                                            </label>
                                                         </div>
                                                         <div class="form-check">
-                                                            <InputRadio class="form-check-input" id="fixed-@row.Employee.EmployeeId" Value="false" />
-                                                            <label class="form-check-label" for="fixed-@row.Employee.EmployeeId">Fixed monthly</label>
+                                                            <InputRadio class="form-check-input"
+                                                                        id="@($"fixed-{row.Employee.EmployeeId}")"
+                                                                        Value="false" />
+                                                            <label class="form-check-label"
+                                                                   for="@($"fixed-{row.Employee.EmployeeId}")">
+                                                                Fixed monthly
+                                                            </label>
                                                         </div>
                                                     </InputRadioGroup>
                                                 </div>
 
                                                 <div class="form-group">
-                                                    <label for="hourly-amount-@row.Employee.EmployeeId">Hourly rate</label>
-                                                    <InputNumber id="hourly-amount-@row.Employee.EmployeeId" class="form-control" @bind-Value="row.EditModel.HourlyRate" disabled="@(!row.EditModel.IsHourly)" step="0.25" />
+                                                    <label for="@($"hourly-amount-{row.Employee.EmployeeId}")">Hourly rate</label>
+                                                    <InputNumber id="@($"hourly-amount-{row.Employee.EmployeeId}")"
+                                                                 class="form-control"
+                                                                 @bind-Value="row.EditModel.HourlyRate"
+                                                                 disabled="@(!row.EditModel.IsHourly)"
+                                                                 step="0.25" />
                                                     <ValidationMessage For="() => row.EditModel.HourlyRate" />
                                                 </div>
 
                                                 <div class="form-group">
-                                                    <label for="salary-amount-@row.Employee.EmployeeId">Fixed monthly salary</label>
-                                                    <InputNumber id="salary-amount-@row.Employee.EmployeeId" class="form-control" @bind-Value="row.EditModel.FixedMonthlySalary" disabled="@(row.EditModel.IsHourly)" step="0.01" />
+                                                    <label for="@($"salary-amount-{row.Employee.EmployeeId}")">Fixed monthly salary</label>
+                                                    <InputNumber id="@($"salary-amount-{row.Employee.EmployeeId}")"
+                                                                 class="form-control"
+                                                                 @bind-Value="row.EditModel.FixedMonthlySalary"
+                                                                 disabled="@(row.EditModel.IsHourly)"
+                                                                 step="0.01" />
                                                     <ValidationMessage For="() => row.EditModel.FixedMonthlySalary" />
                                                 </div>
                                             </div>

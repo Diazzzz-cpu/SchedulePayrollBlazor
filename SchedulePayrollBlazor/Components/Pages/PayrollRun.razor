@@ -168,20 +168,27 @@
                                                 <ValidationSummary />
                                                 <div class="ps-form-grid">
                                                     <div class="form-group">
-                                                        <label for="type-@entry.Id">Type</label>
-                                                        <InputSelect id="type-@entry.Id" class="form-select" @bind-Value="GetAdjustmentForm(entry.Id).Type">
+                                                        <label for="@($"type-{entry.Id}")">Type</label>
+                                                        <InputSelect id="@($"type-{entry.Id}")"
+                                                                     class="form-select"
+                                                                     @bind-Value="GetAdjustmentForm(entry.Id).Type">
                                                             <option value="Deduction">Deduction</option>
                                                             <option value="Bonus">Bonus</option>
                                                         </InputSelect>
                                                     </div>
                                                     <div class="form-group">
-                                                        <label for="label-@entry.Id">Label</label>
-                                                        <InputText id="label-@entry.Id" class="form-control" @bind-Value="GetAdjustmentForm(entry.Id).Label" />
+                                                        <label for="@($"label-{entry.Id}")">Label</label>
+                                                        <InputText id="@($"label-{entry.Id}")"
+                                                                   class="form-control"
+                                                                   @bind-Value="GetAdjustmentForm(entry.Id).Label" />
                                                         <ValidationMessage For="() => GetAdjustmentForm(entry.Id).Label" />
                                                     </div>
                                                     <div class="form-group">
-                                                        <label for="amount-@entry.Id">Amount (PHP)</label>
-                                                        <InputNumber id="amount-@entry.Id" class="form-control" @bind-Value="GetAdjustmentForm(entry.Id).Amount" step="0.01" />
+                                                        <label for="@($"amount-{entry.Id}")">Amount (PHP)</label>
+                                                        <InputNumber id="@($"amount-{entry.Id}")"
+                                                                     class="form-control"
+                                                                     @bind-Value="GetAdjustmentForm(entry.Id).Amount"
+                                                                     step="0.01" />
                                                         <ValidationMessage For="() => GetAdjustmentForm(entry.Id).Amount" />
                                                     </div>
                                                 </div>

@@ -1,5 +1,6 @@
 @page "/schedules"
 @attribute [Authorize]
+@using System
 @using System.Globalization
 @using System.Security.Claims
 @using Microsoft.EntityFrameworkCore
@@ -15,7 +16,7 @@
             <p class="ps-schedule-subtitle">Plan coverage and keep every team informed.</p>
         </div>
         <div class="ps-schedule-actions">
-            <span class="ps-timezone">@_timezoneDisplay</span>
+            @* Removed UTC badge per instructions *@
             <AuthorizeView Roles="Admin">
                 <Authorized>
                     <button type="button" class="ps-button ps-button-primary" @onclick="CreateShift">
@@ -71,10 +72,7 @@
         </div>
     </div>
 
-    <div class="ps-info-note">
-        <span class="ps-info-icon">⚠️</span>
-        <span>Shift times displayed do not automatically adjust for daylight saving time changes</span>
-    </div>
+    @* Removed DST warning per instructions *@
 
     <div class="ps-schedule-card">
         <div class="ps-schedule-header">
@@ -116,10 +114,8 @@
                         }
                         else
                         {
-                            var visible = dayShifts.Take(3).ToList();
-                            var hiddenCount = dayShifts.Count - visible.Count;
-
-                            @foreach (var shift in visible)
+                            @* Removed hardcoded shifts; data now fully driven by _shifts *@
+                            @foreach (var shift in dayShifts)
                             {
                                 <div class="ps-shift-card">
                                     <div class="ps-shift-accent"></div>
@@ -128,11 +124,6 @@
                                         <div class="ps-shift-time">@shift.Start.ToString("hh:mm tt", CultureInfo.InvariantCulture) – @shift.End.ToString("hh:mm tt", CultureInfo.InvariantCulture)</div>
                                     </div>
                                 </div>
-                            }
-
-                            @if (hiddenCount > 0)
-                            {
-                                <div class="ps-shift-more">+@hiddenCount more</div>
                             }
                         }
                     </div>
@@ -152,8 +143,6 @@
     private int? _selectedEmployeeId;
     private string? _searchText;
     private int? _currentEmployeeId;
-    private string _timezoneDisplay = string.Empty;
-
     private List<string> _groups = new() { "All", "IT Department", "Operations", "Support" };
     private List<(int Id, string Name, string Group)> _employees = new();
 
@@ -184,7 +173,6 @@
         var today = DateTime.Today;
         _weekStart = StartOfWeek(today);
         _selectedMonth = new DateTime(today.Year, today.Month, 1);
-        _timezoneDisplay = FormatTimeZone(TimeZoneInfo.Local);
 
         var authState = await AuthStateProvider.GetAuthenticationStateAsync();
         var user = authState.User;
@@ -278,32 +266,17 @@
         {
             var weekEnd = _weekStart.AddDays(7);
             var employeeFilter = _isAdmin ? _selectedEmployeeId : _currentEmployeeId;
-            var groupFilter = _isAdmin ? _selectedGroup : null;
+            var groupFilter = _selectedGroup;
 
-            var result = await ShiftService.GetShiftsAsync(_weekStart, weekEnd, employeeFilter, groupFilter);
-
-            IEnumerable<Shift> filtered = result;
-
-            if (!_isAdmin && _currentEmployeeId.HasValue)
-            {
-                filtered = filtered.Where(s => s.EmployeeId == _currentEmployeeId.Value);
-            }
-
-            if (!string.IsNullOrWhiteSpace(_searchText))
-            {
-                var term = _searchText.Trim();
-                filtered = filtered.Where(s =>
-                    s.EmployeeName.Contains(term, StringComparison.OrdinalIgnoreCase) ||
-                    (!string.IsNullOrWhiteSpace(s.GroupName) && s.GroupName.Contains(term, StringComparison.OrdinalIgnoreCase)));
-            }
+            var result = await ShiftService.GetShiftsAsync(
+                _weekStart,
+                weekEnd,
+                employeeFilter,
+                groupFilter,
+                _searchText);
 
             _shifts.Clear();
-            _shifts.AddRange(filtered.OrderBy(s => s.Start));
-        }
-        catch
-        {
-            _shifts.Clear();
-            _shifts.AddRange(BuildSampleShifts(_weekStart));
+            _shifts.AddRange(result ?? Array.Empty<Shift>());
         }
         finally
         {
@@ -312,8 +285,11 @@
         }
     }
 
-    private Task OnSearchAsync()
-        => LoadShiftsAsync();
+    private async Task OnSearchAsync()
+    {
+        @* Wired up filters/search to re-query shifts *@
+        await LoadShiftsAsync();
+    }
 
     private async Task OnReset()
     {
@@ -331,7 +307,7 @@
         {
             _selectedEmployeeId = _currentEmployeeId;
             var self = _employees.FirstOrDefault();
-            SelectedGroup = self.Group;
+            SelectedGroup = self != default ? self.Group : null;
         }
         else
         {
@@ -402,14 +378,6 @@
         return date.Date.AddDays(-diff);
     }
 
-    private static string FormatTimeZone(TimeZoneInfo timeZone)
-    {
-        var offset = timeZone.GetUtcOffset(DateTime.UtcNow);
-        var sign = offset >= TimeSpan.Zero ? "+" : "-";
-        offset = offset.Duration();
-        return $"UTC {sign}{offset:hh\\:mm}";
-    }
-
     private static List<(int Id, string Name, string Group)> BuildSampleEmployees() => new()
     {
         (1, "Ulysses Dela Pena", "IT Department"),
@@ -418,58 +386,6 @@
         (4, "Avery Quinn", "IT Department"),
         (5, "Lena Ortiz", "Operations")
     };
-
-    private static List<Shift> BuildSampleShifts(DateTime weekStart)
-    {
-        return new List<Shift>
-        {
-            new()
-            {
-                Id = 1,
-                EmployeeId = 1,
-                EmployeeName = "Ulysses Dela Pena",
-                GroupName = "IT Department",
-                Start = weekStart.AddHours(8),
-                End = weekStart.AddHours(16)
-            },
-            new()
-            {
-                Id = 2,
-                EmployeeId = 2,
-                EmployeeName = "Maria Santos",
-                GroupName = "Operations",
-                Start = weekStart.AddDays(1).AddHours(9),
-                End = weekStart.AddDays(1).AddHours(17)
-            },
-            new()
-            {
-                Id = 3,
-                EmployeeId = 3,
-                EmployeeName = "Jacob Lee",
-                GroupName = "Support",
-                Start = weekStart.AddDays(2).AddHours(14),
-                End = weekStart.AddDays(2).AddHours(22)
-            },
-            new()
-            {
-                Id = 4,
-                EmployeeId = 4,
-                EmployeeName = "Avery Quinn",
-                GroupName = "IT Department",
-                Start = weekStart.AddDays(4).AddHours(7),
-                End = weekStart.AddDays(4).AddHours(15)
-            },
-            new()
-            {
-                Id = 5,
-                EmployeeId = 5,
-                EmployeeName = "Lena Ortiz",
-                GroupName = "Operations",
-                Start = weekStart.AddDays(5).AddHours(10),
-                End = weekStart.AddDays(5).AddHours(18)
-            }
-        };
-    }
 
     private string GetWeekRangeLabel()
     {

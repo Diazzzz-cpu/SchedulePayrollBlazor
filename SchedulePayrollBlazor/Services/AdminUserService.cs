@@ -42,7 +42,7 @@ public class AdminUserService
 
                 Department = u.Employee != null ? u.Employee.Department : null,
                 JobTitle = u.Employee != null ? u.Employee.JobTitle : null,
-                EmploymentType = u.Employee != null ? u.Employee.EmploymentType : null,
+                EmploymentType = u.Employee != null ? u.Employee.EmploymentType.ToString() : null,
                 StartDate = u.Employee != null ? u.Employee.StartDate : null,
                 Location = u.Employee != null ? u.Employee.Location : null
             })
@@ -74,7 +74,7 @@ public class AdminUserService
         var user = new User
         {
             Email = email,
-            PasswordHash = PasswordHasher.HashPassword(password),
+            PasswordHash = PasswordHasher.HashPassword(password!),
             FirstName = model.FirstName.Trim(),
             LastName = model.LastName.Trim(),
             RoleId = role.RoleId,
@@ -99,9 +99,7 @@ public class AdminUserService
 
                     Department = model.Department?.Trim() ?? string.Empty,
                     JobTitle = model.JobTitle?.Trim() ?? string.Empty,
-                    EmploymentType = string.IsNullOrWhiteSpace(model.EmploymentType)
-                        ? "FullTime"
-                        : model.EmploymentType.Trim(),
+                    EmploymentType = ParseEmploymentType(model.EmploymentType),
                     StartDate = model.StartDate ?? DateTime.UtcNow,
                     Location = model.Location?.Trim() ?? string.Empty,
                     IsActive = true
@@ -173,9 +171,7 @@ public class AdminUserService
                     FullName = $"{user.FirstName} {user.LastName}".Trim(),
                     Department = model.Department?.Trim() ?? string.Empty,
                     JobTitle = model.JobTitle?.Trim() ?? string.Empty,
-                    EmploymentType = string.IsNullOrWhiteSpace(model.EmploymentType)
-                        ? "FullTime"
-                        : model.EmploymentType.Trim(),
+                    EmploymentType = ParseEmploymentType(model.EmploymentType),
                     StartDate = model.StartDate ?? DateTime.UtcNow,
                     Location = model.Location?.Trim() ?? string.Empty,
                     IsActive = true
@@ -186,10 +182,16 @@ public class AdminUserService
                 user.Employee.FullName = $"{user.FirstName} {user.LastName}".Trim();
                 user.Employee.Department = model.Department?.Trim() ?? string.Empty;
                 user.Employee.JobTitle = model.JobTitle?.Trim() ?? string.Empty;
-                user.Employee.EmploymentType = string.IsNullOrWhiteSpace(model.EmploymentType)
-                    ? user.Employee.EmploymentType
-                    : model.EmploymentType.Trim();
-                user.Employee.StartDate = model.StartDate ?? user.Employee.StartDate;
+                if (!string.IsNullOrWhiteSpace(model.EmploymentType))
+                {
+                    user.Employee.EmploymentType = ParseEmploymentType(model.EmploymentType);
+                }
+
+                if (model.StartDate.HasValue)
+                {
+                    user.Employee.StartDate = model.StartDate;
+                }
+
                 user.Employee.Location = model.Location?.Trim() ?? string.Empty;
             }
         }
@@ -198,70 +200,55 @@ public class AdminUserService
             _dbContext.Employees.Remove(user.Employee);
         }
 
-        await _dbContext.SaveChangesAsync();
-        return (true, null, null);
+        try
+        {
+            await _dbContext.SaveChangesAsync();
+            return (true, null, null);
+        }
+        catch
+        {
+            return (false, "Failed to update the user. Please try again.", null);
+        }
     }
 
-    public async Task<(bool Success, string? ErrorMessage)> DeleteUserAsync(int userId, int currentUserId)
+    private async Task<Role> EnsureRoleAsync(string roleCode)
     {
-        if (userId == currentUserId)
+        var normalizedCode = roleCode.Trim();
+
+        var role = await _dbContext.Roles
+            .FirstOrDefaultAsync(r => r.Code.ToLower() == normalizedCode.ToLower());
+
+        if (role is null)
         {
-            return (false, "You cannot delete your own account while signed in.");
+            role = new Role
+            {
+                Code = normalizedCode,
+                Name = normalizedCode
+            };
+
+            await _dbContext.Roles.AddAsync(role);
+            await _dbContext.SaveChangesAsync();
         }
 
-        var user = await _dbContext.Users
-            .Include(u => u.Employee)
-            .FirstOrDefaultAsync(u => u.UserId == userId);
-
-        if (user is null)
-        {
-            return (false, "User not found.");
-        }
-
-        _dbContext.Users.Remove(user);
-        await _dbContext.SaveChangesAsync();
-        return (true, null);
+        return role;
     }
 
     private static bool ShouldCreateEmployee(AdminUserFormModel model)
-    {
-        return model.IsEmployeeRole
-               || !string.IsNullOrWhiteSpace(model.Department)
-               || !string.IsNullOrWhiteSpace(model.JobTitle)
-               || model.StartDate.HasValue
-               || !string.IsNullOrWhiteSpace(model.Location);
-    }
+        => !string.Equals(model.Role, "Admin", StringComparison.OrdinalIgnoreCase);
+
+    private static readonly SimplePasswordHasher PasswordHasher = new();
 
     private static string GenerateTemporaryPassword()
+        => PasswordHasher.GenerateRandomPassword();
+
+    private static EmploymentType ParseEmploymentType(string? employmentType)
     {
-        return Guid.NewGuid().ToString("N")[..10];
-    }
-
-    private async Task<Role> EnsureRoleAsync(string roleName)
-    {
-        var normalized = string.IsNullOrWhiteSpace(roleName)
-            ? "Employee"
-            : roleName.Trim();
-
-        var lower = normalized.ToLowerInvariant();
-
-        var role = await _dbContext.Roles
-            .FirstOrDefaultAsync(r => r.Name == normalized || r.Name.ToLower() == lower);
-
-        if (role is not null)
+        if (!string.IsNullOrWhiteSpace(employmentType)
+            && Enum.TryParse<EmploymentType>(employmentType, true, out var parsed))
         {
-            return role;
+            return parsed;
         }
 
-        role = new Role
-        {
-            Code = normalized.ToUpperInvariant(),
-            Name = normalized
-        };
-
-        await _dbContext.Roles.AddAsync(role);
-        await _dbContext.SaveChangesAsync();
-
-        return role;
+        return EmploymentType.FullTime;
     }
 }

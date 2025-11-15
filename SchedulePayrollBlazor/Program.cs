@@ -1,7 +1,9 @@
 using System;
 using Microsoft.AspNetCore.Components.Authorization;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using SchedulePayrollBlazor.Data;
+using SchedulePayrollBlazor.Data.Models;
 using SchedulePayrollBlazor.Services;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -11,7 +13,7 @@ builder.Configuration
     .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
     .AddJsonFile($"appsettings.{builder.Environment.EnvironmentName}.json", optional: true);
 
-// OPTIONAL but helps avoid “Some services are not able to be constructed”
+// OPTIONAL but helps avoid Some services are not able to be constructed
 // AggregateException at builder.Build(), by turning off eager validation.
 builder.Host.UseDefaultServiceProvider(options =>
 {
@@ -51,6 +53,8 @@ builder.Services.AddScoped<AuthenticationStateProvider>(sp =>
 // App services
 builder.Services.AddScoped<AuthService>();
 builder.Services.AddScoped<AdminUserService>();
+builder.Services.AddScoped<IEmployeeService, EmployeeService>();
+builder.Services.AddScoped<IPasswordHasher<User>, PasswordHasher<User>>();
 
 // --------------------------------
 // Build + pipeline

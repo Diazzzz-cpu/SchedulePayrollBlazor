@@ -35,7 +35,7 @@ namespace SchedulePayrollBlazor.Migrations
                         .HasColumnType("longtext")
                         .HasColumnName("department");
 
-                    b.Property<string>("EmploymentType")
+                    b.Property<string>("EmploymentTypeValue")
                         .HasColumnType("longtext")
                         .HasColumnName("employment_type");
 

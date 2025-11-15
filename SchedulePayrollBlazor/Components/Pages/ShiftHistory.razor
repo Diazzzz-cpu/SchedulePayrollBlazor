@@ -1,0 +1,42 @@
+@page "/schedules/history"
+@attribute [Authorize]
+@inject NavigationManager Nav
+
+<div class="ps-schedule-page">
+    <div class="ps-schedule-header-bar">
+        <div class="ps-schedule-heading">
+            <h1 class="ps-schedule-title">Shift history</h1>
+            <p class="ps-schedule-subtitle">Review past shift assignments and confirmations.</p>
+        </div>
+        <div class="ps-schedule-actions">
+            <span class="ps-timezone">@_timezoneDisplay</span>
+        </div>
+    </div>
+
+    <div class="ps-tabs" role="tablist">
+        <button type="button" class="ps-tab" @onclick="@(() => Nav.NavigateTo("/schedules"))">Shift schedule</button>
+        <button type="button" class="ps-tab ps-tab-active" aria-current="page">Shift history</button>
+    </div>
+
+    <div class="ps-schedule-card ps-history-card">
+        <div class="ps-history-empty">No shift history yet</div>
+        <p class="ps-history-subtext">Once shifts are completed, their records will appear here for auditing and payroll review.</p>
+    </div>
+</div>
+
+@code {
+    private string _timezoneDisplay = string.Empty;
+
+    protected override void OnInitialized()
+    {
+        _timezoneDisplay = FormatTimeZone(TimeZoneInfo.Local);
+    }
+
+    private static string FormatTimeZone(TimeZoneInfo timeZone)
+    {
+        var offset = timeZone.GetUtcOffset(DateTime.UtcNow);
+        var sign = offset >= TimeSpan.Zero ? "+" : "-";
+        offset = offset.Duration();
+        return $"UTC {sign}{offset:hh\\:mm}";
+    }
+}

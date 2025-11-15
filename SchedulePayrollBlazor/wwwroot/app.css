@@ -37,6 +37,19 @@
     --ps-secondary-bg: #e2e8f0;
     --ps-neutral-border: rgba(148, 163, 184, 0.4);
     --ps-table-row-hover: rgba(37, 99, 235, 0.08);
+
+    --bg-body: var(--ps-bg);
+    --bg-card: var(--ps-surface);
+    --bg-elevated: var(--ps-surface-alt);
+    --bg-muted: var(--ps-bg-soft);
+    --text-primary: var(--ps-text);
+    --text-secondary: var(--ps-muted-text);
+    --border-color: var(--ps-border);
+    --accent: var(--ps-primary);
+    --accent-soft: var(--ps-primary-soft);
+    --muted: var(--ps-muted-text);
+    --warning: var(--ps-warning);
+    --warning-soft: var(--ps-warning-bg);
 }
 
 :root[data-theme="dark"] {
@@ -78,6 +91,19 @@
     --ps-secondary-bg: rgba(148, 163, 184, 0.22);
     --ps-neutral-border: rgba(148, 163, 184, 0.32);
     --ps-table-row-hover: rgba(96, 165, 250, 0.14);
+
+    --bg-body: var(--ps-bg);
+    --bg-card: var(--ps-surface);
+    --bg-elevated: var(--ps-surface-alt);
+    --bg-muted: var(--ps-bg-soft);
+    --text-primary: var(--ps-text);
+    --text-secondary: var(--ps-muted-text);
+    --border-color: var(--ps-border);
+    --accent: var(--ps-primary);
+    --accent-soft: var(--ps-primary-soft);
+    --muted: var(--ps-muted-text);
+    --warning: var(--ps-warning);
+    --warning-soft: var(--ps-warning-bg);
 }
 
 * {
@@ -636,6 +662,24 @@ small {
     color: var(--ps-primary);
 }
 
+.ps-button-primary {
+    background-color: var(--accent);
+    color: #ffffff;
+    border-color: transparent;
+    box-shadow: 0 10px 25px -18px var(--accent);
+}
+
+.ps-button-primary:hover,
+.ps-button-primary:focus {
+    filter: brightness(0.92);
+    border-color: transparent;
+}
+
+.ps-button-primary:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
 .ps-table td[data-align="center"],
 .ps-table th[data-align="center"] {
     text-align: center;
@@ -1153,5 +1197,360 @@ textarea:focus {
 
     .ps-auth-card {
         padding: 2rem 1.5rem;
+    }
+}
+/* Shift schedule */
+.ps-schedule-page {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    padding-bottom: 2.5rem;
+}
+
+.ps-schedule-header-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem 1.5rem;
+}
+
+.ps-schedule-heading {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+}
+
+.ps-schedule-title {
+    color: var(--text-primary);
+}
+
+.ps-schedule-subtitle {
+    color: var(--text-secondary);
+    max-width: 520px;
+}
+
+.ps-schedule-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    color: var(--text-secondary);
+}
+
+.ps-timezone {
+    font-size: 0.85rem;
+    padding: 0.35rem 0.85rem;
+    border-radius: 999px;
+    background-color: var(--bg-muted);
+    color: var(--text-secondary);
+    border: 1px solid var(--border-color);
+    transition: background-color 0.25s ease, color 0.25s ease, border-color 0.25s ease;
+}
+
+.ps-tabs {
+    display: flex;
+    gap: 1.5rem;
+    border-bottom: 1px solid var(--border-color);
+    margin-bottom: 0.5rem;
+}
+
+.ps-tab {
+    padding: 0.5rem 0;
+    cursor: pointer;
+    font-weight: 500;
+    color: var(--text-secondary);
+    background: none;
+    border: none;
+    position: relative;
+    transition: color 0.25s ease;
+}
+
+.ps-tab:hover,
+.ps-tab:focus {
+    color: var(--text-primary);
+}
+
+.ps-tab-active {
+    color: var(--text-primary);
+}
+
+.ps-tab-active::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    bottom: -1px;
+    width: 100%;
+    height: 2px;
+    border-radius: 999px;
+    background-color: var(--accent);
+}
+
+.ps-filter-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    align-items: flex-end;
+    justify-content: space-between;
+}
+
+.ps-filter-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem 1rem;
+    align-items: flex-end;
+}
+
+.ps-filter-field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    min-width: 160px;
+}
+
+.ps-filter-label {
+    color: var(--text-secondary);
+    font-size: 0.82rem;
+}
+
+.ps-filter-control,
+.ps-filter-control select,
+.ps-filter-control input {
+    background-color: var(--bg-muted);
+    color: var(--text-primary);
+    border-radius: 0.65rem;
+    border: 1px solid var(--border-color);
+    padding: 0.45rem 0.75rem;
+    font-size: 0.9rem;
+    transition: background-color 0.25s ease, color 0.25s ease, border-color 0.25s ease;
+}
+
+.ps-filter-control:focus,
+.ps-filter-control select:focus,
+.ps-filter-control input:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 0.12rem var(--accent-soft);
+}
+
+.ps-filter-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem 1rem;
+    align-items: flex-end;
+}
+
+.ps-filter-search {
+    min-width: 200px;
+}
+
+.ps-filter-buttons {
+    display: flex;
+    gap: 0.6rem;
+}
+
+.ps-info-note {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    font-size: 0.85rem;
+    color: var(--warning);
+    background-color: var(--warning-soft);
+    border-radius: 0.75rem;
+    border: 1px solid var(--warning);
+    padding: 0.6rem 0.85rem;
+    transition: background-color 0.25s ease, color 0.25s ease, border-color 0.25s ease;
+}
+
+.ps-info-icon {
+    font-size: 1rem;
+}
+
+.ps-schedule-card {
+    background-color: var(--bg-card);
+    color: var(--text-primary);
+    border-radius: 0.9rem;
+    border: 1px solid var(--border-color);
+    padding: 1rem;
+    box-shadow: 0 18px 40px -32px rgba(15, 23, 42, 0.22);
+    transition: background-color 0.25s ease, color 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease;
+}
+
+.ps-schedule-header {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: center;
+    margin-bottom: 0.75rem;
+}
+
+.ps-schedule-nav-buttons {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.ps-schedule-nav-buttons:first-child {
+    justify-content: flex-start;
+}
+
+.ps-schedule-nav-buttons:last-child {
+    justify-content: flex-end;
+}
+
+.ps-icon-button {
+    width: 2.4rem;
+    height: 2.4rem;
+    padding: 0;
+    font-size: 1.35rem;
+    line-height: 1;
+}
+
+.ps-schedule-week-label {
+    text-align: center;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.ps-schedule-grid {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(160px, 1fr));
+    gap: 0.6rem;
+    width: 100%;
+    overflow-x: auto;
+    padding-bottom: 0.25rem;
+}
+
+.ps-schedule-column {
+    background-color: var(--bg-elevated);
+    border-radius: 0.75rem;
+    border: 1px solid var(--border-color);
+    display: flex;
+    flex-direction: column;
+    min-height: 240px;
+    padding: 0.55rem;
+    gap: 0.35rem;
+    transition: background-color 0.25s ease, color 0.25s ease, border-color 0.25s ease;
+}
+
+.ps-schedule-column-header {
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+}
+
+.ps-schedule-day-name {
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-secondary);
+}
+
+.ps-schedule-day-date {
+    font-size: 0.95rem;
+    font-weight: 600;
+}
+
+.ps-schedule-column-body {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    flex: 1;
+}
+
+.ps-schedule-empty {
+    font-size: 0.82rem;
+    color: var(--text-secondary);
+    padding: 0.35rem 0;
+}
+
+.ps-shift-card {
+    display: flex;
+    align-items: stretch;
+    border-radius: 0.65rem;
+    background-color: var(--bg-card);
+    border: 1px solid var(--border-color);
+    overflow: hidden;
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.02);
+    transition: background-color 0.25s ease, color 0.25s ease, border-color 0.25s ease;
+}
+
+.ps-shift-accent {
+    width: 4px;
+    background-color: var(--accent);
+}
+
+.ps-shift-body {
+    padding: 0.35rem 0.6rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+}
+
+.ps-shift-employee {
+    font-size: 0.87rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.ps-shift-time {
+    font-size: 0.78rem;
+    color: var(--text-secondary);
+}
+
+.ps-shift-more {
+    font-size: 0.78rem;
+    color: var(--text-secondary);
+    margin-top: -0.1rem;
+}
+
+.ps-schedule-loading {
+    padding: 1.25rem 0;
+    text-align: center;
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+}
+
+.ps-history-card {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.75rem;
+}
+
+.ps-history-empty {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.ps-history-subtext {
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+    max-width: 520px;
+}
+
+@media (max-width: 900px) {
+    .ps-schedule-grid {
+        grid-template-columns: repeat(7, minmax(200px, 1fr));
+    }
+
+    .ps-schedule-actions {
+        width: 100%;
+        justify-content: space-between;
+    }
+}
+
+@media (max-width: 600px) {
+    .ps-schedule-actions {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .ps-filter-row {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .ps-filter-actions {
+        width: 100%;
+        justify-content: space-between;
     }
 }

@@ -21,6 +21,7 @@ public class AppDbContext : DbContext
     public DbSet<PayrollLine> PayrollLines => Set<PayrollLine>();
     public DbSet<Schedule> Schedules => Set<Schedule>();
     public DbSet<TimeLog> TimeLogs => Set<TimeLog>();
+    public DbSet<Shift> Shifts => Set<Shift>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -227,6 +228,19 @@ public class AppDbContext : DbContext
             entity.HasOne(t => t.Employee)
                   .WithMany(e => e.TimeLogs)
                   .HasForeignKey(t => t.EmployeeId);
+        });
+
+        modelBuilder.Entity<Shift>(entity =>
+        {
+            entity.ToTable("shifts");
+            entity.HasKey(s => s.Id);
+
+            entity.Property(s => s.Id).HasColumnName("shift_id");
+            entity.Property(s => s.EmployeeId).HasColumnName("employee_id").IsRequired();
+            entity.Property(s => s.EmployeeName).HasColumnName("employee_name").HasMaxLength(200).IsRequired();
+            entity.Property(s => s.Start).HasColumnName("start_time").IsRequired();
+            entity.Property(s => s.End).HasColumnName("end_time").IsRequired();
+            entity.Property(s => s.GroupName).HasColumnName("group_name").HasMaxLength(150);
         });
     }
 }

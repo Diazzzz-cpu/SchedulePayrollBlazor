@@ -86,7 +86,7 @@
                     @foreach (var period in periods)
                     {
                         <option value="@period.Id">
-                            @period.Name (@period.StartDate.ToString("MMM dd, yyyy") – @period.EndDate.ToString("MMM dd, yyyy"))
+                            @GetPeriodOptionLabel(period)
                         </option>
                     }
                 </select>
@@ -172,6 +172,7 @@
                                     <div class="payroll-adjustments">
                                         <div class="payroll-adjustments-list">
                                             <h4>Adjustments</h4>
+                                            <div class="text-muted small">@GetPeriodName(entry) — @GetPeriodRange(entry)</div>
                                             @if (entry.Adjustments is null || entry.Adjustments.Count == 0)
                                             {
                                                 <div class="text-muted">No adjustments applied.</div>
@@ -279,6 +280,7 @@
         {
             alertIsError = true;
             alertMessage = $"Error loading payroll data: {ex.Message}";
+            periods = new List<PayrollPeriod>();
             entries = new List<PayrollEntry>();
         }
     }
@@ -401,7 +403,7 @@
 
     private AdjustmentFormModel GetAdjustmentForm(int entryId)
     {
-        if (!adjustmentForms.TryGetValue(entryId, out var model))
+        if (!adjustmentForms.TryGetValue(entryId, out var model) || model is null)
         {
             model = new AdjustmentFormModel();
             adjustmentForms[entryId] = model;
@@ -418,6 +420,25 @@
 
     private static string GetEmployeeEmail(PayrollEntry entry)
         => entry.Employee?.User?.Email ?? "-";
+
+    private static string GetPeriodName(PayrollEntry entry)
+        => entry.PayrollPeriod?.Name ?? "Payroll period";
+
+    private static string GetPeriodRange(PayrollEntry entry)
+        => entry.PayrollPeriod is null
+            ? "—"
+            : $"{entry.PayrollPeriod.StartDate:MMM dd, yyyy} – {entry.PayrollPeriod.EndDate:MMM dd, yyyy}";
+
+    private static string GetPeriodOptionLabel(PayrollPeriod? period)
+    {
+        if (period is null)
+        {
+            return "Payroll period";
+        }
+
+        var name = string.IsNullOrWhiteSpace(period.Name) ? "Payroll period" : period.Name;
+        return $"{name} ({period.StartDate:MMM dd, yyyy} – {period.EndDate:MMM dd, yyyy})";
+    }
 
     private void EnsureAdjustmentForms()
     {

@@ -19,11 +19,11 @@
         </div>
         <div class="ps-stat-card">
             <span class="ps-stat-title">Today's shifts</span>
-            <span class="ps-stat-value">@todaySchedules</span>
+            <span class="ps-stat-value">@todayShiftCount</span>
         </div>
         <div class="ps-stat-card">
             <span class="ps-stat-title">Next 7 days</span>
-            <span class="ps-stat-value">@upcomingSchedules</span>
+            <span class="ps-stat-value">@upcomingShiftCount</span>
         </div>
         <div class="ps-stat-card">
             <span class="ps-stat-title">Open payroll runs</span>
@@ -146,8 +146,8 @@
 
 @code {
     private int totalEmployees;
-    private int todaySchedules;
-    private int upcomingSchedules;
+    private int todayShiftCount;
+    private int upcomingShiftCount;
     private int activePayrolls;
     private List<Employee> recentEmployees = new();
     private List<PayrollRun> recentPayrollRuns = new();
@@ -157,16 +157,16 @@
         totalEmployees = await Db.Employees.CountAsync(e => e.IsActive);
 
         var today = DateTime.Today.Date;
+        var tomorrow = today.AddDays(1);
+        var weekEndExclusive = tomorrow.AddDays(7);
 
-        todaySchedules = await Db.Schedules
-            .CountAsync(s => s.EmployeeId != 0 && s.ShiftDate.Date == today);
+        todayShiftCount = await Db.Shifts
+            .CountAsync(s => s.EmployeeId != 0 && s.Start >= today && s.Start < tomorrow);
 
-        var nextWeek = today.AddDays(7);
-
-        upcomingSchedules = await Db.Schedules
+        upcomingShiftCount = await Db.Shifts
             .CountAsync(s => s.EmployeeId != 0 &&
-                             s.ShiftDate.Date > today &&
-                             s.ShiftDate.Date <= nextWeek);
+                             s.Start >= tomorrow &&
+                             s.Start < weekEndExclusive);
 
         activePayrolls = await Db.PayrollRuns
             .CountAsync(p => p.Status == "Pending" || p.Status == "Calculated");

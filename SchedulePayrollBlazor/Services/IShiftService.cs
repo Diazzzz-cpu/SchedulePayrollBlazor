@@ -14,7 +14,8 @@ public interface IShiftService
         DateTime weekStart,
         DateTime weekEnd,
         int? employeeId = null,
-        string? group = null);
+        string? group = null,
+        string? searchText = null);
 }
 
 public class ShiftService : IShiftService
@@ -30,7 +31,8 @@ public class ShiftService : IShiftService
         DateTime weekStart,
         DateTime weekEnd,
         int? employeeId = null,
-        string? group = null)
+        string? group = null,
+        string? searchText = null)
     {
         IQueryable<Shift> query = _db.Shifts
             .AsNoTracking()
@@ -44,6 +46,12 @@ public class ShiftService : IShiftService
         if (!string.IsNullOrWhiteSpace(group) && !string.Equals(group, "All", StringComparison.OrdinalIgnoreCase))
         {
             query = query.Where(s => s.GroupName == group);
+        }
+
+        if (!string.IsNullOrWhiteSpace(searchText))
+        {
+            var term = searchText.Trim().ToLowerInvariant();
+            query = query.Where(s => s.EmployeeName != null && s.EmployeeName.ToLower().Contains(term));
         }
 
         return await query

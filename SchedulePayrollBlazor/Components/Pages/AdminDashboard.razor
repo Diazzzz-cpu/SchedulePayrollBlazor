@@ -4,84 +4,84 @@
 @using Microsoft.EntityFrameworkCore
 @using SchedulePayrollBlazor.Data.Models
 
-<div class="dashboard-container">
-    <div class="dashboard-header">
-        <h2>Admin Dashboard</h2>
-        <p>Monitor workforce activity and payroll at a glance.</p>
-    </div>
+<div class="page">
+    <header class="page-header">
+        <div>
+            <h1 class="page-title">Admin Dashboard</h1>
+            <p class="page-subtitle">Monitor workforce activity and payroll at a glance.</p>
+        </div>
+    </header>
 
-    <div class="stats-grid">
-        <div class="stat-card">
-            <div class="stat-icon" style="background: #e3f2fd;">
-                <span style="color: #1976d2;">👥</span>
-            </div>
-            <div class="stat-content">
+    <section class="metric-grid">
+        <div class="metric-card blue">
+            <div class="metric-icon">👥</div>
+            <div class="metric-content">
                 <h3>@totalEmployees</h3>
                 <p>Total Employees</p>
             </div>
         </div>
 
-        <div class="stat-card">
-            <div class="stat-icon" style="background: #f3e5f5;">
-                <span style="color: #7b1fa2;">📅</span>
-            </div>
-            <div class="stat-content">
+        <div class="metric-card purple">
+            <div class="metric-icon">📅</div>
+            <div class="metric-content">
                 <h3>@todaySchedules</h3>
                 <p>Today's Shifts</p>
             </div>
         </div>
 
-        <div class="stat-card">
-            <div class="stat-icon" style="background: #fff3e0;">
-                <span style="color: #f57c00;">⏭️</span>
-            </div>
-            <div class="stat-content">
+        <div class="metric-card orange">
+            <div class="metric-icon">⏭️</div>
+            <div class="metric-content">
                 <h3>@upcomingSchedules</h3>
                 <p>Shifts Next 7 Days</p>
             </div>
         </div>
 
-        <div class="stat-card">
-            <div class="stat-icon" style="background: #e8f5e9;">
-                <span style="color: #388e3c;">💰</span>
-            </div>
-            <div class="stat-content">
+        <div class="metric-card green">
+            <div class="metric-icon">💰</div>
+            <div class="metric-content">
                 <h3>@activePayrolls</h3>
                 <p>Open Payroll Runs</p>
             </div>
         </div>
-    </div>
+    </section>
 
-    <div class="dashboard-actions">
-        <h3>Quick Actions</h3>
-        <div class="action-grid">
-            <a href="/employees" class="action-card">
-                <div class="action-icon">👤</div>
+    <section class="content-card">
+        <div class="card-header">
+            <h3>Quick Actions</h3>
+            <p>Jump directly into the most common workflows.</p>
+        </div>
+        <div class="quick-actions">
+            <a href="/employees" class="quick-card">
+                <div class="quick-icon">👤</div>
                 <h4>Employees</h4>
                 <p>Review and maintain employee records</p>
             </a>
-            <a href="/schedules" class="action-card">
-                <div class="action-icon">📆</div>
+            <a href="/schedules" class="quick-card">
+                <div class="quick-icon">📆</div>
                 <h4>Schedules</h4>
                 <p>Plan and edit team schedules</p>
             </a>
-            <a href="/payroll" class="action-card">
-                <div class="action-icon">💵</div>
+            <a href="/payroll" class="quick-card">
+                <div class="quick-icon">💵</div>
                 <h4>Payroll</h4>
                 <p>Track payroll progress</p>
             </a>
-            <a href="/settings" class="action-card">
-                <div class="action-icon">⚙️</div>
+            <a href="/settings" class="quick-card">
+                <div class="quick-icon">⚙️</div>
                 <h4>Settings</h4>
                 <p>Manage company configuration</p>
             </a>
         </div>
-    </div>
+    </section>
 
-    <div class="recent-activity">
-        <h3>Recent Hires</h3>
+    <section class="content-card">
+        <div class="card-header">
+            <h3>Recent Hires</h3>
+            <p>Latest additions to your team.</p>
+        </div>
         <div class="table-responsive">
-            <table class="table">
+            <table>
                 <thead>
                     <tr>
                         <th>Name</th>
@@ -104,25 +104,28 @@
                             <td>@employee.EmploymentType</td>
                             <td>
                                 @(
-                                                            employee.StartDate.HasValue
-                                                            ? employee.StartDate.Value.ToString("MMM dd, yyyy")
-                                                            : "-"
-                                                            )
-                        </td>
-                        <td>
-                            <span class="badge @(employee.IsActive ? "badge-success" : "badge-danger")">
-                                @(employee.IsActive ? "Active" : "Inactive")
-                            </span>
-                        </td>
-                    </tr>
-                                        }
+                                    employee.StartDate.HasValue
+                                        ? employee.StartDate.Value.ToString("MMM dd, yyyy")
+                                        : "-"
+                                )
+                            </td>
+                            <td>
+                                <span class="badge @(employee.IsActive ? "badge-success" : "badge-danger")">
+                                    @(employee.IsActive ? "Active" : "Inactive")
+                                </span>
+                            </td>
+                        </tr>
+                    }
                 </tbody>
             </table>
         </div>
-    </div>
+    </section>
 
-    <div class="recent-activity">
-        <h3>Recent Payroll Activity</h3>
+    <section class="content-card">
+        <div class="card-header">
+            <h3>Recent Payroll Activity</h3>
+            <p>Last five payroll events across the organization.</p>
+        </div>
         @if (recentPayrollRuns.Count == 0)
         {
             <div class="alert alert-info">No payroll runs recorded yet.</div>
@@ -130,7 +133,7 @@
         else
         {
             <div class="table-responsive">
-                <table class="table">
+                <table>
                     <thead>
                         <tr>
                             <th>Employee</th>
@@ -155,7 +158,7 @@
                 </table>
             </div>
         }
-    </div>
+    </section>
 </div>
 
 @code {

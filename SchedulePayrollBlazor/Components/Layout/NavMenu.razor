@@ -6,55 +6,82 @@
 @implements IDisposable
 
 <nav class="side-nav">
-    <div class="side-section-header">
-        @if (isAuthenticated)
-        {
-            <div class="side-user">
-                <span class="user-name">@displayName</span>
-                <span class="user-role">@roleLabel</span>
-            </div>
-        }
-        else
-        {
-            <div class="side-user">
-                <span class="user-name">Welcome</span>
-                <span class="user-role">Please sign in</span>
-            </div>
-        }
+    <div class="side-nav-user">
+        <span class="user-name">@(isAuthenticated ? displayName : "Welcome")</span>
+        <span class="user-role">@(isAuthenticated ? roleLabel : "Please sign in")</span>
     </div>
 
     @if (!isAuthenticated)
     {
-        <div class="side-section">
-            <NavLink href="/login" class="side-link" activeClass="active">Login</NavLink>
+        <div class="side-nav-section">
+            <div class="side-nav-links">
+                <NavLink href="/login" class="side-nav-link" activeClass="active">
+                    <span class="icon">🔐</span>
+                    <span>Login</span>
+                </NavLink>
+            </div>
         </div>
     }
     else if (isAdmin)
     {
-        <div class="side-section">
-            <span class="side-section-title">Admin</span>
-            <NavLink href="/admin/users" class="side-link" activeClass="active">User Management</NavLink>
-            <NavLink href="/admindashboard" class="side-link" activeClass="active">Dashboard</NavLink>
-            <NavLink href="/employees" class="side-link" activeClass="active">Employees</NavLink>
-            <NavLink href="/schedules" class="side-link" activeClass="active">Schedules</NavLink>
-            <NavLink href="/payroll" class="side-link" activeClass="active">Payroll</NavLink>
-            <NavLink href="/settings" class="side-link" activeClass="active">Settings</NavLink>
+        <div class="side-nav-section">
+            <span class="side-nav-title">Admin</span>
+            <div class="side-nav-links">
+                <NavLink href="/admindashboard" class="side-nav-link" activeClass="active" Match="NavLinkMatch.Prefix">
+                    <span class="icon">📊</span>
+                    <span>Dashboard</span>
+                </NavLink>
+                <NavLink href="/employees" class="side-nav-link" activeClass="active">
+                    <span class="icon">👥</span>
+                    <span>Employees</span>
+                </NavLink>
+                <NavLink href="/schedules" class="side-nav-link" activeClass="active">
+                    <span class="icon">📅</span>
+                    <span>Schedules</span>
+                </NavLink>
+                <NavLink href="/payroll" class="side-nav-link" activeClass="active">
+                    <span class="icon">💵</span>
+                    <span>Payroll</span>
+                </NavLink>
+                <NavLink href="/settings" class="side-nav-link" activeClass="active">
+                    <span class="icon">⚙️</span>
+                    <span>Settings</span>
+                </NavLink>
+                <NavLink href="/admin/users" class="side-nav-link" activeClass="active">
+                    <span class="icon">🛠️</span>
+                    <span>User Management</span>
+                </NavLink>
+            </div>
         </div>
     }
     else
     {
-        <div class="side-section">
-            <span class="side-section-title">Employee</span>
-            <NavLink href="/userdashboard" class="side-link" activeClass="active">Dashboard</NavLink>
-            <NavLink href="/myschedule" class="side-link" activeClass="active">My Schedule</NavLink>
-            <NavLink href="/mypayroll" class="side-link" activeClass="active">My Payroll</NavLink>
-            <NavLink href="/profile" class="side-link" activeClass="active">Profile</NavLink>
+        <div class="side-nav-section">
+            <span class="side-nav-title">Employee</span>
+            <div class="side-nav-links">
+                <NavLink href="/userdashboard" class="side-nav-link" activeClass="active" Match="NavLinkMatch.Prefix">
+                    <span class="icon">🏠</span>
+                    <span>Dashboard</span>
+                </NavLink>
+                <NavLink href="/myschedule" class="side-nav-link" activeClass="active">
+                    <span class="icon">📆</span>
+                    <span>My Schedule</span>
+                </NavLink>
+                <NavLink href="/mypayroll" class="side-nav-link" activeClass="active">
+                    <span class="icon">💰</span>
+                    <span>My Payroll</span>
+                </NavLink>
+                <NavLink href="/profile" class="side-nav-link" activeClass="active">
+                    <span class="icon">👤</span>
+                    <span>Profile</span>
+                </NavLink>
+            </div>
         </div>
     }
 
     @if (isAuthenticated)
     {
-        <button class="side-logout" @onclick="Logout">Logout</button>
+        <button class="side-nav-logout" @onclick="Logout">Logout</button>
     }
 </nav>
 

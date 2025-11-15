@@ -4,62 +4,82 @@
 @using Microsoft.EntityFrameworkCore
 @using SchedulePayrollBlazor.Data.Models
 
-<h3>Payroll Runs</h3>
-
-@if (payPeriods.Count == 0)
-{
-    <div class="alert alert-info">No pay periods found. Create pay period records to begin tracking payroll.</div>
-}
-else
-{
-    <div class="d-flex gap-2 align-items-end mb-3">
+<div class="page">
+    <header class="page-header">
         <div>
-            <label class="form-label">Pay Period</label>
-            <select class="form-select" @onchange="OnPeriodChanged" value="@selectedPeriodId">
-                @foreach (var period in payPeriods)
-                {
-                    <option value="@period.PayPeriodId">@period.PeriodName (@period.StartDate:MMM dd → @period.EndDate:MMM dd)</option>
-                }
-            </select>
+            <h1 class="page-title">Payroll Runs</h1>
+            <p class="page-subtitle">Monitor payroll status across pay periods.</p>
         </div>
-        <div class="ms-auto text-muted">
-            Showing @(filteredRuns.Count) run(s)
-        </div>
-    </div>
+    </header>
 
-    @if (filteredRuns.Count == 0)
+    @if (payPeriods.Count == 0)
     {
-        <div class="alert alert-warning">No payroll runs found for the selected period.</div>
+        <div class="content-card">
+            <div class="alert alert-info">No pay periods found. Create pay period records to begin tracking payroll.</div>
+        </div>
     }
     else
     {
-        <table class="table table-striped">
-            <thead>
-                <tr>
-                    <th>Employee</th>
-                    <th>Gross Pay</th>
-                    <th>Deductions</th>
-                    <th>Net Pay</th>
-                    <th>Status</th>
-                    <th>Processed</th>
-                </tr>
-            </thead>
-            <tbody>
-                @foreach (var run in filteredRuns)
-                {
-                    <tr>
-                        <td>@run.Employee.FullName</td>
-                        <td>$@run.GrossPay.ToString("N2")</td>
-                        <td>$@run.TotalDeductions.ToString("N2")</td>
-                        <td><strong>$@run.NetPay.ToString("N2")</strong></td>
-                        <td><span class="badge @GetStatusClass(run.Status)">@run.Status</span></td>
-                        <td>@run.CreatedAt.ToLocalTime().ToString("MMM dd, yyyy")</td>
-                    </tr>
-                }
-            </tbody>
-        </table>
+        <section class="filter-bar">
+            <div class="form-group">
+                <label>Pay Period</label>
+                <select @onchange="OnPeriodChanged" value="@selectedPeriodId">
+                    @foreach (var period in payPeriods)
+                    {
+                        <option value="@period.PayPeriodId">@period.PeriodName (@period.StartDate:MMM dd → @period.EndDate:MMM dd)</option>
+                    }
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Runs</label>
+                <div class="text-muted">Showing @(filteredRuns.Count) run(s)</div>
+            </div>
+        </section>
+
+        @if (filteredRuns.Count == 0)
+        {
+            <div class="content-card">
+                <div class="alert alert-warning">No payroll runs found for the selected period.</div>
+            </div>
+        }
+        else
+        {
+            <section class="content-card">
+                <div class="card-header">
+                    <h3>Payroll Details</h3>
+                    <p>Latest results for the selected pay period.</p>
+                </div>
+                <div class="table-responsive">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Employee</th>
+                                <th>Gross Pay</th>
+                                <th>Deductions</th>
+                                <th>Net Pay</th>
+                                <th>Status</th>
+                                <th>Processed</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var run in filteredRuns)
+                            {
+                                <tr>
+                                    <td>@run.Employee.FullName</td>
+                                    <td>$@run.GrossPay.ToString("N2")</td>
+                                    <td>$@run.TotalDeductions.ToString("N2")</td>
+                                    <td><strong>$@run.NetPay.ToString("N2")</strong></td>
+                                    <td><span class="badge @GetStatusClass(run.Status)">@run.Status</span></td>
+                                    <td>@run.CreatedAt.ToLocalTime().ToString("MMM dd, yyyy")</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        }
     }
-}
+</div>
 
 @code {
     private List<PayPeriod> payPeriods = new();

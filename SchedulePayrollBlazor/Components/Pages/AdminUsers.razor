@@ -6,18 +6,21 @@
 @using System.Security.Claims
 @using Microsoft.AspNetCore.Components.Authorization
 
-    @if (!isAuthorized)
-    {
-        <div class="loading-state">
-            <p>Loading user management…</p>
-        </div>
-    }
-    else
-    {
-        <div class="page-header">
-            <h2>User Management</h2>
-            <p>Provision, edit, and remove workforce accounts.</p>
-        </div>
+@if (!isAuthorized)
+{
+    <div class="content-card">
+        <div class="loading">Loading user management…</div>
+    </div>
+}
+else
+{
+    <div class="page">
+        <header class="page-header">
+            <div>
+                <h1 class="page-title">User Management</h1>
+                <p class="page-subtitle">Provision, edit, and remove workforce accounts.</p>
+            </div>
+        </header>
 
         @if (!string.IsNullOrWhiteSpace(alertMessage))
         {
@@ -31,7 +34,7 @@
             </div>
         }
 
-        <div class="card-grid">
+        <section class="card-grid">
             <div class="card">
                 <div class="card-header">
                     <h3>Create User</h3>
@@ -43,26 +46,26 @@
 
                     <div class="form-group">
                         <label>Email</label>
-                        <InputText @bind-Value="createModel.Email" class="form-control" type="email" />
+                        <InputText @bind-Value="createModel.Email" type="email" />
                         <ValidationMessage For="() => createModel.Email" />
                     </div>
 
                     <div class="form-row">
                         <div class="form-group">
                             <label>First Name</label>
-                            <InputText @bind-Value="createModel.FirstName" class="form-control" />
+                            <InputText @bind-Value="createModel.FirstName" />
                             <ValidationMessage For="() => createModel.FirstName" />
                         </div>
                         <div class="form-group">
                             <label>Last Name</label>
-                            <InputText @bind-Value="createModel.LastName" class="form-control" />
+                            <InputText @bind-Value="createModel.LastName" />
                             <ValidationMessage For="() => createModel.LastName" />
                         </div>
                     </div>
 
                     <div class="form-group">
                         <label>Role</label>
-                        <InputSelect @bind-Value="createModel.Role" class="form-control">
+                        <InputSelect @bind-Value="createModel.Role">
                             @foreach (var option in roleOptions)
                             {
                                 <option value="@option">@option</option>
@@ -75,18 +78,18 @@
                     <div class="form-row">
                         <div class="form-group">
                             <label>Department</label>
-                            <InputText @bind-Value="createModel.Department" class="form-control" />
+                            <InputText @bind-Value="createModel.Department" />
                         </div>
                         <div class="form-group">
                             <label>Job Title</label>
-                            <InputText @bind-Value="createModel.JobTitle" class="form-control" />
+                            <InputText @bind-Value="createModel.JobTitle" />
                         </div>
                     </div>
 
                     <div class="form-row">
                         <div class="form-group">
                             <label>Employment Type</label>
-                            <InputSelect @bind-Value="createModel.EmploymentType" class="form-control">
+                            <InputSelect @bind-Value="createModel.EmploymentType">
                                 @foreach (var option in employmentTypeOptions)
                                 {
                                     <option value="@option">@option</option>
@@ -95,18 +98,18 @@
                         </div>
                         <div class="form-group">
                             <label>Start Date</label>
-                            <InputDate @bind-Value="createModel.StartDate" class="form-control" />
+                            <InputDate @bind-Value="createModel.StartDate" />
                         </div>
                         <div class="form-group">
                             <label>Location</label>
-                            <InputText @bind-Value="createModel.Location" class="form-control" />
+                            <InputText @bind-Value="createModel.Location" />
                         </div>
                     </div>
 
                     <div class="form-group">
                         <label>Initial Password <span class="text-muted">(leave blank to auto-generate)</span></label>
                         <div class="input-with-button">
-                            <InputText @bind-Value="createModel.Password" class="form-control" type="text" />
+                            <InputText @bind-Value="createModel.Password" type="text" />
                             <button type="button" class="btn btn-secondary" @onclick="() => createModel.Password = GenerateTemporaryPassword()">Generate</button>
                         </div>
                     </div>
@@ -141,7 +144,7 @@
                 else
                 {
                     <div class="table-responsive">
-                        <table class="table">
+                        <table>
                             <thead>
                                 <tr>
                                     <th>Email</th>
@@ -174,11 +177,11 @@
                     </div>
                 }
             </div>
-        </div>
+        </section>
 
         @if (editModel is not null)
         {
-            <div class="card">
+            <section class="card">
                 <div class="card-header">
                     <h3>Edit User</h3>
                     <p>Update account access or employee details.</p>
@@ -189,26 +192,26 @@
 
                     <div class="form-group">
                         <label>Email</label>
-                        <InputText @bind-Value="editModel.Email" class="form-control" type="email" />
+                        <InputText @bind-Value="editModel.Email" type="email" />
                         <ValidationMessage For="() => editModel.Email" />
                     </div>
 
                     <div class="form-row">
                         <div class="form-group">
                             <label>First Name</label>
-                            <InputText @bind-Value="editModel.FirstName" class="form-control" />
+                            <InputText @bind-Value="editModel.FirstName" />
                             <ValidationMessage For="() => editModel.FirstName" />
                         </div>
                         <div class="form-group">
                             <label>Last Name</label>
-                            <InputText @bind-Value="editModel.LastName" class="form-control" />
+                            <InputText @bind-Value="editModel.LastName" />
                             <ValidationMessage For="() => editModel.LastName" />
                         </div>
                     </div>
 
                     <div class="form-group">
                         <label>Role</label>
-                        <InputSelect @bind-Value="editModel.Role" class="form-control">
+                        <InputSelect @bind-Value="editModel.Role">
                             @foreach (var option in roleOptions)
                             {
                                 <option value="@option">@option</option>
@@ -221,18 +224,18 @@
                     <div class="form-row">
                         <div class="form-group">
                             <label>Department</label>
-                            <InputText @bind-Value="editModel.Department" class="form-control" />
+                            <InputText @bind-Value="editModel.Department" />
                         </div>
                         <div class="form-group">
                             <label>Job Title</label>
-                            <InputText @bind-Value="editModel.JobTitle" class="form-control" />
+                            <InputText @bind-Value="editModel.JobTitle" />
                         </div>
                     </div>
 
                     <div class="form-row">
                         <div class="form-group">
                             <label>Employment Type</label>
-                            <InputSelect @bind-Value="editModel.EmploymentType" class="form-control">
+                            <InputSelect @bind-Value="editModel.EmploymentType">
                                 @foreach (var option in employmentTypeOptions)
                                 {
                                     <option value="@option">@option</option>
@@ -241,21 +244,21 @@
                         </div>
                         <div class="form-group">
                             <label>Start Date</label>
-                            <InputDate @bind-Value="editModel.StartDate" class="form-control" />
+                            <InputDate @bind-Value="editModel.StartDate" />
                         </div>
                         <div class="form-group">
                             <label>Location</label>
-                            <InputText @bind-Value="editModel.Location" class="form-control" />
+                            <InputText @bind-Value="editModel.Location" />
                         </div>
                     </div>
 
                     <div class="form-group">
                         <label>Reset Password <span class="text-muted">(optional)</span></label>
                         <div class="input-with-button">
-                            <InputText @bind-Value="editModel.Password" class="form-control" type="text" />
+                            <InputText @bind-Value="editModel.Password" type="text" />
                             <button type="button" class="btn btn-secondary" @onclick="() => editModel.Password = GenerateTemporaryPassword()">Generate</button>
                         </div>
-                        <small class="form-text text-muted">Leave blank to keep the current password.</small>
+                        <small class="text-muted">Leave blank to keep the current password.</small>
                     </div>
 
                     <div class="form-actions">
@@ -263,9 +266,10 @@
                         <button type="button" class="btn btn-secondary" @onclick="CancelEdit">Cancel</button>
                     </div>
                 </EditForm>
-            </div>
+            </section>
         }
-    }
+    </div>
+}
 
     @code {
 

@@ -6,61 +6,79 @@
 @using System.Globalization
 @using SchedulePayrollBlazor.Data.Models
 
-<h3>Schedules (@dateString)</h3>
+<div class="page">
+    <header class="page-header">
+        <div>
+            <h1 class="page-title">Schedules</h1>
+            <p class="page-subtitle">Review and manage upcoming shift assignments.</p>
+        </div>
+        <div class="page-actions">
+            <a class="btn btn-primary" href="/schedules/new">+ Add Schedule</a>
+        </div>
+    </header>
 
-<div class="d-flex align-items-center mb-3">
-    <input type="date" class="form-control w-auto me-2"
-           value="@dateString"
-           @onchange="OnDateChanged" />
-    <button class="btn btn-secondary me-2" @onclick="() => Load()">Load</button>
-    <a class="btn btn-primary" href="/schedules/new">+ Add Schedule</a>
+    <section class="filter-bar">
+        <div class="form-group">
+            <label>Schedule Date</label>
+            <input type="date" value="@dateString" @onchange="OnDateChanged" />
+        </div>
+        <div class="form-actions">
+            <button class="btn btn-secondary" @onclick="() => Load()">Load</button>
+        </div>
+    </section>
+
+    @if (items is null)
+    {
+        <div class="content-card">
+            <div class="loading">Loading...</div>
+        </div>
+    }
+    else if (items.Count == 0)
+    {
+        <div class="content-card">
+            <div class="alert alert-info">No schedules found for the selected date.</div>
+        </div>
+    }
+    else
+    {
+        <section class="content-card">
+            <div class="card-header">
+                <h3>Shift Overview</h3>
+                <p>Found <strong>@items.Count</strong> schedule(s) for @dateString.</p>
+            </div>
+            <div class="table-responsive">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Employee</th>
+                            <th>Start</th>
+                            <th>End</th>
+                            <th>Source</th>
+                            <th>Date</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var s in items)
+                        {
+                            <tr>
+                                <td>@s.Employee.FullName</td>
+                                <td>@s.StartTime.ToString("hh\\:mm")</td>
+                                <td>@s.EndTime.ToString("hh\\:mm")</td>
+                                <td>@s.Source</td>
+                                <td>@s.ShiftDate.ToString("yyyy-MM-dd")</td>
+                                <td class="table-actions">
+                                    <a class="btn btn-outline" href="/schedules/edit/@s.ScheduleId">Edit</a>
+                                    <button type="button" class="btn btn-outline" @onclick="() => DeleteSchedule(s.ScheduleId)">Delete</button>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    }
 </div>
-
-@if (items is null)
-{
-    <p><em>Loading...</em></p>
-}
-else if (items.Count == 0)
-{
-    <div class="alert alert-info">No schedules found for the selected date.</div>
-}
-else
-{
-    <p>Found <strong>@items.Count</strong> schedule(s).</p>
-
-    <table class="table table-bordered table-striped">
-        <thead class="table-light">
-            <tr>
-                <th>Employee</th>
-                <th>Start</th>
-                <th>End</th>
-                <th>Source</th>
-                <th>Date</th>
-                <th style="width: 120px;">Actions</th>
-            </tr>
-        </thead>
-        <tbody>
-            @foreach (var s in items)
-            {
-                <tr>
-                    <td>@s.Employee.FullName</td>
-                    <td>@s.StartTime.ToString("hh\\:mm")</td>
-                    <td>@s.EndTime.ToString("hh\\:mm")</td>
-                    <td>@s.Source</td>
-                    <td>@s.ShiftDate.ToString("yyyy-MM-dd")</td>
-                    <td>
-                        <a class="btn btn-sm btn-outline-primary me-1"
-                           href="/schedules/edit/@s.ScheduleId">Edit</a>
-                        <button class="btn btn-sm btn-outline-danger"
-                                @onclick="() => DeleteSchedule(s.ScheduleId)">
-                            Delete
-                        </button>
-                    </td>
-                </tr>
-            }
-        </tbody>
-    </table>
-}
 
 @code {
     private string dateString = DateTime.Today.ToString("yyyy-MM-dd");

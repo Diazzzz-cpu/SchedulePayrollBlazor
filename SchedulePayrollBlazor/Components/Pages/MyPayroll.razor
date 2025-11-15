@@ -7,23 +7,29 @@
 @using SchedulePayrollBlazor.Data.Models
 @using System.Security.Claims
 
-<div class="page-container">
-    <div class="page-header">
-        <h2>My Payroll</h2>
-        <p>View your payroll information</p>
-    </div>
+<div class="page">
+    <header class="page-header">
+        <div>
+            <h1 class="page-title">My Payroll</h1>
+            <p class="page-subtitle">Track your pay history and earnings.</p>
+        </div>
+    </header>
 
     @if (payrollRuns == null)
     {
-        <div class="loading">Loading...</div>
+        <div class="content-card">
+            <div class="loading">Loading...</div>
+        </div>
     }
     else if (!payrollRuns.Any())
     {
-        <div class="alert alert-info">No payroll records found.</div>
+        <div class="content-card">
+            <div class="alert alert-info">No payroll records found.</div>
+        </div>
     }
     else
     {
-        <div class="payroll-summary">
+        <section class="summary-grid">
             <div class="summary-card">
                 <h4>Total Earnings (All Time)</h4>
                 <h2>$@totalEarnings.ToString("N2")</h2>
@@ -32,51 +38,55 @@
                 <h4>Last Paycheck</h4>
                 <h2>$@lastPaycheck.ToString("N2")</h2>
             </div>
-        </div>
+        </section>
 
-        <div class="table-responsive">
-            <table class="table">
-                <thead>
-                    <tr>
-                        <th>Pay Period</th>
-                        <th>Gross Pay</th>
-                        <th>Deductions</th>
-                        <th>Net Pay</th>
-                        <th>Status</th>
-                        <th>Processed</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @foreach (var run in payrollRuns)
-                    {
+        <section class="content-card">
+            <div class="card-header">
+                <h3>Pay History</h3>
+                <p>Your most recent payroll runs.</p>
+            </div>
+            <div class="table-responsive">
+                <table>
+                    <thead>
                         <tr>
-                            <td>
-                                @if (run.PayPeriod != null)
-                                {
-                                    <div>@run.PayPeriod.PeriodName</div>
-                                    <small class="text-muted">
-                                        @run.PayPeriod.StartDate.ToString("MMM dd") - @run.PayPeriod.EndDate.ToString("MMM dd, yyyy")
-                                    </small>
-                                }
-                                else
-                                {
-                                    <div>Ad hoc</div>
-                                }
-                            </td>
-                            <td class="text-success">$@run.GrossPay.ToString("N2")</td>
-                            <td class="text-danger">$@run.TotalDeductions.ToString("N2")</td>
-                            <td><strong>$@run.NetPay.ToString("N2")</strong></td>
-                            <td>
-                                <span class="badge @GetStatusBadgeClass(run.Status)">
-                                    @run.Status
-                                </span>
-                            </td>
-                            <td>@run.CreatedAt.ToLocalTime().ToString("MMM dd, yyyy")</td>
+                            <th>Pay Period</th>
+                            <th>Gross Pay</th>
+                            <th>Deductions</th>
+                            <th>Net Pay</th>
+                            <th>Status</th>
+                            <th>Processed</th>
                         </tr>
-                    }
-                </tbody>
-            </table>
-        </div>
+                    </thead>
+                    <tbody>
+                        @foreach (var run in payrollRuns)
+                        {
+                            <tr>
+                                <td>
+                                    @if (run.PayPeriod != null)
+                                    {
+                                        <div>@run.PayPeriod.PeriodName</div>
+                                        <small class="text-muted">
+                                            @run.PayPeriod.StartDate.ToString("MMM dd") - @run.PayPeriod.EndDate.ToString("MMM dd, yyyy")
+                                        </small>
+                                    }
+                                    else
+                                    {
+                                        <div>Ad hoc</div>
+                                    }
+                                </td>
+                                <td class="text-success">$@run.GrossPay.ToString("N2")</td>
+                                <td class="text-danger">$@run.TotalDeductions.ToString("N2")</td>
+                                <td><strong>$@run.NetPay.ToString("N2")</strong></td>
+                                <td>
+                                    <span class="badge @GetStatusBadgeClass(run.Status)">@run.Status</span>
+                                </td>
+                                <td>@run.CreatedAt.ToLocalTime().ToString("MMM dd, yyyy")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </section>
     }
 </div>
 

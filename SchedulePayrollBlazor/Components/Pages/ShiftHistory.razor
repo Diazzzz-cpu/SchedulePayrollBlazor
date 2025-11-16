@@ -1,6 +1,13 @@
 @page "/schedules/history"
 @attribute [Authorize]
 @inject NavigationManager Nav
+@inject IShiftService ShiftService
+@inject AuthenticationStateProvider AuthStateProvider
+@inject AppDbContext Db
+@using Microsoft.EntityFrameworkCore
+@using System.Globalization
+@using System.Security.Claims
+@using SchedulePayrollBlazor.Data.Models
 
 <div class="ps-schedule-page">
     <div class="ps-schedule-header-bar">
@@ -18,18 +25,189 @@
         <button type="button" class="ps-tab ps-tab-active" aria-current="page">Shift history</button>
     </div>
 
+    <div class="ps-filter-row">
+        <div class="ps-filter-group">
+            @if (_isAdmin)
+            {
+                <div class="ps-filter-field">
+                    <span class="ps-filter-label">Employee:</span>
+                    <InputSelect class="ps-filter-control" @bind-Value="_selectedEmployeeId" @onchange="OnEmployeeChanged">
+                        @foreach (var employee in _employees)
+                        {
+                            <option value="@employee.Id">@employee.Name</option>
+                        }
+                    </InputSelect>
+                </div>
+            }
+            <div class="ps-filter-field">
+                <span class="ps-filter-label">From:</span>
+                <InputDate class="ps-filter-control" @bind-Value="_fromDate" />
+            </div>
+            <div class="ps-filter-field">
+                <span class="ps-filter-label">To:</span>
+                <InputDate class="ps-filter-control" @bind-Value="_toDate" />
+            </div>
+        </div>
+        <div class="ps-filter-actions">
+            <button type="button" class="ps-button ps-button-primary" @onclick="LoadHistoryAsync" disabled="@_isLoading">Refresh</button>
+        </div>
+    </div>
+
     <div class="ps-schedule-card ps-history-card">
-        <div class="ps-history-empty">No shift history yet</div>
-        <p class="ps-history-subtext">Once shifts are completed, their records will appear here for auditing and payroll review.</p>
+        @if (_isLoading)
+        {
+            <div class="ps-schedule-loading">Loading history…</div>
+        }
+        else if (!string.IsNullOrWhiteSpace(_errorMessage))
+        {
+            <div class="ps-alert ps-alert-danger">@_errorMessage</div>
+        }
+        else if (_history.Count == 0)
+        {
+            <div class="ps-history-empty">No shift history yet</div>
+            <p class="ps-history-subtext">Once shifts are completed, their records will appear here for auditing and payroll review.</p>
+        }
+        else
+        {
+            <div class="ps-table-container">
+                <table class="ps-table">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Employee</th>
+                            <th>Group</th>
+                            <th>Start</th>
+                            <th>End</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var shift in _history)
+                        {
+                            <tr>
+                                <td>@shift.Start.ToLocalTime().ToString("MMM dd, yyyy", CultureInfo.InvariantCulture)</td>
+                                <td>@ResolveEmployeeName(shift)</td>
+                                <td>@(string.IsNullOrWhiteSpace(shift.GroupName) ? "—" : shift.GroupName)</td>
+                                <td>@shift.Start.ToLocalTime().ToString("hh:mm tt", CultureInfo.InvariantCulture)</td>
+                                <td>@shift.End.ToLocalTime().ToString("hh:mm tt", CultureInfo.InvariantCulture)</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
     </div>
 </div>
 
 @code {
     private string _timezoneDisplay = string.Empty;
+    private readonly List<Shift> _history = new();
+    private readonly List<(int Id, string Name)> _employees = new();
+    private bool _isLoading;
+    private bool _isAdmin;
+    private int _selectedEmployeeId;
+    private DateTime _fromDate = DateTime.Today.AddMonths(-1);
+    private DateTime _toDate = DateTime.Today;
+    private string? _errorMessage;
 
-    protected override void OnInitialized()
+    protected override async Task OnInitializedAsync()
     {
         _timezoneDisplay = FormatTimeZone(TimeZoneInfo.Local);
+        await ResolveUserAsync();
+        await LoadHistoryAsync();
+    }
+
+    private async Task ResolveUserAsync()
+    {
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+
+        _isAdmin = user.IsInRole("Admin");
+
+        if (!_isAdmin)
+        {
+            var employeeClaim = user.FindFirst("EmployeeId")?.Value;
+            if (!int.TryParse(employeeClaim, out _selectedEmployeeId))
+            {
+                var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+                var email = user.FindFirst(ClaimTypes.Email)?.Value;
+                var resolved = await ShiftService.ResolveEmployeeIdForUserAsync(userId, email);
+                _selectedEmployeeId = resolved ?? 0;
+            }
+
+            if (_selectedEmployeeId > 0)
+            {
+                var displayName = user.Identity?.Name ?? user.FindFirst(ClaimTypes.Email)?.Value ?? $"Employee {_selectedEmployeeId}";
+                _employees.Add((_selectedEmployeeId, displayName));
+            }
+        }
+        else
+        {
+            var list = await Db.Employees
+                .AsNoTracking()
+                .OrderBy(e => e.FullName)
+                .Select(e => new { e.EmployeeId, e.FullName })
+                .ToListAsync();
+
+            foreach (var employee in list)
+            {
+                _employees.Add((employee.EmployeeId, string.IsNullOrWhiteSpace(employee.FullName) ? $"Employee {employee.EmployeeId}" : employee.FullName));
+            }
+
+            if (_employees.Count > 0)
+            {
+                _selectedEmployeeId = _employees[0].Id;
+            }
+        }
+    }
+
+    private async Task LoadHistoryAsync()
+    {
+        _errorMessage = null;
+
+        if (_selectedEmployeeId <= 0)
+        {
+            _errorMessage = "No employee selected.";
+            return;
+        }
+
+        _isLoading = true;
+
+        try
+        {
+            _history.Clear();
+            var history = await ShiftService.GetShiftHistoryForEmployeeAsync(_selectedEmployeeId, _fromDate, _toDate.AddDays(1));
+            _history.AddRange(history);
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = ex.Message;
+        }
+        finally
+        {
+            _isLoading = false;
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private Task OnEmployeeChanged(ChangeEventArgs args)
+    {
+        if (int.TryParse(Convert.ToString(args.Value, CultureInfo.InvariantCulture), out var parsed))
+        {
+            _selectedEmployeeId = parsed;
+        }
+
+        return LoadHistoryAsync();
+    }
+
+    private string ResolveEmployeeName(Shift shift)
+    {
+        if (!string.IsNullOrWhiteSpace(shift.EmployeeName))
+        {
+            return shift.EmployeeName;
+        }
+
+        var match = _employees.FirstOrDefault(e => e.Id == shift.EmployeeId);
+        return match == default ? $"Employee {shift.EmployeeId}" : match.Name;
     }
 
     private static string FormatTimeZone(TimeZoneInfo timeZone)

@@ -6,6 +6,7 @@
 @using System.ComponentModel.DataAnnotations
 @using System.Linq
 @using SchedulePayrollBlazor.Data.Models
+@using SchedulePayrollBlazor.Utilities
 
 <div class="ps-page">
     <div class="ps-page-header">
@@ -130,134 +131,156 @@
                     Base pay is derived from shift hours and compensation settings. Adjustments update the totals instantly.
                 </p>
             </div>
-            <div class="ps-table-container">
-                <table class="ps-table">
-                    <thead>
-                        <tr>
-                            <th>Employee</th>
-                            <th>Total hours</th>
-                            <th>Base pay</th>
-                            <th>Deductions</th>
-                            <th>Bonuses</th>
-                            <th>Net pay</th>
-                            <th>Updated</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @foreach (var entry in entries)
+            @{
+                var groupedEntries = new List<(string Title, List<PayrollEntry> Items)>
+                {
+                    ("Fixed Employees", entries.Where(e => GetPayStructure(e) == PayStructureType.Fixed).ToList()),
+                    ("Hybrid Employees", entries.Where(e => GetPayStructure(e) == PayStructureType.Hybrid).ToList()),
+                    ("Hourly Employees", entries.Where(e =>
                         {
-                            var form = GetAdjustmentForm(entry.Id);
-                            <tr>
-                                <td>
-                                    <div class="fw-semibold">@GetEmployeeName(entry)</div>
-                                    <div class="text-muted">@GetEmployeeEmail(entry)</div>
-                                </td>
-                                <td>@string.Format("{0:N2} hrs", entry.TotalHoursWorked)</td>
-                                <td><strong>₱@entry.BasePay.ToString("N2")</strong></td>
-                                <td class="text-danger">₱@entry.TotalDeductions.ToString("N2")</td>
-                                <td class="text-success">₱@entry.TotalBonuses.ToString("N2")</td>
-                                <td><strong>₱@entry.NetPay.ToString("N2")</strong></td>
-                                <td>
-                                    <div class="payroll-processed">
-                                        <div class="payroll-processed-date">
-                                            @entry.CalculatedAt.ToLocalTime().ToString("MMM dd, yyyy")
-                                        </div>
-                                        <div class="payroll-processed-time">
-                                            @entry.CalculatedAt.ToLocalTime().ToString("HH:mm")
-                                        </div>
-                                    </div>
-                                </td>
-                            </tr>
-                            <tr class="ps-table-row-detail">
-                                <td colspan="7">
-                                    <div class="payroll-adjustments">
-                                        <div class="payroll-adjustments-list">
-                                            <h4>Adjustments</h4>
-                                            <div class="text-muted small">@GetPeriodName(entry) — @GetPeriodRange(entry)</div>
-                                            @if (entry.Adjustments is null || entry.Adjustments.Count == 0)
-                                            {
-                                                <div class="text-muted">No adjustments applied.</div>
-                                            }
-                                            else
-                                            {
-                                                <ul class="adjustment-list">
-                                                    @foreach (var adjustment in (entry.Adjustments ?? new List<PayrollAdjustment>())
-                                                                                            .OrderBy(a => a.Type).ThenBy(a => a.Label))
-                                                    {
-                                                        <li>
-                                                            <span class="badge @(IsBonus(adjustment) ? "badge-success" : "badge-danger")">
-                                                                @adjustment.Type
-                                                            </span>
-                                                            <span class="adjustment-label">@adjustment.Label</span>
-                                                            <span class="adjustment-amount">₱@adjustment.Amount.ToString("N2")</span>
-                                                            <button type="button"
-                                                                    class="ps-button ps-button-ghost"
-                                                                    @onclick="() => RemoveAdjustmentAsync(adjustment.Id)">
-                                                                Remove
-                                                            </button>
-                                                        </li>
-                                                    }
-                                                </ul>
-                                            }
-                                        </div>
-
-                                        <!-- UPDATED FORM LAYOUT -->
-                                        <div class="payroll-adjustments-form">
-                                            <EditForm Model="form" OnValidSubmit="async () => await AddAdjustmentAsync(entry.Id)">
-                                                <DataAnnotationsValidator />
-                                                <ValidationSummary />
-
-                                                <!-- Row 1: title + label on same line -->
-                                                <div class="payroll-adjust-row-top">
-                                                    <h4 class="payroll-adjust-title">Add adjustment</h4>
-
-                                                    <div class="form-group payroll-label-inline">
-                                                        <label for="@($"label-{entry.Id}")">Label</label>
-                                                        <InputText id="@($"label-{entry.Id}")"
-                                                                   class="form-control"
-                                                                   @bind-Value="form.Label" />
-                                                        <ValidationMessage For="() => form.Label" />
-                                                    </div>
-                                                </div>
-
-                                                <!-- Row 2: type, amount, button aligned -->
-                                                <div class="payroll-adjust-row-bottom">
-                                                    <div class="form-group payroll-adjust-type">
-                                                        <label for="@($"type-{entry.Id}")">Type</label>
-                                                        <InputSelect id="@($"type-{entry.Id}")"
-                                                                     class="form-select"
-                                                                     @bind-Value="form.Type">
-                                                            <option value="Deduction">Deduction</option>
-                                                            <option value="Bonus">Bonus</option>
-                                                        </InputSelect>
-                                                    </div>
-
-                                                    <div class="form-group">
-                                                        <label for="@($"amount-{entry.Id}")">Amount (PHP)</label>
-                                                        <InputNumber id="@($"amount-{entry.Id}")"
-                                                                     class="form-control"
-                                                                     @bind-Value="form.Amount"
-                                                                     step="0.01" />
-                                                        <ValidationMessage For="() => form.Amount" />
-                                                    </div>
-
-                                                    <div class="form-group payroll-add-btn-wrapper">
-                                                        <label class="payroll-invisible-label">Add</label>
-                                                        <button type="submit" class="btn btn-primary payroll-add-btn">
-                                                            Add adjustment
-                                                        </button>
-                                                    </div>
-                                                </div>
-                                            </EditForm>
-                                        </div>
-                                        <!-- END UPDATED FORM LAYOUT -->
-
-                                    </div>
-                                </td>
-                            </tr>
+                            var structure = GetPayStructure(e);
+                            return structure == PayStructureType.Hourly || structure == PayStructureType.Unknown;
+                        }).ToList())
+                };
+            }
+            <div class="payroll-groups">
+                @foreach (var group in groupedEntries)
+                {
+                    <div class="payroll-group-section">
+                        <h4>@group.Title</h4>
+                        @if (group.Items.Count == 0)
+                        {
+                            <div class="text-muted">No entries available.</div>
                         }
-                    </tbody>
-                </table>
+                        else
+                        {
+                            <div class="ps-table-container">
+                                <table class="ps-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Employee</th>
+                                            <th>Total hours</th>
+                                            <th>Base pay</th>
+                                            <th>Deductions</th>
+                                            <th>Bonuses</th>
+                                            <th>Net pay</th>
+                                            <th>Updated</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach (var entry in group.Items)
+                                        {
+                                            var form = GetAdjustmentForm(entry.Id);
+                                            <tr>
+                                                <td>
+                                                    <div class="fw-semibold">@GetEmployeeName(entry)</div>
+                                                    <div class="text-muted">@GetEmployeeEmail(entry)</div>
+                                                </td>
+                                                <td>@string.Format("{0:N2} hrs", entry.TotalHoursWorked)</td>
+                                                <td><strong>₱@entry.BasePay.ToString("N2")</strong></td>
+                                                <td class="text-danger">₱@entry.TotalDeductions.ToString("N2")</td>
+                                                <td class="text-success">₱@entry.TotalBonuses.ToString("N2")</td>
+                                                <td><strong>₱@entry.NetPay.ToString("N2")</strong></td>
+                                                <td>
+                                                    <div class="payroll-processed">
+                                                        <div class="payroll-processed-date">
+                                                            @entry.CalculatedAt.ToLocalTime().ToString("MMM dd, yyyy")
+                                                        </div>
+                                                        <div class="payroll-processed-time">
+                                                            @entry.CalculatedAt.ToLocalTime().ToString("HH:mm")
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                            <tr class="ps-table-row-detail">
+                                                <td colspan="7">
+                                                    <div class="payroll-adjustments">
+                                                        <div class="payroll-adjustments-list">
+                                                            <h4>Adjustments</h4>
+                                                            <div class="text-muted small">@GetPeriodName(entry) — @GetPeriodRange(entry)</div>
+                                                            @if (entry.Adjustments is null || entry.Adjustments.Count == 0)
+                                                            {
+                                                                <div class="text-muted">No adjustments applied.</div>
+                                                            }
+                                                            else
+                                                            {
+                                                                <ul class="adjustment-list">
+                                                                    @foreach (var adjustment in (entry.Adjustments ?? new List<PayrollAdjustment>())
+                                                                                                    .OrderBy(a => a.Type).ThenBy(a => a.Label))
+                                                                    {
+                                                                        <li>
+                                                                            <span class="badge @(IsBonus(adjustment) ? "badge-success" : "badge-danger")">
+                                                                                @adjustment.Type
+                                                                            </span>
+                                                                            <span class="adjustment-label">@adjustment.Label</span>
+                                                                            <span class="adjustment-amount">₱@adjustment.Amount.ToString("N2")</span>
+                                                                            <button type="button"
+                                                                                    class="ps-button ps-button-ghost"
+                                                                                    @onclick="() => RemoveAdjustmentAsync(adjustment.Id)">
+                                                                                Remove
+                                                                            </button>
+                                                                        </li>
+                                                                    }
+                                                                </ul>
+                                                            }
+                                                        </div>
+
+                                                        <div class="payroll-adjustments-form">
+                                                            <EditForm Model="form" OnValidSubmit="async () => await AddAdjustmentAsync(entry.Id)">
+                                                                <DataAnnotationsValidator />
+                                                                <ValidationSummary />
+
+                                                                <div class="payroll-adjust-row-top">
+                                                                    <h4 class="payroll-adjust-title">Add adjustment</h4>
+
+                                                                    <div class="form-group payroll-label-inline">
+                                                                        <label for="@($"label-{entry.Id}")">Label</label>
+                                                                        <InputText id="@($"label-{entry.Id}")"
+                                                                                   class="form-control"
+                                                                                   @bind-Value="form.Label" />
+                                                                        <ValidationMessage For="() => form.Label" />
+                                                                    </div>
+                                                                </div>
+
+                                                                <div class="payroll-adjust-row-bottom">
+                                                                    <div class="form-group payroll-adjust-type">
+                                                                        <label for="@($"type-{entry.Id}")">Type</label>
+                                                                        <InputSelect id="@($"type-{entry.Id}")"
+                                                                                     class="form-select"
+                                                                                     @bind-Value="form.Type">
+                                                                            <option value="Deduction">Deduction</option>
+                                                                            <option value="Bonus">Bonus</option>
+                                                                        </InputSelect>
+                                                                    </div>
+
+                                                                    <div class="form-group">
+                                                                        <label for="@($"amount-{entry.Id}")">Amount (PHP)</label>
+                                                                        <InputNumber id="@($"amount-{entry.Id}")"
+                                                                                     class="form-control"
+                                                                                     @bind-Value="form.Amount"
+                                                                                     step="0.01" />
+                                                                        <ValidationMessage For="() => form.Amount" />
+                                                                    </div>
+
+                                                                    <div class="form-group payroll-add-btn-wrapper">
+                                                                        <label class="payroll-invisible-label">Add</label>
+                                                                        <button type="submit" class="btn btn-primary payroll-add-btn">
+                                                                            Add adjustment
+                                                                        </button>
+                                                                    </div>
+                                                                </div>
+                                                            </EditForm>
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+                        }
+                    </div>
+                }
             </div>
         </section>
     }
@@ -471,6 +494,11 @@
                 adjustmentForms[entry.Id] = new AdjustmentFormModel();
             }
         }
+    }
+
+    private static PayStructureType GetPayStructure(PayrollEntry entry)
+    {
+        return PayStructureHelper.Determine(entry.Employee?.Compensation);
     }
 
     private sealed class CreatePeriodModel : IValidatableObject

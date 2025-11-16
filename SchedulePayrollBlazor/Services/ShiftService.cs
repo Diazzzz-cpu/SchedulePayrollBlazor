@@ -122,6 +122,32 @@ public class ShiftService : IShiftService
         }
     }
 
+    public async Task<List<Shift>> GetShiftHistoryForEmployeeAsync(int employeeId, DateTime? from = null, DateTime? to = null)
+    {
+        if (employeeId <= 0)
+        {
+            return new List<Shift>();
+        }
+
+        var upperBound = to ?? DateTime.UtcNow;
+        var lowerBound = from ?? upperBound.AddMonths(-3);
+
+        try
+        {
+            return await _db.Shifts
+                .AsNoTracking()
+                .Where(s => s.EmployeeId == employeeId)
+                .Where(s => s.End <= upperBound)
+                .Where(s => s.Start >= lowerBound)
+                .OrderByDescending(s => s.Start)
+                .ToListAsync();
+        }
+        catch
+        {
+            return new List<Shift>();
+        }
+    }
+
     public async Task<Shift> InsertShiftAsync(Shift shift)
     {
         ArgumentNullException.ThrowIfNull(shift);

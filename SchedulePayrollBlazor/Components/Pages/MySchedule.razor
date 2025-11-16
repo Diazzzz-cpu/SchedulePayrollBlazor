@@ -5,6 +5,7 @@
 @using SchedulePayrollBlazor.Data.Models
 @inject IShiftService ShiftService
 @inject AuthenticationStateProvider AuthStateProvider
+@inject NavigationManager Nav
 
 <div class="ps-schedule-page">
     <div class="ps-schedule-header-bar">
@@ -16,7 +17,7 @@
 
     <div class="ps-tabs" role="tablist">
         <button type="button" class="ps-tab ps-tab-active" aria-current="page">My schedule</button>
-        <button type="button" class="ps-tab" disabled>Shift history</button>
+        <button type="button" class="ps-tab" @onclick="() => Nav.NavigateTo("/schedules/history")">Shift history</button>
     </div>
 
     <div class="ps-filter-row">
@@ -83,7 +84,7 @@
                                         <div class="ps-shift-accent"></div>
                                         <div class="ps-shift-body">
                                             <div class="ps-shift-employee">@ResolveEmployeeLabel(shift)</div>
-                                            <div class="ps-shift-time">@shift.Start.ToString("hh:mm tt", CultureInfo.InvariantCulture) – @shift.End.ToString("hh:mm tt", CultureInfo.InvariantCulture)</div>
+                                            <div class="ps-shift-time">@shift.Start.ToLocalTime().ToString("hh:mm tt", CultureInfo.InvariantCulture) – @shift.End.ToLocalTime().ToString("hh:mm tt", CultureInfo.InvariantCulture)</div>
                                             @if (!string.IsNullOrWhiteSpace(shift.GroupName))
                                             {
                                                 <div class="ps-shift-more">@shift.GroupName</div>

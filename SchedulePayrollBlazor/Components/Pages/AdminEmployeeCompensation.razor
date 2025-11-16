@@ -5,6 +5,7 @@
 @using Microsoft.EntityFrameworkCore
 @using System.ComponentModel.DataAnnotations
 @using System.Linq
+@using SchedulePayrollBlazor.Utilities
 
 <div class="ps-page">
     <div class="ps-page-header">
@@ -78,11 +79,11 @@
                                             <div class="ps-form-grid">
                                                 <div class="form-group">
                                                     <label>Structure</label>
-                                                    <InputRadioGroup @bind-Value="row.EditModel.IsHourly">
+                                                    <InputRadioGroup @bind-Value="row.EditModel.PayStructure">
                                                         <div class="form-check">
                                                             <InputRadio class="form-check-input"
                                                                         id="@($"hourly-{row.Employee.EmployeeId}")"
-                                                                        Value="true" />
+                                                                        Value="PayStructureType.Hourly" />
                                                             <label class="form-check-label"
                                                                    for="@($"hourly-{row.Employee.EmployeeId}")">
                                                                 Hourly
@@ -91,34 +92,43 @@
                                                         <div class="form-check">
                                                             <InputRadio class="form-check-input"
                                                                         id="@($"fixed-{row.Employee.EmployeeId}")"
-                                                                        Value="false" />
+                                                                        Value="PayStructureType.Fixed" />
                                                             <label class="form-check-label"
                                                                    for="@($"fixed-{row.Employee.EmployeeId}")">
                                                                 Fixed monthly
                                                             </label>
                                                         </div>
+                                                        <div class="form-check">
+                                                            <InputRadio class="form-check-input"
+                                                                        id="@($"hybrid-{row.Employee.EmployeeId}")"
+                                                                        Value="PayStructureType.Hybrid" />
+                                                            <label class="form-check-label"
+                                                                   for="@($"hybrid-{row.Employee.EmployeeId}")">
+                                                                Hybrid
+                                                            </label>
+                                                        </div>
                                                     </InputRadioGroup>
                                                 </div>
 
-                                                <div class="form-group">
-                                                    <label for="@($"hourly-amount-{row.Employee.EmployeeId}")">Hourly rate</label>
-                                                    <InputNumber id="@($"hourly-amount-{row.Employee.EmployeeId}")"
-                                                                 class="form-control"
-                                                                 @bind-Value="row.EditModel.HourlyRate"
-                                                                 disabled="@(!row.EditModel.IsHourly)"
-                                                                 step="0.25" />
-                                                    <ValidationMessage For="() => row.EditModel.HourlyRate" />
-                                                </div>
+                                                    <div class="form-group">
+                                                        <label for="@($"hourly-amount-{row.Employee.EmployeeId}")">Hourly rate</label>
+                                                        <InputNumber id="@($"hourly-amount-{row.Employee.EmployeeId}")"
+                                                                     class="form-control"
+                                                                     @bind-Value="row.EditModel.HourlyRate"
+                                                                     disabled="@(row.EditModel.PayStructure == PayStructureType.Fixed)"
+                                                                     step="0.25" />
+                                                        <ValidationMessage For="() => row.EditModel.HourlyRate" />
+                                                    </div>
 
-                                                <div class="form-group">
-                                                    <label for="@($"salary-amount-{row.Employee.EmployeeId}")">Fixed monthly salary</label>
-                                                    <InputNumber id="@($"salary-amount-{row.Employee.EmployeeId}")"
-                                                                 class="form-control"
-                                                                 @bind-Value="row.EditModel.FixedMonthlySalary"
-                                                                 disabled="@(row.EditModel.IsHourly)"
-                                                                 step="0.01" />
-                                                    <ValidationMessage For="() => row.EditModel.FixedMonthlySalary" />
-                                                </div>
+                                                    <div class="form-group">
+                                                        <label for="@($"salary-amount-{row.Employee.EmployeeId}")">Fixed monthly salary</label>
+                                                        <InputNumber id="@($"salary-amount-{row.Employee.EmployeeId}")"
+                                                                     class="form-control"
+                                                                     @bind-Value="row.EditModel.FixedMonthlySalary"
+                                                                     disabled="@(row.EditModel.PayStructure == PayStructureType.Hourly)"
+                                                                     step="0.01" />
+                                                        <ValidationMessage For="() => row.EditModel.FixedMonthlySalary" />
+                                                    </div>
                                             </div>
 
                                             <div class="ps-form-actions">
@@ -161,14 +171,7 @@
     }
 
     private static string FormatStructure(EmployeeCompensation? compensation)
-    {
-        if (compensation is null)
-        {
-            return "Not set";
-        }
-
-        return compensation.IsHourly ? "Hourly" : "Fixed";
-    }
+        => PayStructureHelper.GetDisplayName(PayStructureHelper.Determine(compensation));
 
     private static string FormatCurrency(decimal? value)
     {
@@ -212,12 +215,13 @@
         try
         {
             var model = row.EditModel;
+            var payStructure = model.PayStructure;
             var compensation = new EmployeeCompensation
             {
                 EmployeeId = row.Employee.EmployeeId,
-                IsHourly = model.IsHourly,
-                HourlyRate = model.IsHourly ? model.HourlyRate : null,
-                FixedMonthlySalary = model.IsHourly ? null : model.FixedMonthlySalary
+                IsHourly = payStructure != PayStructureType.Fixed,
+                HourlyRate = payStructure == PayStructureType.Fixed ? null : model.HourlyRate,
+                FixedMonthlySalary = payStructure == PayStructureType.Hourly ? null : model.FixedMonthlySalary
             };
 
             await PayrollService.UpsertCompensationAsync(compensation);
@@ -246,33 +250,32 @@
 
     private sealed class CompensationEditModel : IValidatableObject
     {
-        public bool IsHourly { get; set; }
+        public PayStructureType PayStructure { get; set; } = PayStructureType.Hourly;
         public decimal? HourlyRate { get; set; }
         public decimal? FixedMonthlySalary { get; set; }
 
         public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
         {
-            if (IsHourly)
+            var requiresHourly = PayStructure is PayStructureType.Hourly or PayStructureType.Hybrid;
+            var requiresFixed = PayStructure is PayStructureType.Fixed or PayStructureType.Hybrid;
+
+            if (requiresHourly && (!HourlyRate.HasValue || HourlyRate.Value <= 0))
             {
-                if (!HourlyRate.HasValue || HourlyRate.Value <= 0)
-                {
-                    yield return new ValidationResult("Hourly rate must be greater than 0.", new[] { nameof(HourlyRate) });
-                }
+                yield return new ValidationResult("Hourly rate must be greater than 0.", new[] { nameof(HourlyRate) });
             }
-            else
+
+            if (requiresFixed && (!FixedMonthlySalary.HasValue || FixedMonthlySalary.Value <= 0))
             {
-                if (!FixedMonthlySalary.HasValue || FixedMonthlySalary.Value <= 0)
-                {
-                    yield return new ValidationResult("Fixed monthly salary must be greater than 0.", new[] { nameof(FixedMonthlySalary) });
-                }
+                yield return new ValidationResult("Fixed monthly salary must be greater than 0.", new[] { nameof(FixedMonthlySalary) });
             }
         }
 
         public static CompensationEditModel From(EmployeeCompensation compensation)
         {
+            var structure = PayStructureHelper.Determine(compensation);
             return new CompensationEditModel
             {
-                IsHourly = compensation.IsHourly,
+                PayStructure = structure,
                 HourlyRate = compensation.HourlyRate,
                 FixedMonthlySalary = compensation.FixedMonthlySalary
             };

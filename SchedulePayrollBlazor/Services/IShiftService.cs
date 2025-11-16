@@ -19,6 +19,8 @@ public interface IShiftService
 
     Task<IReadOnlyList<Shift>> GetShiftsForEmployeeAsync(int employeeId, DateTime startInclusive, DateTime endExclusive);
 
+    Task<List<Shift>> GetShiftHistoryForEmployeeAsync(int employeeId, DateTime? from = null, DateTime? to = null);
+
     Task<Shift> InsertShiftAsync(Shift shift);
 
     /// <summary>

@@ -2,22 +2,19 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using SchedulePayrollBlazor.Data;
 using SchedulePayrollBlazor.Data.Models;
+using SchedulePayrollBlazor.Utilities;
 
 namespace SchedulePayrollBlazor.Services;
 
 public class EmployeeService : IEmployeeService
 {
     private readonly AppDbContext _db;
-    private readonly IPasswordHasher<User> _passwordHasher;
-
-    public EmployeeService(AppDbContext db, IPasswordHasher<User> passwordHasher)
+    public EmployeeService(AppDbContext db)
     {
         _db = db;
-        _passwordHasher = passwordHasher;
     }
 
     public async Task<List<Employee>> GetAllAsync()
@@ -63,7 +60,7 @@ public class EmployeeService : IEmployeeService
                     ?? throw new InvalidOperationException("Unable to find associated user for employee.");
             }
 
-            employee.User.PasswordHash = _passwordHasher.HashPassword(employee.User, newPassword);
+            employee.User.PasswordHash = PasswordHasher.HashPassword(newPassword);
         }
 
         await _db.SaveChangesAsync();

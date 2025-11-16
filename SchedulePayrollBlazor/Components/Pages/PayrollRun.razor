@@ -132,15 +132,27 @@
                 </p>
             </div>
             @{
+                var fixedEntries = entries
+                    .Where(e => GetPayStructure(e) == PayStructureType.Fixed)
+                    .ToList();
+
+                var hybridEntries = entries
+                    .Where(e => GetPayStructure(e) == PayStructureType.Hybrid)
+                    .ToList();
+
+                var hourlyEntries = entries
+                    .Where(e =>
+                    {
+                        var structure = GetPayStructure(e);
+                        return structure == PayStructureType.Hourly || structure == PayStructureType.Unknown;
+                    })
+                    .ToList();
+
                 var groupedEntries = new List<(string Title, List<PayrollEntry> Items)>
                 {
-                    ("Fixed Employees", entries.Where(e => GetPayStructure(e) == PayStructureType.Fixed).ToList()),
-                    ("Hybrid Employees", entries.Where(e => GetPayStructure(e) == PayStructureType.Hybrid).ToList()),
-                    ("Hourly Employees", entries.Where(e =>
-                        {
-                            var structure = GetPayStructure(e);
-                            return structure == PayStructureType.Hourly || structure == PayStructureType.Unknown;
-                        }).ToList())
+                    ("Fixed employees", fixedEntries),
+                    ("Hybrid employees", hybridEntries),
+                    ("Hourly employees", hourlyEntries)
                 };
             }
             <div class="payroll-groups">
@@ -165,6 +177,7 @@
                                             <th>Bonuses</th>
                                             <th>Net pay</th>
                                             <th>Updated</th>
+                                            <th>Actions</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -191,9 +204,24 @@
                                                         </div>
                                                     </div>
                                                 </td>
+                                                <td class="payroll-adjust-action">
+                                                    <div class="payroll-action-wrap">
+                                                        <button type="button"
+                                                                class="btn btn-outline-primary btn-sm"
+                                                                @onclick="() => ToggleAdjustmentForm(entry.Id)">
+                                                            @(adjustingEntryId == entry.Id ? "Close" : "Adjust")
+                                                        </button>
+                                                        @if ((entry.Adjustments?.Count ?? 0) > 0)
+                                                        {
+                                                            <span class="payroll-adjust-summary">@entry.Adjustments.Count adjustment@(entry.Adjustments.Count == 1 ? string.Empty : "s")</span>
+                                                        }
+                                                    </div>
+                                                </td>
                                             </tr>
+                                            @if (adjustingEntryId == entry.Id)
+                                            {
                                                 <tr class="ps-table-row-detail">
-                                                    <td colspan="7">
+                                                    <td colspan="8">
                                                         <div class="payroll-adjustments">
                                                             <div class="payroll-adjustments-list">
                                                                 <div class="payroll-adjustments-form-header">
@@ -201,11 +229,6 @@
                                                                         <h4>Adjustments</h4>
                                                                         <div class="text-muted small">@GetPeriodName(entry) — @GetPeriodRange(entry)</div>
                                                                     </div>
-                                                                    <button type="button"
-                                                                            class="btn btn-outline-primary payroll-adjust-toggle"
-                                                                            @onclick="() => ToggleAdjustmentForm(entry.Id)">
-                                                                        @(adjustingEntryId == entry.Id ? "Close" : "Make adjustment")
-                                                                    </button>
                                                                 </div>
                                                                 @if (entry.Adjustments is null || entry.Adjustments.Count == 0)
                                                                 {
@@ -234,63 +257,61 @@
                                                                 }
                                                             </div>
 
-                                                            @if (adjustingEntryId == entry.Id)
-                                                            {
-                                                                <div class="payroll-adjustments-form">
-                                                                    <EditForm Model="form" OnValidSubmit="async () => await AddAdjustmentAsync(entry.Id)">
-                                                                        <DataAnnotationsValidator />
-                                                                        <ValidationSummary />
+                                                            <div class="payroll-adjustments-form">
+                                                                <EditForm Model="form" OnValidSubmit="async () => await AddAdjustmentAsync(entry.Id)">
+                                                                    <DataAnnotationsValidator />
+                                                                    <ValidationSummary />
 
-                                                                        <div class="payroll-adjust-row-top">
-                                                                            <h4 class="payroll-adjust-title">Add adjustment</h4>
+                                                                    <div class="payroll-adjust-row-top">
+                                                                        <h4 class="payroll-adjust-title">Add adjustment</h4>
 
-                                                                            <div class="form-group payroll-label-inline">
-                                                                                <label for="@($"label-{entry.Id}")">Label</label>
-                                                                                <InputText id="@($"label-{entry.Id}")"
-                                                                                           class="form-control"
-                                                                                           @bind-Value="form.Label" />
-                                                                                <ValidationMessage For="() => form.Label" />
-                                                                            </div>
+                                                                        <div class="form-group payroll-label-inline">
+                                                                            <label for="@($"label-{entry.Id}")">Label</label>
+                                                                            <InputText id="@($"label-{entry.Id}")"
+                                                                                       class="form-control"
+                                                                                       @bind-Value="form.Label" />
+                                                                            <ValidationMessage For="() => form.Label" />
+                                                                        </div>
+                                                                    </div>
+
+                                                                    <div class="payroll-adjust-row-bottom">
+                                                                        <div class="form-group payroll-adjust-type">
+                                                                            <label for="@($"type-{entry.Id}")">Type</label>
+                                                                            <InputSelect id="@($"type-{entry.Id}")"
+                                                                                         class="form-select"
+                                                                                         @bind-Value="form.Type">
+                                                                                <option value="Deduction">Deduction</option>
+                                                                                <option value="Bonus">Bonus</option>
+                                                                            </InputSelect>
                                                                         </div>
 
-                                                                        <div class="payroll-adjust-row-bottom">
-                                                                            <div class="form-group payroll-adjust-type">
-                                                                                <label for="@($"type-{entry.Id}")">Type</label>
-                                                                                <InputSelect id="@($"type-{entry.Id}")"
-                                                                                             class="form-select"
-                                                                                             @bind-Value="form.Type">
-                                                                                    <option value="Deduction">Deduction</option>
-                                                                                    <option value="Bonus">Bonus</option>
-                                                                                </InputSelect>
-                                                                            </div>
+                                                                        <div class="form-group">
+                                                                            <label for="@($"amount-{entry.Id}")">Amount (PHP)</label>
+                                                                            <InputNumber id="@($"amount-{entry.Id}")"
+                                                                                         class="form-control"
+                                                                                         @bind-Value="form.Amount"
+                                                                                         step="0.01" />
+                                                                            <ValidationMessage For="() => form.Amount" />
+                                                                        </div>
 
-                                                                            <div class="form-group">
-                                                                                <label for="@($"amount-{entry.Id}")">Amount (PHP)</label>
-                                                                                <InputNumber id="@($"amount-{entry.Id}")"
-                                                                                             class="form-control"
-                                                                                             @bind-Value="form.Amount"
-                                                                                             step="0.01" />
-                                                                                <ValidationMessage For="() => form.Amount" />
-                                                                            </div>
-
-                                                                            <div class="form-group payroll-add-btn-wrapper">
-                                                                                <label class="payroll-invisible-label">Actions</label>
-                                                                                <div class="payroll-adjust-actions">
-                                                                                    <button type="submit" class="btn btn-primary payroll-add-btn">
-                                                                                        Add adjustment
-                                                                                    </button>
-                                                                                    <button type="button" class="btn btn-outline-secondary" @onclick="() => CloseAdjustmentForm(entry.Id)">
-                                                                                        Cancel
-                                                                                    </button>
-                                                                                </div>
+                                                                        <div class="form-group payroll-add-btn-wrapper">
+                                                                            <label class="payroll-invisible-label">Actions</label>
+                                                                            <div class="payroll-adjust-actions">
+                                                                                <button type="submit" class="btn btn-primary payroll-add-btn">
+                                                                                    Add adjustment
+                                                                                </button>
+                                                                                <button type="button" class="btn btn-outline-secondary" @onclick="() => CloseAdjustmentForm(entry.Id)">
+                                                                                    Cancel
+                                                                                </button>
                                                                             </div>
                                                                         </div>
-                                                                    </EditForm>
-                                                                </div>
-                                                            }
+                                                                    </div>
+                                                                </EditForm>
+                                                            </div>
                                                         </div>
                                                     </td>
                                                 </tr>
+                                            }
                                         }
                                     </tbody>
                                 </table>

@@ -1,6 +1,5 @@
 using System;
 using Microsoft.AspNetCore.Components.Authorization;
-using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using SchedulePayrollBlazor.Data;
 using SchedulePayrollBlazor.Data.Models;
@@ -57,7 +56,6 @@ builder.Services.AddScoped<AdminUserService>();
 builder.Services.AddScoped<IEmployeeService, EmployeeService>();
 builder.Services.AddScoped<IShiftService, ShiftService>();
 builder.Services.AddScoped<IPayrollService, PayrollService>();
-builder.Services.AddScoped<IPasswordHasher<User>, PasswordHasher<User>>();
 
 // --------------------------------
 // Build + pipeline

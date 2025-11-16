@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using System.Linq;
 using SchedulePayrollBlazor.Data;
 using SchedulePayrollBlazor.Data.Models;
+using SchedulePayrollBlazor.Utilities;
 
 namespace SchedulePayrollBlazor.Services;
 
@@ -127,9 +128,16 @@ public class PayrollService : IPayrollService
                 }
             }
 
-            var basePay = compensation.IsHourly
-                ? totalHours * (compensation.HourlyRate ?? 0m)
-                : compensation.FixedMonthlySalary ?? 0m;
+            var structure = PayStructureHelper.Determine(compensation);
+            var basePay = structure switch
+            {
+                PayStructureType.Hourly => totalHours * (compensation.HourlyRate ?? 0m),
+                PayStructureType.Fixed => compensation.FixedMonthlySalary ?? 0m,
+                PayStructureType.Hybrid => (compensation.FixedMonthlySalary ?? 0m) + totalHours * (compensation.HourlyRate ?? 0m),
+                _ => compensation.IsHourly
+                    ? totalHours * (compensation.HourlyRate ?? 0m)
+                    : compensation.FixedMonthlySalary ?? 0m
+            };
 
             basePay = Math.Round(basePay, 2, MidpointRounding.AwayFromZero);
 
@@ -167,6 +175,8 @@ public class PayrollService : IPayrollService
         return await _db.PayrollEntries
             .Include(pe => pe.Employee)
                 .ThenInclude(e => e.User)
+            .Include(pe => pe.Employee)
+                .ThenInclude(e => e.Compensation)
             .Include(pe => pe.PayrollPeriod)
             .Include(pe => pe.Adjustments)
             .Where(pe => pe.PayrollPeriodId == payrollPeriodId)
@@ -179,6 +189,8 @@ public class PayrollService : IPayrollService
         return _db.PayrollEntries
             .Include(pe => pe.Employee)
                 .ThenInclude(e => e.User)
+            .Include(pe => pe.Employee)
+                .ThenInclude(e => e.Compensation)
             .Include(pe => pe.PayrollPeriod)
             .Include(pe => pe.Adjustments)
             .FirstOrDefaultAsync(pe => pe.Id == payrollEntryId);
@@ -189,6 +201,8 @@ public class PayrollService : IPayrollService
         return _db.PayrollEntries
             .Include(pe => pe.Employee)
                 .ThenInclude(e => e.User)
+            .Include(pe => pe.Employee)
+                .ThenInclude(e => e.Compensation)
             .Include(pe => pe.PayrollPeriod)
             .Include(pe => pe.Adjustments)
             .Where(pe => pe.PayrollPeriodId == payrollPeriodId)

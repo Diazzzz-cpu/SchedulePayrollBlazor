@@ -57,62 +57,137 @@
     }
     else
     {
+        var activeEmployees = employees.Where(e => e.IsActive).ToList();
+        var inactiveEmployees = employees.Where(e => !e.IsActive).ToList();
+
         <section class="ps-card">
             <div class="ps-card-header">
-                <h3>Employee directory</h3>
-                <p class="ps-subtitle">Active and inactive employee accounts.</p>
+                <h3>Active employees</h3>
+                <p class="ps-subtitle">Team members with access enabled.</p>
             </div>
-            <div class="ps-table-container">
-                <table class="ps-table">
-                    <thead>
-                        <tr>
-                            <th scope="col">Name</th>
-                            <th scope="col">Email</th>
-                            <th scope="col">Department</th>
-                            <th scope="col">Job title</th>
-                            <th scope="col">Employment type</th>
-                            <th scope="col">Start date</th>
-                            <th scope="col">Status</th>
-                            @if (_isAdmin)
-                            {
-                                <th scope="col" class="text-end">Actions</th>
-                            }
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @foreach (var employee in employees)
-                        {
+            @if (activeEmployees.Count == 0)
+            {
+                <div class="ps-table-container">
+                    <div class="text-muted">No active employees.</div>
+                </div>
+            }
+            else
+            {
+                <div class="ps-table-container">
+                    <table class="ps-table">
+                        <thead>
                             <tr>
-                                <td>@employee.FullName</td>
-                                <td>@employee.User?.Email</td>
-                                <td>@(string.IsNullOrWhiteSpace(employee.Department) ? "-" : employee.Department)</td>
-                                <td>@(string.IsNullOrWhiteSpace(employee.JobTitle) ? "-" : employee.JobTitle)</td>
-                                <td>@FormatEmploymentType(employee.EmploymentType)</td>
-                                <td>
-                                    @(
-                                        employee.StartDate.HasValue
-                                            ? employee.StartDate.Value.ToString("MMM dd, yyyy")
-                                            : "-"
-                                    )
-                                </td>
-                                <td>
-                                    <span class="badge @(employee.IsActive ? "badge-success" : "badge-secondary")">
-                                        @(employee.IsActive ? "Active" : "Inactive (Archived)")
-                                    </span>
-                                </td>
+                                <th scope="col">Name</th>
+                                <th scope="col">Email</th>
+                                <th scope="col">Department</th>
+                                <th scope="col">Job title</th>
+                                <th scope="col">Employment type</th>
+                                <th scope="col">Start date</th>
+                                <th scope="col">Status</th>
                                 @if (_isAdmin)
                                 {
-                                    <td class="ps-table-actions">
-                                        <button class="ps-button ps-button-ghost" type="button" @onclick="() => BeginEditAsync(employee.EmployeeId)">
-                                            Edit
-                                        </button>
-                                    </td>
+                                    <th scope="col" class="text-end">Actions</th>
                                 }
                             </tr>
-                        }
-                    </tbody>
-                </table>
+                        </thead>
+                        <tbody>
+                            @foreach (var employee in activeEmployees)
+                            {
+                                <tr>
+                                    <td>@employee.FullName</td>
+                                    <td>@employee.User?.Email</td>
+                                    <td>@(string.IsNullOrWhiteSpace(employee.Department) ? "-" : employee.Department)</td>
+                                    <td>@(string.IsNullOrWhiteSpace(employee.JobTitle) ? "-" : employee.JobTitle)</td>
+                                    <td>@FormatEmploymentType(employee.EmploymentType)</td>
+                                    <td>
+                                        @(
+                                            employee.StartDate.HasValue
+                                                ? employee.StartDate.Value.ToString("MMM dd, yyyy")
+                                                : "-"
+                                        )
+                                    </td>
+                                    <td>
+                                        <span class="badge badge-success">Active</span>
+                                    </td>
+                                    @if (_isAdmin)
+                                    {
+                                        <td class="ps-table-actions">
+                                            <button class="ps-button ps-button-ghost" type="button" @onclick="() => BeginEditAsync(employee.EmployeeId)">
+                                                Edit
+                                            </button>
+                                        </td>
+                                    }
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </section>
+
+        <section class="ps-card">
+            <div class="ps-card-header">
+                <h3>Inactive employees</h3>
+                <p class="ps-subtitle">Archived or disabled accounts.</p>
             </div>
+            @if (inactiveEmployees.Count == 0)
+            {
+                <div class="ps-table-container">
+                    <div class="text-muted">No inactive employees.</div>
+                </div>
+            }
+            else
+            {
+                <div class="ps-table-container">
+                    <table class="ps-table">
+                        <thead>
+                            <tr>
+                                <th scope="col">Name</th>
+                                <th scope="col">Email</th>
+                                <th scope="col">Department</th>
+                                <th scope="col">Job title</th>
+                                <th scope="col">Employment type</th>
+                                <th scope="col">Start date</th>
+                                <th scope="col">Status</th>
+                                @if (_isAdmin)
+                                {
+                                    <th scope="col" class="text-end">Actions</th>
+                                }
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var employee in inactiveEmployees)
+                            {
+                                <tr>
+                                    <td>@employee.FullName</td>
+                                    <td>@employee.User?.Email</td>
+                                    <td>@(string.IsNullOrWhiteSpace(employee.Department) ? "-" : employee.Department)</td>
+                                    <td>@(string.IsNullOrWhiteSpace(employee.JobTitle) ? "-" : employee.JobTitle)</td>
+                                    <td>@FormatEmploymentType(employee.EmploymentType)</td>
+                                    <td>
+                                        @(
+                                            employee.StartDate.HasValue
+                                                ? employee.StartDate.Value.ToString("MMM dd, yyyy")
+                                                : "-"
+                                        )
+                                    </td>
+                                    <td>
+                                        <span class="badge badge-secondary">Inactive (Archived)</span>
+                                    </td>
+                                    @if (_isAdmin)
+                                    {
+                                        <td class="ps-table-actions">
+                                            <button class="ps-button ps-button-ghost" type="button" @onclick="() => BeginEditAsync(employee.EmployeeId)">
+                                                Edit
+                                            </button>
+                                        </td>
+                                    }
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
         </section>
     }
 
@@ -203,7 +278,12 @@
 
                         <div class="form-group">
                             <label for="employee-password">Initial password <span class="ps-muted">(leave blank to auto-generate)</span></label>
-                            <InputText id="employee-password" class="form-control" @bind-Value="createModel.Password" type="password" autocomplete="new-password" />
+                            <div class="input-with-button">
+                                <InputText id="employee-password" class="form-control" @bind-Value="createModel.Password" type="@CreatePasswordInputType" autocomplete="new-password" />
+                                <button type="button" class="btn btn-outline-secondary" @onclick="ToggleCreatePassword" aria-label="Toggle password visibility">
+                                    @(createPasswordVisible ? "Hide" : "Show")
+                                </button>
+                            </div>
                         </div>
 
                         <div class="ps-form-actions">
@@ -297,11 +377,21 @@
                         <div class="ps-form-grid">
                             <div class="form-group">
                                 <label for="edit-password">New password <span class="ps-muted">(leave blank to keep current)</span></label>
-                                <InputText id="edit-password" class="form-control" @bind-Value="editModel.NewPassword" type="password" autocomplete="new-password" />
+                                <div class="input-with-button">
+                                    <InputText id="edit-password" class="form-control" @bind-Value="editModel.NewPassword" type="@EditPasswordInputType" autocomplete="new-password" />
+                                    <button type="button" class="btn btn-outline-secondary" @onclick="ToggleEditPassword" aria-label="Toggle password visibility">
+                                        @(editPasswordVisible ? "Hide" : "Show")
+                                    </button>
+                                </div>
                             </div>
                             <div class="form-group">
                                 <label for="edit-password-confirm">Confirm password</label>
-                                <InputText id="edit-password-confirm" class="form-control" @bind-Value="editModel.ConfirmPassword" type="password" autocomplete="new-password" />
+                                <div class="input-with-button">
+                                    <InputText id="edit-password-confirm" class="form-control" @bind-Value="editModel.ConfirmPassword" type="@EditConfirmPasswordInputType" autocomplete="new-password" />
+                                    <button type="button" class="btn btn-outline-secondary" @onclick="ToggleEditConfirmPassword" aria-label="Toggle password confirmation visibility">
+                                        @(editConfirmPasswordVisible ? "Hide" : "Show")
+                                    </button>
+                                </div>
                             </div>
                         </div>
 
@@ -332,11 +422,18 @@
     private bool isSubmitting;
     private bool isEditSubmitting;
     private bool _isAdmin;
+    private bool createPasswordVisible;
+    private bool editPasswordVisible;
+    private bool editConfirmPasswordVisible;
     private string? pageSuccessMessage;
     private string? pageErrorMessage;
     private string? generatedPassword;
     private string? dialogError;
     private string? editError;
+
+    private string CreatePasswordInputType => createPasswordVisible ? "text" : "password";
+    private string EditPasswordInputType => editPasswordVisible ? "text" : "password";
+    private string EditConfirmPasswordInputType => editConfirmPasswordVisible ? "text" : "password";
 
     private readonly string[] roleOptions = new[] { "Employee", "Admin" };
 
@@ -404,6 +501,12 @@
         isSubmitting = false;
         dialogError = null;
     }
+
+    private void ToggleCreatePassword() => createPasswordVisible = !createPasswordVisible;
+
+    private void ToggleEditPassword() => editPasswordVisible = !editPasswordVisible;
+
+    private void ToggleEditConfirmPassword() => editConfirmPasswordVisible = !editConfirmPasswordVisible;
 
     private async Task HandleCreateEmployeeAsync()
     {

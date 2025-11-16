@@ -109,7 +109,8 @@ else
                     <div class="form-group">
                         <label>Initial Password <span class="text-muted">(leave blank to auto-generate)</span></label>
                         <div class="input-with-button">
-                            <InputText @bind-Value="createModel.Password" type="text" />
+                            <InputText @bind-Value="createModel.Password" type="@CreatePasswordInputType" />
+                            <button type="button" class="btn btn-outline-secondary" @onclick="ToggleCreatePassword">@(createPasswordVisible ? "Hide" : "Show")</button>
                             <button type="button" class="btn btn-secondary" @onclick="() => createModel.Password = GenerateTemporaryPassword()">Generate</button>
                         </div>
                     </div>
@@ -270,7 +271,8 @@ else
                     <div class="form-group">
                         <label>Reset Password <span class="text-muted">(optional)</span></label>
                         <div class="input-with-button">
-                            <InputText @bind-Value="editModel.Password" type="text" />
+                            <InputText @bind-Value="editModel.Password" type="@EditPasswordInputType" />
+                            <button type="button" class="btn btn-outline-secondary" @onclick="ToggleEditPassword">@(editPasswordVisible ? "Hide" : "Show")</button>
                             <button type="button" class="btn btn-secondary" @onclick="() => editModel.Password = GenerateTemporaryPassword()">Generate</button>
                         </div>
                         <small class="text-muted">Leave blank to keep the current password.</small>
@@ -300,11 +302,16 @@ else
         private bool isAuthorized;
         private bool isLoading;
         private bool isProcessing;
+        private bool createPasswordVisible;
+        private bool editPasswordVisible;
         private int currentUserId;
 
         private string? alertMessage;
         private string alertStyle = "info";
         private string? temporaryPassword;
+
+        private string CreatePasswordInputType => createPasswordVisible ? "text" : "password";
+        private string EditPasswordInputType => editPasswordVisible ? "text" : "password";
 
         protected override async Task OnInitializedAsync()
         {
@@ -481,6 +488,10 @@ else
         {
             editModel = null;
         }
+
+        private void ToggleCreatePassword() => createPasswordVisible = !createPasswordVisible;
+
+        private void ToggleEditPassword() => editPasswordVisible = !editPasswordVisible;
 
         private void ResetCreateModel()
         {

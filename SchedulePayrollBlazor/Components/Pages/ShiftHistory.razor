@@ -16,7 +16,7 @@
             <p class="ps-schedule-subtitle">Review past shift assignments and confirmations.</p>
         </div>
         <div class="ps-schedule-actions">
-            <span class="ps-timezone">@_timezoneDisplay</span>
+            <span class="ps-timezone">Local time</span>
         </div>
     </div>
 
@@ -99,7 +99,6 @@
 </div>
 
 @code {
-    private string _timezoneDisplay = string.Empty;
     private readonly List<Shift> _history = new();
     private readonly List<(int Id, string Name)> _employees = new();
     private bool _isLoading;
@@ -111,7 +110,6 @@
 
     protected override async Task OnInitializedAsync()
     {
-        _timezoneDisplay = FormatTimeZone(TimeZoneInfo.Local);
         await ResolveUserAsync();
         await LoadHistoryAsync();
     }
@@ -208,13 +206,5 @@
 
         var match = _employees.FirstOrDefault(e => e.Id == shift.EmployeeId);
         return match == default ? $"Employee {shift.EmployeeId}" : match.Name;
-    }
-
-    private static string FormatTimeZone(TimeZoneInfo timeZone)
-    {
-        var offset = timeZone.GetUtcOffset(DateTime.UtcNow);
-        var sign = offset >= TimeSpan.Zero ? "+" : "-";
-        offset = offset.Duration();
-        return $"UTC {sign}{offset:hh\\:mm}";
     }
 }

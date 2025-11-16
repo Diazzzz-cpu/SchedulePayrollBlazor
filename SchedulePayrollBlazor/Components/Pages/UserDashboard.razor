@@ -74,9 +74,9 @@
                         @foreach (var shift in upcomingShifts)
                         {
                             <tr>
-                                <td>@shift.Start.ToString("MMM dd, yyyy")</td>
-                                <td>@shift.Start.ToString("hh:mm tt", CultureInfo.InvariantCulture)</td>
-                                <td>@shift.End.ToString("hh:mm tt", CultureInfo.InvariantCulture)</td>
+                                <td>@shift.Start.ToLocalTime().ToString("MMM dd, yyyy", CultureInfo.InvariantCulture)</td>
+                                <td>@shift.Start.ToLocalTime().ToString("hh:mm tt", CultureInfo.InvariantCulture)</td>
+                                <td>@shift.End.ToLocalTime().ToString("hh:mm tt", CultureInfo.InvariantCulture)</td>
                                 <td>@((shift.End - shift.Start).TotalHours.ToString("F1")) hours</td>
                                 <td>@(string.IsNullOrWhiteSpace(shift.GroupName) ? "Unassigned" : shift.GroupName)</td>
                             </tr>

@@ -111,10 +111,17 @@ public class PayrollService : IPayrollService
             var employeeId = compensation.EmployeeId;
 
             shiftsByEmployee.TryGetValue(employeeId, out var employeeShifts);
+            var existingEntry = existingEntries.FirstOrDefault(pe => pe.EmployeeId == employeeId);
+            var hasRelevantShifts = employeeShifts is not null && employeeShifts.Count > 0;
+
+            if (!hasRelevantShifts && existingEntry is null)
+            {
+                continue;
+            }
 
             decimal totalHours = 0m;
 
-            if (employeeShifts is not null)
+            if (hasRelevantShifts)
             {
                 foreach (var shift in employeeShifts)
                 {
@@ -127,21 +134,43 @@ public class PayrollService : IPayrollService
                     totalHours += Math.Round(duration, 2, MidpointRounding.AwayFromZero);
                 }
             }
+            else if (existingEntry is not null)
+            {
+                totalHours = existingEntry.TotalHoursWorked;
+            }
 
             var structure = PayStructureHelper.Determine(compensation);
-            var basePay = structure switch
+            decimal basePay;
+
+            if (hasRelevantShifts)
             {
-                PayStructureType.Hourly => totalHours * (compensation.HourlyRate ?? 0m),
-                PayStructureType.Fixed => compensation.FixedMonthlySalary ?? 0m,
-                PayStructureType.Hybrid => (compensation.FixedMonthlySalary ?? 0m) + totalHours * (compensation.HourlyRate ?? 0m),
-                _ => compensation.IsHourly
-                    ? totalHours * (compensation.HourlyRate ?? 0m)
-                    : compensation.FixedMonthlySalary ?? 0m
-            };
+                basePay = structure switch
+                {
+                    PayStructureType.Hourly => totalHours * (compensation.HourlyRate ?? 0m),
+                    PayStructureType.Fixed => compensation.FixedMonthlySalary ?? 0m,
+                    PayStructureType.Hybrid => (compensation.FixedMonthlySalary ?? 0m) + totalHours * (compensation.HourlyRate ?? 0m),
+                    _ => compensation.IsHourly
+                        ? totalHours * (compensation.HourlyRate ?? 0m)
+                        : compensation.FixedMonthlySalary ?? 0m
+                };
+            }
+            else
+            {
+                basePay = existingEntry?.BasePay
+                    ?? structure switch
+                    {
+                        PayStructureType.Hourly => 0m,
+                        PayStructureType.Fixed => compensation.FixedMonthlySalary ?? 0m,
+                        PayStructureType.Hybrid => compensation.FixedMonthlySalary ?? 0m,
+                        _ => compensation.IsHourly
+                            ? 0m
+                            : compensation.FixedMonthlySalary ?? 0m
+                    };
+            }
 
             basePay = Math.Round(basePay, 2, MidpointRounding.AwayFromZero);
 
-            var entry = existingEntries.FirstOrDefault(pe => pe.EmployeeId == employeeId);
+            var entry = existingEntry;
 
             if (entry is null)
             {

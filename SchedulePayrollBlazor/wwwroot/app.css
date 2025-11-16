@@ -177,6 +177,28 @@ small {
     background: linear-gradient(180deg, var(--ps-bg-soft) 0%, var(--ps-bg) 100%);
 }
 
+.ps-public-shell {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1.5rem;
+    padding: 2.5rem 1.5rem;
+    background: linear-gradient(180deg, var(--ps-bg-soft) 0%, var(--ps-bg) 100%);
+}
+
+.ps-public-brand {
+    align-items: center;
+    text-align: center;
+}
+
+.ps-public-content {
+    width: min(720px, 100%);
+    display: flex;
+    justify-content: center;
+}
+
 .ps-sidebar {
     width: 252px;
     padding: 2.5rem 1.75rem 2rem;
@@ -1683,6 +1705,10 @@ textarea {
     flex-wrap: wrap;
 }
 
+.payroll-adjust-toggle {
+    white-space: nowrap;
+}
+
 .payroll-label-inline {
     flex: 1 1 260px;
     margin-bottom: 0;
@@ -1695,6 +1721,13 @@ textarea {
 .payroll-add-btn {
     white-space: nowrap;
     align-self: flex-end;
+}
+
+.payroll-adjust-actions {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+    flex-wrap: wrap;
 }
 
 .payroll-adjustments-grid {

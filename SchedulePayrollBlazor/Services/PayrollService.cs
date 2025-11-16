@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using System.Collections.Generic;
 using System.Linq;
 using SchedulePayrollBlazor.Data;
 using SchedulePayrollBlazor.Data.Models;
@@ -88,18 +89,30 @@ public class PayrollService : IPayrollService
             return new List<PayrollEntry>();
         }
 
+        var periodEndExclusive = period.EndDate.AddDays(1);
+
         var relevantShifts = await _db.Shifts
-            .Where(s => s.Start >= period.StartDate && s.End <= period.EndDate)
+            .Where(s => s.Start < periodEndExclusive && s.End > period.StartDate)
             .ToListAsync();
 
         var shiftsByEmployee = relevantShifts
             .GroupBy(s => s.EmployeeId)
             .ToDictionary(group => group.Key, group => group.ToList());
+        var employeesWithActivity = new HashSet<int>(shiftsByEmployee.Keys);
 
         var existingEntries = await _db.PayrollEntries
             .Include(pe => pe.Adjustments)
             .Where(pe => pe.PayrollPeriodId == payrollPeriodId)
             .ToListAsync();
+
+        var entriesWithoutShifts = existingEntries
+            .Where(pe => !employeesWithActivity.Contains(pe.EmployeeId))
+            .ToList();
+
+        if (entriesWithoutShifts.Count > 0)
+        {
+            _db.PayrollEntries.RemoveRange(entriesWithoutShifts);
+        }
 
         foreach (var compensation in compensations)
         {
@@ -110,63 +123,39 @@ public class PayrollService : IPayrollService
 
             var employeeId = compensation.EmployeeId;
 
-            shiftsByEmployee.TryGetValue(employeeId, out var employeeShifts);
-            var existingEntry = existingEntries.FirstOrDefault(pe => pe.EmployeeId == employeeId);
-            var hasRelevantShifts = employeeShifts is not null && employeeShifts.Count > 0;
-
-            if (!hasRelevantShifts && existingEntry is null)
+            if (!shiftsByEmployee.TryGetValue(employeeId, out var employeeShifts) ||
+                employeeShifts.Count == 0)
             {
                 continue;
             }
 
+            var existingEntry = existingEntries.FirstOrDefault(pe => pe.EmployeeId == employeeId);
+
             decimal totalHours = 0m;
 
-            if (hasRelevantShifts)
+            foreach (var shift in employeeShifts)
             {
-                foreach (var shift in employeeShifts)
+                if (shift.End <= shift.Start)
                 {
-                    if (shift.End <= shift.Start)
-                    {
-                        continue;
-                    }
-
-                    var duration = (decimal)(shift.End - shift.Start).TotalHours;
-                    totalHours += Math.Round(duration, 2, MidpointRounding.AwayFromZero);
+                    continue;
                 }
-            }
-            else if (existingEntry is not null)
-            {
-                totalHours = existingEntry.TotalHoursWorked;
+
+                var duration = (decimal)(shift.End - shift.Start).TotalHours;
+                totalHours += Math.Round(duration, 2, MidpointRounding.AwayFromZero);
             }
 
             var structure = PayStructureHelper.Determine(compensation);
             decimal basePay;
 
-            if (hasRelevantShifts)
+            basePay = structure switch
             {
-                basePay = structure switch
-                {
-                    PayStructureType.Hourly => totalHours * (compensation.HourlyRate ?? 0m),
-                    PayStructureType.Fixed => compensation.FixedMonthlySalary ?? 0m,
-                    PayStructureType.Hybrid => (compensation.FixedMonthlySalary ?? 0m) + totalHours * (compensation.HourlyRate ?? 0m),
-                    _ => compensation.IsHourly
-                        ? totalHours * (compensation.HourlyRate ?? 0m)
-                        : compensation.FixedMonthlySalary ?? 0m
-                };
-            }
-            else
-            {
-                basePay = existingEntry?.BasePay
-                    ?? structure switch
-                    {
-                        PayStructureType.Hourly => 0m,
-                        PayStructureType.Fixed => compensation.FixedMonthlySalary ?? 0m,
-                        PayStructureType.Hybrid => compensation.FixedMonthlySalary ?? 0m,
-                        _ => compensation.IsHourly
-                            ? 0m
-                            : compensation.FixedMonthlySalary ?? 0m
-                    };
-            }
+                PayStructureType.Hourly => totalHours * (compensation.HourlyRate ?? 0m),
+                PayStructureType.Fixed => compensation.FixedMonthlySalary ?? 0m,
+                PayStructureType.Hybrid => (compensation.FixedMonthlySalary ?? 0m) + totalHours * (compensation.HourlyRate ?? 0m),
+                _ => compensation.IsHourly
+                    ? totalHours * (compensation.HourlyRate ?? 0m)
+                    : compensation.FixedMonthlySalary ?? 0m
+            };
 
             basePay = Math.Round(basePay, 2, MidpointRounding.AwayFromZero);
 

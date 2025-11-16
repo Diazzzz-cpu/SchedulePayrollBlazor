@@ -196,7 +196,9 @@ small {
 .ps-public-content {
     width: min(720px, 100%);
     display: flex;
+    align-items: center;
     justify-content: center;
+    flex: 1;
 }
 
 .ps-sidebar {
@@ -971,7 +973,7 @@ textarea {
 
 /* Auth */
 .ps-auth {
-    min-height: calc(100vh - 64px);
+    width: 100%;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -1694,6 +1696,23 @@ textarea {
     text-align: right;
     white-space: nowrap;
     flex-shrink: 0;
+}
+
+.payroll-adjust-action {
+    text-align: right;
+    white-space: nowrap;
+}
+
+.payroll-action-wrap {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    justify-content: flex-end;
+}
+
+.payroll-adjust-summary {
+    color: var(--ps-muted-text);
+    font-size: 0.9rem;
 }
 
 .payroll-adjustments-form-header {

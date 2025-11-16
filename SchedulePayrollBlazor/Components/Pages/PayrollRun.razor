@@ -182,7 +182,7 @@
                                             {
                                                 <ul class="adjustment-list">
                                                     @foreach (var adjustment in (entry.Adjustments ?? new List<PayrollAdjustment>())
-                                                        .OrderBy(a => a.Type).ThenBy(a => a.Label))
+                                                                                            .OrderBy(a => a.Type).ThenBy(a => a.Label))
                                                     {
                                                         <li>
                                                             <span class="badge @(IsBonus(adjustment) ? "badge-success" : "badge-danger")">
@@ -200,12 +200,17 @@
                                                 </ul>
                                             }
                                         </div>
+
+                                        <!-- UPDATED FORM LAYOUT -->
                                         <div class="payroll-adjustments-form">
                                             <EditForm Model="form" OnValidSubmit="async () => await AddAdjustmentAsync(entry.Id)">
                                                 <DataAnnotationsValidator />
                                                 <ValidationSummary />
-                                                <div class="payroll-adjustments-form-header">
-                                                    <h4>Add adjustment</h4>
+
+                                                <!-- Row 1: title + label on same line -->
+                                                <div class="payroll-adjust-row-top">
+                                                    <h4 class="payroll-adjust-title">Add adjustment</h4>
+
                                                     <div class="form-group payroll-label-inline">
                                                         <label for="@($"label-{entry.Id}")">Label</label>
                                                         <InputText id="@($"label-{entry.Id}")"
@@ -213,10 +218,11 @@
                                                                    @bind-Value="form.Label" />
                                                         <ValidationMessage For="() => form.Label" />
                                                     </div>
-                                                    <button type="submit" class="btn btn-primary payroll-add-btn">Add adjustment</button>
                                                 </div>
-                                                <div class="ps-form-grid payroll-adjustments-grid">
-                                                    <div class="form-group">
+
+                                                <!-- Row 2: type, amount, button aligned -->
+                                                <div class="payroll-adjust-row-bottom">
+                                                    <div class="form-group payroll-adjust-type">
                                                         <label for="@($"type-{entry.Id}")">Type</label>
                                                         <InputSelect id="@($"type-{entry.Id}")"
                                                                      class="form-select"
@@ -225,6 +231,7 @@
                                                             <option value="Bonus">Bonus</option>
                                                         </InputSelect>
                                                     </div>
+
                                                     <div class="form-group">
                                                         <label for="@($"amount-{entry.Id}")">Amount (PHP)</label>
                                                         <InputNumber id="@($"amount-{entry.Id}")"
@@ -233,9 +240,18 @@
                                                                      step="0.01" />
                                                         <ValidationMessage For="() => form.Amount" />
                                                     </div>
+
+                                                    <div class="form-group payroll-add-btn-wrapper">
+                                                        <label class="payroll-invisible-label">Add</label>
+                                                        <button type="submit" class="btn btn-primary payroll-add-btn">
+                                                            Add adjustment
+                                                        </button>
+                                                    </div>
                                                 </div>
                                             </EditForm>
                                         </div>
+                                        <!-- END UPDATED FORM LAYOUT -->
+
                                     </div>
                                 </td>
                             </tr>

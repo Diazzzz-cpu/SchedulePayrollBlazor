@@ -716,7 +716,6 @@ small {
     background-color: var(--accent);
     color: #ffffff;
     border-color: transparent;
-    box-shadow: 0 10px 25px -18px var(--accent);
 }
 
     .ps-button-primary:hover,
@@ -1255,6 +1254,7 @@ textarea {
         padding: 2rem 1.5rem;
     }
 }
+
 /* Shift schedule */
 .ps-schedule-page {
     display: flex;
@@ -1688,9 +1688,9 @@ textarea {
     margin-bottom: 0;
 }
 
-.payroll-label-inline .form-control {
-    width: 100%;
-}
+    .payroll-label-inline .form-control {
+        width: 100%;
+    }
 
 .payroll-add-btn {
     white-space: nowrap;
@@ -1700,6 +1700,11 @@ textarea {
 .payroll-adjustments-grid {
     grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
     row-gap: 0.75rem;
+}
+
+/* ?? This is the new rule to nudge the Type field down a bit */
+.payroll-adjust-type {
+    margin-top: 10px;
 }
 
 .ps-summary-grid {

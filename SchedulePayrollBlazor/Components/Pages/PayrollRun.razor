@@ -124,12 +124,14 @@
     }
     else
     {
-        <section class="ps-card">
+        <section class="ps-card payroll-summary-card">
             <div class="ps-card-header">
-                <h3>Payroll summary</h3>
-                <p class="ps-subtitle">
-                    Base pay is derived from shift hours and compensation settings. Adjustments update the totals instantly.
-                </p>
+                <div>
+                    <h3>Payroll summary</h3>
+                    <p class="ps-subtitle payroll-summary-lede">
+                        Base pay is derived from shift hours and compensation settings. Adjustments update the totals instantly.
+                    </p>
+                </div>
             </div>
             @{
                 var fixedEntries = entries
@@ -148,18 +150,32 @@
                     })
                     .ToList();
 
-                var groupedEntries = new List<(string Title, List<PayrollEntry> Items)>
+                var groupedEntries = new List<(string Title, PayStructureType Type, List<PayrollEntry> Items)>
                 {
-                    ("Fixed employees", fixedEntries),
-                    ("Hybrid employees", hybridEntries),
-                    ("Hourly employees", hourlyEntries)
+                    ("Hourly payroll", PayStructureType.Hourly, hourlyEntries),
+                    ("Hybrid payroll", PayStructureType.Hybrid, hybridEntries),
+                    ("Fixed payroll", PayStructureType.Fixed, fixedEntries)
                 };
             }
-            <div class="payroll-groups">
+            <div class="payroll-summary-grid">
                 @foreach (var group in groupedEntries)
                 {
-                    <div class="payroll-group-section">
-                        <h4>@group.Title</h4>
+                    <div class="payroll-section-card">
+                        <div class="payroll-section-header">
+                            <h4 class="payroll-section-title">@group.Title</h4>
+                            @if (group.Type == PayStructureType.Fixed && group.Items.Count > 0)
+                            {
+                                <button type="button" class="btn btn-outline-primary btn-sm" @onclick="() => ApplyFixedComponentsAsync(applyToFixed: true, applyToHybrid: false)">
+                                    Add pay
+                                </button>
+                            }
+                            else if (group.Type == PayStructureType.Hybrid && group.Items.Count > 0)
+                            {
+                                <button type="button" class="btn btn-outline-primary btn-sm" @onclick="() => ApplyFixedComponentsAsync(applyToFixed: false, applyToHybrid: true)">
+                                    Add pay
+                                </button>
+                            }
+                        </div>
                         @if (group.Items.Count == 0)
                         {
                             <div class="text-muted">No entries available.</div>
@@ -167,7 +183,7 @@
                         else
                         {
                             <div class="ps-table-container">
-                                <table class="ps-table">
+                                <table class="ps-table payroll-table">
                                     <thead>
                                         <tr>
                                             <th>Employee</th>
@@ -190,10 +206,10 @@
                                                     <div class="text-muted">@GetEmployeeEmail(entry)</div>
                                                 </td>
                                                 <td>@string.Format("{0:N2} hrs", entry.TotalHoursWorked)</td>
-                                                <td><strong>₱@entry.BasePay.ToString("N2")</strong></td>
-                                                <td class="text-danger">₱@entry.TotalDeductions.ToString("N2")</td>
-                                                <td class="text-success">₱@entry.TotalBonuses.ToString("N2")</td>
-                                                <td><strong>₱@entry.NetPay.ToString("N2")</strong></td>
+                                                <td><strong>@FormatCurrency(entry, entry.BasePay, isBasePay: true)</strong></td>
+                                                <td class="text-danger">@FormatCurrency(entry, entry.TotalDeductions)</td>
+                                                <td class="text-success">@FormatCurrency(entry, entry.TotalBonuses)</td>
+                                                <td><strong>@FormatCurrency(entry, entry.NetPay)</strong></td>
                                                 <td>
                                                     <div class="payroll-processed">
                                                         <div class="payroll-processed-date">
@@ -205,7 +221,7 @@
                                                     </div>
                                                 </td>
                                                 <td class="payroll-adjust-action">
-                                                    <div class="payroll-action-wrap">
+                                                    <div class="payroll-row-actions">
                                                         <button type="button"
                                                                 class="btn btn-outline-primary btn-sm"
                                                                 @onclick="() => ToggleAdjustmentForm(entry.Id)">
@@ -258,23 +274,20 @@
                                                             </div>
 
                                                             <div class="payroll-adjustments-form">
+                                                                <h4 class="payroll-adjust-title">Add adjustment</h4>
                                                                 <EditForm Model="form" OnValidSubmit="async () => await AddAdjustmentAsync(entry.Id)">
                                                                     <DataAnnotationsValidator />
                                                                     <ValidationSummary />
 
-                                                                    <div class="payroll-adjust-row-top">
-                                                                        <h4 class="payroll-adjust-title">Add adjustment</h4>
-
-                                                                        <div class="form-group payroll-label-inline">
+                                                                    <div class="payroll-adjust-inline-fields">
+                                                                        <div class="form-group">
                                                                             <label for="@($"label-{entry.Id}")">Label</label>
                                                                             <InputText id="@($"label-{entry.Id}")"
                                                                                        class="form-control"
                                                                                        @bind-Value="form.Label" />
                                                                             <ValidationMessage For="() => form.Label" />
                                                                         </div>
-                                                                    </div>
 
-                                                                    <div class="payroll-adjust-row-bottom">
                                                                         <div class="form-group payroll-adjust-type">
                                                                             <label for="@($"type-{entry.Id}")">Type</label>
                                                                             <InputSelect id="@($"type-{entry.Id}")"
@@ -294,16 +307,13 @@
                                                                             <ValidationMessage For="() => form.Amount" />
                                                                         </div>
 
-                                                                        <div class="form-group payroll-add-btn-wrapper">
-                                                                            <label class="payroll-invisible-label">Actions</label>
-                                                                            <div class="payroll-adjust-actions">
-                                                                                <button type="submit" class="btn btn-primary payroll-add-btn">
-                                                                                    Add adjustment
-                                                                                </button>
-                                                                                <button type="button" class="btn btn-outline-secondary" @onclick="() => CloseAdjustmentForm(entry.Id)">
-                                                                                    Cancel
-                                                                                </button>
-                                                                            </div>
+                                                                        <div class="payroll-adjust-inline-actions">
+                                                                            <button type="submit" class="btn btn-primary btn-sm">
+                                                                                Add
+                                                                            </button>
+                                                                            <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="() => CloseAdjustmentForm(entry.Id)">
+                                                                                Cancel
+                                                                            </button>
                                                                         </div>
                                                                     </div>
                                                                 </EditForm>
@@ -497,6 +507,32 @@
         }
     }
 
+    private async Task ApplyFixedComponentsAsync(bool applyToFixed, bool applyToHybrid)
+    {
+        if (selectedPeriodId == 0)
+        {
+            return;
+        }
+
+        try
+        {
+            entries = await PayrollService.ApplyFixedPayAsync(selectedPeriodId, applyToFixed, applyToHybrid);
+            EnsureAdjustmentForms();
+            adjustingEntryId = null;
+            alertIsError = false;
+            alertMessage = applyToFixed && applyToHybrid
+                ? "Fixed pay applied for eligible employees."
+                : applyToFixed
+                    ? "Fixed salaries added."
+                    : "Hybrid fixed pay added.";
+        }
+        catch (Exception ex)
+        {
+            alertIsError = true;
+            alertMessage = $"Error applying fixed pay: {ex.Message}";
+        }
+    }
+
     private AdjustmentFormModel GetAdjustmentForm(int entryId)
     {
         if (!adjustmentForms.TryGetValue(entryId, out var model) || model is null)
@@ -555,6 +591,18 @@
     private static PayStructureType GetPayStructure(PayrollEntry entry)
     {
         return PayStructureHelper.Determine(entry.Employee?.Compensation);
+    }
+
+    private string FormatCurrency(PayrollEntry entry, decimal amount, bool isBasePay = false)
+    {
+        var structure = GetPayStructure(entry);
+
+        if (structure == PayStructureType.Fixed && entry.BasePay == 0m && (isBasePay || amount == 0m))
+        {
+            return "—";
+        }
+
+        return $"₱{amount:N2}";
     }
 
     private sealed class CreatePeriodModel : IValidatableObject

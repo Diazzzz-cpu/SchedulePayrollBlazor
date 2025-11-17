@@ -1925,3 +1925,261 @@ textarea {
     margin-left: 1px; /* optical alignment */
     line-height: 1.2;
 }
+
+/* Center the login page fully */
+.ps-auth-container {
+    min-height: 100vh;
+    display: flex;
+    justify-content: center; /* horizontal center */
+    align-items: center; /* vertical center */
+    padding: 2rem;
+    background-color: var(--ps-bg);
+}
+
+/* Container inside auth layout */
+.ps-auth-container {
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    padding: 2rem;
+}
+
+/* Login card styling */
+.ps-auth-card {
+    width: min(420px, 100%);
+    background: var(--ps-surface);
+    border: 1px solid var(--ps-border);
+    border-radius: 0.9rem;
+    padding: 2.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    box-shadow: var(--ps-shadow-card);
+}
+
+.ps-auth-layout {
+    min-height: 100vh;
+    display: flex;
+    justify-content: center; /* center horizontally */
+    align-items: center; /* center vertically */
+    background-color: var(--ps-bg);
+}
+
+.ps-auth-header {
+    text-align: center;
+    margin-bottom: 1.5rem;
+}
+
+/* Payroll summary layout */
+.ps-payroll-summary {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+/* If you have 3 sections (Hourly / Hybrid / Fixed) as cards */
+.ps-payroll-section {
+    background: var(--ps-surface);
+    border-radius: 0.9rem;
+    border: 1px solid var(--ps-border);
+    padding: 1.25rem 1.5rem;
+    box-shadow: var(--ps-shadow-card);
+}
+
+/* Section header / title */
+.ps-payroll-section-header {
+    margin-bottom: 0.75rem;
+}
+
+    .ps-payroll-section-header h3 {
+        font-size: 1rem;
+        font-weight: 600;
+        margin: 0;
+    }
+
+/* Table: prevent horizontal scrolling by forcing wrapping */
+.ps-payroll-table {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed; /* forces columns to share width */
+}
+
+    .ps-payroll-table th,
+    .ps-payroll-table td {
+        padding: 0.5rem 0.6rem;
+        text-align: left;
+        vertical-align: top;
+        white-space: normal; /* allow wrapping */
+        word-wrap: break-word;
+        overflow-wrap: break-word;
+    }
+
+/* Keep numeric columns compact */
+.ps-col-hours,
+.ps-col-updated,
+.ps-col-base,
+.ps-col-deductions,
+.ps-col-bonuses,
+.ps-col-net {
+    width: 7rem;
+}
+
+/* Adjustments column: tiny, only for the button/icon */
+.ps-col-adjust {
+    width: 4.5rem;
+    white-space: nowrap;
+}
+
+/* Compact "Adjust" button */
+.ps-adjust-btn {
+    padding: 0.2rem 0.6rem;
+    font-size: 0.8rem;
+    line-height: 1.2;
+}
+
+/* Payroll summary overall layout */
+.payroll-summary-card {
+    overflow-x: hidden; /* guard against table overflow */
+}
+
+.payroll-summary-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.payroll-section-card {
+    background: var(--ps-surface);
+    border-radius: 0.9rem;
+    border: 1px solid var(--ps-border);
+    padding: 1rem 1.25rem;
+    box-shadow: var(--ps-shadow-card);
+}
+
+.payroll-section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 0.5rem;
+}
+
+.payroll-section-title {
+    font-size: 0.95rem;
+    font-weight: 600;
+    margin: 0;
+}
+
+/* Table layout: fixed width and wrapping */
+
+/* Payroll summary table – tidy columns, no broken headers */
+/* Payroll summary table – straight columns, headers on one line */
+.payroll-table {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: auto; /* let browser size columns based on content */
+}
+
+    .payroll-table th,
+    .payroll-table td {
+        padding: 0.5rem 0.6rem;
+        text-align: left;
+        vertical-align: top;
+    }
+
+    /* Headers: NEVER wrap, so text doesn't split into multiple lines */
+    .payroll-table th {
+        white-space: nowrap;
+    }
+
+    /* Cells: can wrap if content is long, so no horizontal scroll */
+    .payroll-table td {
+        white-space: normal;
+        word-wrap: break-word;
+        overflow-wrap: break-word;
+    }
+
+/* Employee column: flexible */
+.ps-col-employee {
+    width: auto;
+}
+
+/* Numeric/date columns: shrink to content but stay aligned */
+.ps-col-hours,
+.ps-col-base,
+.ps-col-deductions,
+.ps-col-bonuses,
+.ps-col-net,
+.ps-col-updated,
+.ps-col-adjust {
+    width: 1%;
+    white-space: nowrap; /* keep "8.00 hrs", dates, and Adjust on one line */
+}
+
+/* Compact Adjust button */
+.ps-adjust-btn {
+    padding: 0.2rem 0.6rem;
+    font-size: 0.8rem;
+    line-height: 1.2;
+}}
+
+
+.payroll-adjust-summary {
+    margin-top: 0.15rem;
+    font-size: 0.75rem;
+    color: var(--ps-sidebar-text);
+}
+
+/* Detail row adjustments area */
+.payroll-adjustments {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    max-width: 100%;
+}
+
+.payroll-adjustments-header h4 {
+    margin: 0;
+    font-size: 0.95rem;
+}
+
+.adjustment-list {
+    list-style: none;
+    padding-left: 0;
+    margin: 0;
+}
+
+.adjustment-list li {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.4rem;
+    margin-bottom: 0.35rem;
+}
+
+.adjustment-label {
+    font-size: 0.85rem;
+}
+
+.adjustment-amount {
+    font-weight: 600;
+    font-size: 0.85rem;
+}
+
+/* Inline fields: responsive, no horizontal scroll */
+.payroll-adjust-inline-fields {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+}
+
+.payroll-adjust-inline-fields .form-group {
+    flex: 1 1 160px;
+    min-width: 140px;
+}
+
+.payroll-adjust-inline-actions {
+    display: flex;
+    align-items: flex-end;
+    gap: 0.5rem;
+}

@@ -133,49 +133,57 @@
                     </p>
                 </div>
             </div>
+
             @{
                 var fixedEntries = entries
-                    .Where(e => GetPayStructure(e) == PayStructureType.Fixed)
-                    .ToList();
+                .Where(e => GetPayStructure(e) == PayStructureType.Fixed)
+                .ToList();
 
                 var hybridEntries = entries
-                    .Where(e => GetPayStructure(e) == PayStructureType.Hybrid)
-                    .ToList();
+                .Where(e => GetPayStructure(e) == PayStructureType.Hybrid)
+                .ToList();
 
                 var hourlyEntries = entries
-                    .Where(e =>
-                    {
-                        var structure = GetPayStructure(e);
-                        return structure == PayStructureType.Hourly || structure == PayStructureType.Unknown;
-                    })
-                    .ToList();
+                .Where(e =>
+                {
+                    var structure = GetPayStructure(e);
+                    return structure == PayStructureType.Hourly || structure == PayStructureType.Unknown;
+                })
+                .ToList();
 
                 var groupedEntries = new List<(string Title, PayStructureType Type, List<PayrollEntry> Items)>
                 {
-                    ("Hourly payroll", PayStructureType.Hourly, hourlyEntries),
-                    ("Hybrid payroll", PayStructureType.Hybrid, hybridEntries),
-                    ("Fixed payroll", PayStructureType.Fixed, fixedEntries)
+                ("Hourly payroll", PayStructureType.Hourly, hourlyEntries),
+                ("Hybrid payroll", PayStructureType.Hybrid, hybridEntries),
+                ("Fixed payroll", PayStructureType.Fixed, fixedEntries)
                 };
             }
+
             <div class="payroll-summary-grid">
                 @foreach (var group in groupedEntries)
                 {
                     <div class="payroll-section-card">
                         <div class="payroll-section-header">
                             <h4 class="payroll-section-title">@group.Title</h4>
+
                             @if (group.Type == PayStructureType.Fixed && group.Items.Count > 0)
                             {
-                                <button type="button" class="btn btn-outline-primary btn-sm" @onclick="() => ApplyFixedComponentsAsync(applyToFixed: true, applyToHybrid: false)">
+                                <button type="button"
+                                        class="btn btn-outline-primary btn-sm ps-adjust-btn"
+                                        @onclick="() => ApplyFixedComponentsAsync(applyToFixed: true, applyToHybrid: false)">
                                     Add pay
                                 </button>
                             }
                             else if (group.Type == PayStructureType.Hybrid && group.Items.Count > 0)
                             {
-                                <button type="button" class="btn btn-outline-primary btn-sm" @onclick="() => ApplyFixedComponentsAsync(applyToFixed: false, applyToHybrid: true)">
+                                <button type="button"
+                                        class="btn btn-outline-primary btn-sm ps-adjust-btn"
+                                        @onclick="() => ApplyFixedComponentsAsync(applyToFixed: false, applyToHybrid: true)">
                                     Add pay
                                 </button>
                             }
                         </div>
+
                         @if (group.Items.Count == 0)
                         {
                             <div class="text-muted">No entries available.</div>
@@ -186,14 +194,14 @@
                                 <table class="ps-table payroll-table">
                                     <thead>
                                         <tr>
-                                            <th>Employee</th>
-                                            <th>Total hours</th>
-                                            <th>Base pay</th>
-                                            <th>Deductions</th>
-                                            <th>Bonuses</th>
-                                            <th>Net pay</th>
-                                            <th>Updated</th>
-                                            <th>Actions</th>
+                                            <th class="ps-col-employee">Employee</th>
+                                            <th class="ps-col-hours">Hours</th>
+                                            <th class="ps-col-base">Base</th>
+                                            <th class="ps-col-deductions">Deduct.</th>
+                                            <th class="ps-col-bonuses">Bonus</th>
+                                            <th class="ps-col-net">Net</th>
+                                            <th class="ps-col-updated">Updated</th>
+                                            <th class="ps-col-adjust">Adjust</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -201,16 +209,26 @@
                                         {
                                             var form = GetAdjustmentForm(entry.Id);
                                             <tr>
-                                                <td>
+                                                <td class="ps-col-employee">
                                                     <div class="fw-semibold">@GetEmployeeName(entry)</div>
                                                     <div class="text-muted">@GetEmployeeEmail(entry)</div>
                                                 </td>
-                                                <td>@string.Format("{0:N2} hrs", entry.TotalHoursWorked)</td>
-                                                <td><strong>@FormatCurrency(entry, entry.BasePay, isBasePay: true)</strong></td>
-                                                <td class="text-danger">@FormatCurrency(entry, entry.TotalDeductions)</td>
-                                                <td class="text-success">@FormatCurrency(entry, entry.TotalBonuses)</td>
-                                                <td><strong>@FormatCurrency(entry, entry.NetPay)</strong></td>
-                                                <td>
+                                                <td class="ps-col-hours">
+                                                    @string.Format("{0:N2} hrs", entry.TotalHoursWorked)
+                                                </td>
+                                                <td class="ps-col-base">
+                                                    <strong>@FormatCurrency(entry, entry.BasePay, isBasePay: true)</strong>
+                                                </td>
+                                                <td class="ps-col-deductions text-danger">
+                                                    @FormatCurrency(entry, entry.TotalDeductions)
+                                                </td>
+                                                <td class="ps-col-bonuses text-success">
+                                                    @FormatCurrency(entry, entry.TotalBonuses)
+                                                </td>
+                                                <td class="ps-col-net">
+                                                    <strong>@FormatCurrency(entry, entry.NetPay)</strong>
+                                                </td>
+                                                <td class="ps-col-updated">
                                                     <div class="payroll-processed">
                                                         <div class="payroll-processed-date">
                                                             @entry.CalculatedAt.ToLocalTime().ToString("MMM dd, yyyy")
@@ -220,62 +238,64 @@
                                                         </div>
                                                     </div>
                                                 </td>
-                                                <td class="payroll-adjust-action">
-                                                    <div class="payroll-row-actions">
-                                                        <button type="button"
-                                                                class="btn btn-outline-primary btn-sm"
-                                                                @onclick="() => ToggleAdjustmentForm(entry.Id)">
-                                                            @(adjustingEntryId == entry.Id ? "Close" : "Adjust")
-                                                        </button>
-                                                        @if ((entry.Adjustments?.Count ?? 0) > 0)
-                                                        {
-                                                            <span class="payroll-adjust-summary">@entry.Adjustments.Count adjustment@(entry.Adjustments.Count == 1 ? string.Empty : "s")</span>
-                                                        }
-                                                    </div>
+                                                <td class="ps-col-adjust">
+                                                    <button type="button"
+                                                            class="btn btn-outline-primary btn-sm ps-adjust-btn"
+                                                            @onclick="() => ToggleAdjustmentForm(entry.Id)">
+                                                        @(adjustingEntryId == entry.Id ? "Close" : "Adjust")
+                                                    </button>
+                                                    @if ((entry.Adjustments?.Count ?? 0) > 0)
+                                                    {
+                                                        <div class="payroll-adjust-summary">
+                                                            @entry.Adjustments.Count adjustment@(entry.Adjustments.Count == 1 ? string.Empty : "s")
+                                                        </div>
+                                                    }
                                                 </td>
                                             </tr>
+
                                             @if (adjustingEntryId == entry.Id)
                                             {
                                                 <tr class="ps-table-row-detail">
                                                     <td colspan="8">
                                                         <div class="payroll-adjustments">
-                                                            <div class="payroll-adjustments-list">
-                                                                <div class="payroll-adjustments-form-header">
-                                                                    <div>
-                                                                        <h4>Adjustments</h4>
-                                                                        <div class="text-muted small">@GetPeriodName(entry) — @GetPeriodRange(entry)</div>
-                                                                    </div>
+                                                            <div class="payroll-adjustments-header">
+                                                                <h4>Adjustments</h4>
+                                                                <div class="text-muted small">
+                                                                    @GetPeriodName(entry) — @GetPeriodRange(entry)
                                                                 </div>
-                                                                @if (entry.Adjustments is null || entry.Adjustments.Count == 0)
-                                                                {
-                                                                    <div class="text-muted">No adjustments applied.</div>
-                                                                }
-                                                                else
-                                                                {
-                                                                    <ul class="adjustment-list">
-                                                                        @foreach (var adjustment in (entry.Adjustments ?? new List<PayrollAdjustment>())
-                                                                                                        .OrderBy(a => a.Type).ThenBy(a => a.Label))
-                                                                        {
-                                                                            <li>
-                                                                                <span class="badge @(IsBonus(adjustment) ? "badge-success" : "badge-danger")">
-                                                                                    @adjustment.Type
-                                                                                </span>
-                                                                                <span class="adjustment-label">@adjustment.Label</span>
-                                                                                <span class="adjustment-amount">₱@adjustment.Amount.ToString("N2")</span>
-                                                                                <button type="button"
-                                                                                        class="ps-button ps-button-ghost"
-                                                                                        @onclick="() => RemoveAdjustmentAsync(adjustment.Id)">
-                                                                                    Remove
-                                                                                </button>
-                                                                            </li>
-                                                                        }
-                                                                    </ul>
-                                                                }
                                                             </div>
+
+                                                            @if (entry.Adjustments is null || entry.Adjustments.Count == 0)
+                                                            {
+                                                                <div class="text-muted">No adjustments applied.</div>
+                                                            }
+                                                            else
+                                                            {
+                                                                <ul class="adjustment-list">
+                                                                    @foreach (var adjustment in (entry.Adjustments ?? new List<PayrollAdjustment>())
+                                                                                                                .OrderBy(a => a.Type)
+                                                                                                                .ThenBy(a => a.Label))
+                                                                    {
+                                                                        <li>
+                                                                            <span class="badge @(IsBonus(adjustment) ? "badge-success" : "badge-danger")">
+                                                                                @adjustment.Type
+                                                                            </span>
+                                                                            <span class="adjustment-label">@adjustment.Label</span>
+                                                                            <span class="adjustment-amount">₱@adjustment.Amount.ToString("N2")</span>
+                                                                            <button type="button"
+                                                                                    class="ps-button ps-button-ghost"
+                                                                                    @onclick="() => RemoveAdjustmentAsync(adjustment.Id)">
+                                                                                Remove
+                                                                            </button>
+                                                                        </li>
+                                                                    }
+                                                                </ul>
+                                                            }
 
                                                             <div class="payroll-adjustments-form">
                                                                 <h4 class="payroll-adjust-title">Add adjustment</h4>
-                                                                <EditForm Model="form" OnValidSubmit="async () => await AddAdjustmentAsync(entry.Id)">
+                                                                <EditForm Model="form"
+                                                                          OnValidSubmit="async () => await AddAdjustmentAsync(entry.Id)">
                                                                     <DataAnnotationsValidator />
                                                                     <ValidationSummary />
 
@@ -311,7 +331,9 @@
                                                                             <button type="submit" class="btn btn-primary btn-sm">
                                                                                 Add
                                                                             </button>
-                                                                            <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="() => CloseAdjustmentForm(entry.Id)">
+                                                                            <button type="button"
+                                                                                    class="btn btn-outline-secondary btn-sm"
+                                                                                    @onclick="() => CloseAdjustmentForm(entry.Id)">
                                                                                 Cancel
                                                                             </button>
                                                                         </div>

@@ -1,58 +1,57 @@
 @page "/"
 @page "/login"
+@layout AuthLayout
 @attribute [AllowAnonymous]
 
 @using System.ComponentModel.DataAnnotations
 @inject SchedulePayrollBlazor.Services.AuthService AuthService
 @inject NavigationManager Nav
 
-<div class="ps-auth-shell">
-    <div class="ps-auth">
-        <div class="ps-auth-card">
-            <div class="ps-auth-header">
-                <h2>Sign in to PaySync</h2>
-                <p class="ps-subtitle">Enter your credentials to continue.</p>
+<div class="ps-auth-container">
+    <div class="ps-auth-card">
+        <div class="ps-auth-header">
+            <h2>Sign in to PaySync</h2>
+            <p class="ps-subtitle">Enter your credentials to continue.</p>
+        </div>
+
+        <EditForm Model="model" OnValidSubmit="HandleLogin" FormName="LoginForm">
+            <DataAnnotationsValidator />
+
+            <div class="mb-3">
+                <label for="login-email" class="form-label">Email address</label>
+                <InputText id="login-email" @bind-Value="model.Email" type="email" class="form-control" placeholder="you@example.com" />
+                <ValidationMessage For="() => model.Email" />
             </div>
 
-            <EditForm Model="model" OnValidSubmit="HandleLogin" FormName="LoginForm">
-                <DataAnnotationsValidator />
-
-                <div class="mb-3">
-                    <label for="login-email" class="form-label">Email address</label>
-                    <InputText id="login-email" @bind-Value="model.Email" type="email" class="form-control" placeholder="you@example.com" />
-                    <ValidationMessage For="() => model.Email" />
+            <div class="mb-3">
+                <label for="login-password" class="form-label">Password</label>
+                <div class="input-with-button">
+                    <InputText id="login-password" @bind-Value="model.Password" type="@PasswordInputType" class="form-control" placeholder="••••••••" />
+                    <button type="button" class="btn btn-outline-secondary" @onclick="TogglePasswordVisibility" aria-label="Toggle password visibility">
+                        @(showPassword ? "Hide" : "Show")
+                    </button>
                 </div>
+                <ValidationMessage For="() => model.Password" />
+            </div>
 
-                <div class="mb-3">
-                    <label for="login-password" class="form-label">Password</label>
-                    <div class="input-with-button">
-                        <InputText id="login-password" @bind-Value="model.Password" type="@PasswordInputType" class="form-control" placeholder="••••••••" />
-                        <button type="button" class="btn btn-outline-secondary" @onclick="TogglePasswordVisibility" aria-label="Toggle password visibility">
-                            @(showPassword ? "Hide" : "Show")
-                        </button>
-                    </div>
-                    <ValidationMessage For="() => model.Password" />
-                </div>
+            @if (!string.IsNullOrWhiteSpace(errorMessage))
+            {
+                <div class="alert alert-danger" role="alert">@errorMessage</div>
+            }
 
-                @if (!string.IsNullOrWhiteSpace(errorMessage))
+            <button type="submit" class="btn btn-primary w-100" disabled="@isLoading">
+                @if (isLoading)
                 {
-                    <div class="alert alert-danger" role="alert">@errorMessage</div>
+                    <span>Signing in…</span>
                 }
+                else
+                {
+                    <span>Sign in</span>
+                }
+            </button>
+        </EditForm>
 
-                <button type="submit" class="btn btn-primary w-100" disabled="@isLoading">
-                    @if (isLoading)
-                    {
-                        <span>Signing in…</span>
-                    }
-                    else
-                    {
-                        <span>Sign in</span>
-                    }
-                </button>
-            </EditForm>
-
-            <p class="ps-subtitle">PaySync access is managed by your administrator.</p>
-        </div>
+        <p class="ps-subtitle">PaySync access is managed by your administrator.</p>
     </div>
 </div>
 

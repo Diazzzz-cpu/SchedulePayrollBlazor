@@ -79,16 +79,6 @@ public class PayrollService : IPayrollService
             .FirstOrDefaultAsync(pp => pp.Id == payrollPeriodId)
             ?? throw new InvalidOperationException("Unable to locate payroll period.");
 
-        var compensations = await _db.EmployeeCompensations
-            .Include(ec => ec.Employee)
-                .ThenInclude(e => e.User)
-            .ToListAsync();
-
-        if (compensations.Count == 0)
-        {
-            return new List<PayrollEntry>();
-        }
-
         var periodEndExclusive = period.EndDate.AddDays(1);
 
         var relevantShifts = await _db.Shifts
@@ -99,6 +89,12 @@ public class PayrollService : IPayrollService
             .GroupBy(s => s.EmployeeId)
             .ToDictionary(group => group.Key, group => group.ToList());
         var employeesWithActivity = new HashSet<int>(shiftsByEmployee.Keys);
+
+        var employees = await _db.Employees
+            .Include(e => e.User)
+            .Include(e => e.Compensation)
+            .Where(e => employeesWithActivity.Contains(e.EmployeeId))
+            .ToListAsync();
 
         var existingEntries = await _db.PayrollEntries
             .Include(pe => pe.Adjustments)
@@ -114,17 +110,11 @@ public class PayrollService : IPayrollService
             _db.PayrollEntries.RemoveRange(entriesWithoutShifts);
         }
 
-        foreach (var compensation in compensations)
+        foreach (var employee in employees)
         {
-            if (compensation.Employee is null)
-            {
-                continue;
-            }
+            var employeeId = employee.EmployeeId;
 
-            var employeeId = compensation.EmployeeId;
-
-            if (!shiftsByEmployee.TryGetValue(employeeId, out var employeeShifts) ||
-                employeeShifts.Count == 0)
+            if (!shiftsByEmployee.TryGetValue(employeeId, out var employeeShifts) || employeeShifts.Count == 0)
             {
                 continue;
             }
@@ -144,20 +134,7 @@ public class PayrollService : IPayrollService
                 totalHours += Math.Round(duration, 2, MidpointRounding.AwayFromZero);
             }
 
-            var structure = PayStructureHelper.Determine(compensation);
-            decimal basePay;
-
-            basePay = structure switch
-            {
-                PayStructureType.Hourly => totalHours * (compensation.HourlyRate ?? 0m),
-                PayStructureType.Fixed => compensation.FixedMonthlySalary ?? 0m,
-                PayStructureType.Hybrid => (compensation.FixedMonthlySalary ?? 0m) + totalHours * (compensation.HourlyRate ?? 0m),
-                _ => compensation.IsHourly
-                    ? totalHours * (compensation.HourlyRate ?? 0m)
-                    : compensation.FixedMonthlySalary ?? 0m
-            };
-
-            basePay = Math.Round(basePay, 2, MidpointRounding.AwayFromZero);
+            var basePay = CalculateBasePay(employee.Compensation, totalHours, includeFixedComponent: false);
 
             var entry = existingEntry;
 
@@ -200,6 +177,36 @@ public class PayrollService : IPayrollService
             .Where(pe => pe.PayrollPeriodId == payrollPeriodId)
             .OrderBy(pe => pe.Employee == null ? string.Empty : pe.Employee.FullName)
             .ToListAsync();
+    }
+
+    public async Task<List<PayrollEntry>> ApplyFixedPayAsync(int payrollPeriodId, bool applyToFixed, bool applyToHybrid)
+    {
+        var entries = await _db.PayrollEntries
+            .Include(pe => pe.Employee)
+                .ThenInclude(e => e.Compensation)
+            .Include(pe => pe.Adjustments)
+            .Where(pe => pe.PayrollPeriodId == payrollPeriodId)
+            .ToListAsync();
+
+        foreach (var entry in entries)
+        {
+            var structure = PayStructureHelper.Determine(entry.Employee?.Compensation);
+
+            if (structure == PayStructureType.Fixed && applyToFixed)
+            {
+                entry.BasePay = CalculateBasePay(entry.Employee?.Compensation, entry.TotalHoursWorked, includeFixedComponent: true);
+                RecalculateEntryTotals(entry);
+            }
+            else if (structure == PayStructureType.Hybrid && applyToHybrid)
+            {
+                entry.BasePay = CalculateBasePay(entry.Employee?.Compensation, entry.TotalHoursWorked, includeFixedComponent: true);
+                RecalculateEntryTotals(entry);
+            }
+        }
+
+        await _db.SaveChangesAsync();
+
+        return await GetPayrollEntriesForPeriodAsync(payrollPeriodId);
     }
 
     public Task<PayrollEntry?> GetPayrollEntryAsync(int payrollEntryId)
@@ -281,6 +288,23 @@ public class PayrollService : IPayrollService
         RecalculateEntryTotals(entry);
 
         await _db.SaveChangesAsync();
+    }
+
+    private static decimal CalculateBasePay(EmployeeCompensation? compensation, decimal totalHours, bool includeFixedComponent)
+    {
+        var structure = PayStructureHelper.Determine(compensation);
+        var hourlyRate = compensation?.HourlyRate ?? 0m;
+        var fixedSalary = includeFixedComponent ? compensation?.FixedMonthlySalary ?? 0m : 0m;
+
+        var basePay = structure switch
+        {
+            PayStructureType.Hourly => totalHours * hourlyRate,
+            PayStructureType.Hybrid => (totalHours * hourlyRate) + fixedSalary,
+            PayStructureType.Fixed => fixedSalary,
+            _ => totalHours * hourlyRate
+        };
+
+        return Math.Round(basePay, 2, MidpointRounding.AwayFromZero);
     }
 
     private static string NormalizeAdjustmentType(string type)

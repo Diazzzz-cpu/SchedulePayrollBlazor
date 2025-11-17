@@ -10,6 +10,7 @@ public interface IPayrollService
     Task<PayrollPeriod> CreatePayrollPeriodAsync(string name, DateTime start, DateTime end);
 
     Task<List<PayrollEntry>> GeneratePayrollForPeriodAsync(int payrollPeriodId);
+    Task<List<PayrollEntry>> ApplyFixedPayAsync(int payrollPeriodId, bool applyToFixed, bool applyToHybrid);
     Task<PayrollEntry?> GetPayrollEntryAsync(int payrollEntryId);
     Task<List<PayrollEntry>> GetPayrollEntriesForPeriodAsync(int payrollPeriodId);
 

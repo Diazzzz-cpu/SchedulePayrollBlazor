@@ -16,16 +16,17 @@
 else
 {
     <div class="ps-page">
-        <div class="ps-page-header">
+        <div class="ps-page-header mb-4">
             <div>
-                <h2>Profile</h2>
-                <p class="ps-subtitle">Manage your personal and employment details.</p>
+                <h2>My profile</h2>
+                <p class="ps-subtitle">View your account details and keep your contact information up to date.</p>
             </div>
         </div>
 
-        <div class="row g-3">
+        <!-- Row 1: Account + Employment, equal gap below -->
+        <div class="row g-3 mb-4">
             <div class="col-12 col-lg-6">
-                <div class="ps-card">
+                <div class="ps-card h-100">
                     <div class="ps-card-header">
                         <h3>Account information</h3>
                     </div>
@@ -46,7 +47,7 @@ else
             </div>
 
             <div class="col-12 col-lg-6">
-                <div class="ps-card">
+                <div class="ps-card h-100">
                     <div class="ps-card-header">
                         <h3>Employment details</h3>
                     </div>
@@ -63,15 +64,99 @@ else
                         <dt>Start date</dt>
                         <dd>
                             @(
-                                profile.StartDate.HasValue
-                                    ? profile.StartDate.Value.ToString("MMM dd, yyyy")
-                                    : "-"
-                            )
-                        </dd>
+                                                    profile.StartDate.HasValue
+                                                    ? profile.StartDate.Value.ToString("MMM dd, yyyy")
+                                                    : "-"
+                                                    )
+                    </dd>
 
                         <dt>Location</dt>
                         <dd>@DisplayOrFallback(profile.Location)</dd>
                     </dl>
+                </div>
+            </div>
+        </div>
+
+        <!-- Row 2: Contact & personal info, cleaner grid + extra spacing -->
+        <div class="row g-3 mt-4">
+            <div class="col-12 col-lg-8">
+                <div class="ps-card">
+                    <div class="ps-card-header">
+                        <h3>Contact &amp; Personal info</h3>
+                        <p class="ps-subtitle">
+                            Only your admin can see this information in the employee record.
+                        </p>
+                    </div>
+
+                @if (!string.IsNullOrWhiteSpace(saveSuccessMessage))
+                    {
+                        <div class="ps-alert ps-alert-success" role="status">
+                            @saveSuccessMessage
+                        </div>
+                    }
+
+                    @if (!string.IsNullOrWhiteSpace(saveErrorMessage))
+                    {
+                        <div class="ps-alert ps-alert-danger" role="alert">
+                            @saveErrorMessage
+                        </div>
+                    }
+
+                    @if (canEditProfile)
+                    {
+                        <EditForm Model="editModel" OnValidSubmit="SaveProfileAsync">
+                            <DataAnnotationsValidator />
+                            <ValidationSummary />
+
+                            <div class="ps-card-body">
+                                <div class="row g-3 align-items-start">
+
+                                    <!-- Phone -->
+                                    <div class="col-12 col-md-4">
+                                        <label class="ps-label" for="profile-phone">Phone</label>
+                                        <InputText id="profile-phone"
+                                                   class="ps-input w-100"
+                                                   @bind-Value="editModel.Phone" />
+                                    </div>
+
+                                    <!-- Birthdate -->
+                                    <div class="col-12 col-md-4">
+                                        <label class="ps-label" for="profile-birthdate">Birthdate</label>
+                                        <InputDate @bind-Value="editModel.BirthDate"
+                                                   id="profile-birthdate"
+                                                   class="ps-input w-100" />
+                                    </div>
+
+                                    <!-- Address ABOVE the input (aligned with Phone + Birthdate labels) -->
+                                    <div class="col-12 col-md-4">
+                                        <label class="ps-label" for="profile-address">Address</label>
+                                        <InputTextArea id="profile-address"
+                                                       class="ps-input w-100"
+                                                       rows="1"
+                                                       @bind-Value="editModel.Address" />
+                                    </div>
+
+                                </div>
+                            </div>
+
+                            <div class="ps-card-footer">
+                                <button type="submit"
+                                        class="ps-button ps-button-primary"
+                                        disabled="@isSaving">
+                                    @(isSaving ? "Saving…" : "Save changes")
+                                </button>
+                            </div>
+                        </EditForm>
+                    }
+                    else
+                    {
+                        <div class="ps-card-body">
+                            <p class="text-muted">
+                                This account is not linked to an employee record yet, so contact information
+                                cannot be edited.
+                            </p>
+                        </div>
+                    }
                 </div>
             </div>
         </div>
@@ -80,6 +165,14 @@ else
 
 @code {
     private ProfileViewModel? profile;
+
+    private ProfileEditModel editModel = new();
+    private bool canEditProfile;
+    private bool isSaving;
+    private string? saveSuccessMessage;
+    private string? saveErrorMessage;
+    private int? employeeId;
+    private int userId;
 
     protected override async Task OnInitializedAsync()
     {
@@ -93,12 +186,14 @@ else
         }
 
         var idValue = userPrincipal.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-        if (!int.TryParse(idValue, out var userId))
+        if (!int.TryParse(idValue, out var parsedUserId))
         {
             await AuthProvider.SignOutAsync();
             Nav.NavigateTo("/login", forceLoad: true);
             return;
         }
+
+        userId = parsedUserId;
 
         var user = await Db.Users
             .Include(u => u.Employee)
@@ -129,7 +224,6 @@ else
             Email = user.Email,
             Role = roleLabel,
             CreatedAt = user.CreatedAt,
-
             Department = user.Employee?.Department ?? string.Empty,
             JobTitle = user.Employee?.JobTitle ?? string.Empty,
             EmploymentType = user.Employee is null
@@ -138,6 +232,86 @@ else
             StartDate = user.Employee?.StartDate,
             Location = user.Employee?.Location ?? string.Empty
         };
+
+        if (user.Employee is not null)
+        {
+            employeeId = user.Employee.EmployeeId;
+            canEditProfile = true;
+
+            var ep = await Db.EmployeeProfiles
+                .FirstOrDefaultAsync(p => p.EmployeeId == employeeId.Value);
+
+            if (ep is not null)
+            {
+                editModel = new ProfileEditModel
+                {
+                    Phone = ep.Phone ?? string.Empty,
+                    BirthDate = ep.BirthDate,
+                    Address = ep.Address ?? string.Empty
+                };
+            }
+            else
+            {
+                editModel = new ProfileEditModel();
+            }
+        }
+        else
+        {
+            canEditProfile = false;
+            employeeId = null;
+        }
+    }
+
+    private async Task SaveProfileAsync()
+    {
+        saveSuccessMessage = null;
+        saveErrorMessage = null;
+
+        if (!canEditProfile || !employeeId.HasValue)
+        {
+            saveErrorMessage = "Your account is not linked to an employee record.";
+            return;
+        }
+
+        isSaving = true;
+        try
+        {
+            var ep = await Db.EmployeeProfiles
+                .FirstOrDefaultAsync(p => p.EmployeeId == employeeId.Value);
+
+            if (ep is null)
+            {
+                ep = new EmployeeProfile
+                {
+                    EmployeeId = employeeId.Value,
+                    UserId = userId
+                };
+                Db.EmployeeProfiles.Add(ep);
+            }
+
+            ep.Phone = string.IsNullOrWhiteSpace(editModel.Phone)
+                ? null
+                : editModel.Phone.Trim();
+
+            ep.BirthDate = editModel.BirthDate;
+
+            ep.Address = string.IsNullOrWhiteSpace(editModel.Address)
+                ? null
+                : editModel.Address.Trim();
+
+            await Db.SaveChangesAsync();
+
+            saveSuccessMessage = "Your profile has been updated.";
+        }
+        catch
+        {
+            saveErrorMessage = "Something went wrong while saving your profile. Please try again.";
+        }
+        finally
+        {
+            isSaving = false;
+            StateHasChanged();
+        }
     }
 
     private static string DisplayOrFallback(string value)
@@ -164,5 +338,12 @@ else
         public string EmploymentType { get; set; } = string.Empty;
         public DateTime? StartDate { get; set; }
         public string Location { get; set; } = string.Empty;
+    }
+
+    private sealed class ProfileEditModel
+    {
+        public string? Phone { get; set; }
+        public DateTime? BirthDate { get; set; }
+        public string? Address { get; set; }
     }
 }

@@ -17,8 +17,7 @@
 
     <div class="ps-tabs" role="tablist">
         <button type="button" class="ps-tab ps-tab-active" aria-current="page">My schedule</button>
-        <!-- fixed button -->
-        <button type="button" class="ps-tab" @onclick="GoToShiftHistory">Shift history</button>
+        <button type="button" class="ps-tab" @onclick="GoToHistory">Shift history</button>
     </div>
 
     <div class="ps-filter-row">
@@ -59,9 +58,9 @@
                 @foreach (var day in GetWeekDays())
                 {
                     var dayShifts = _shifts
-                    .Where(s => s.Start.Date == day.Date)
-                    .OrderBy(s => s.Start)
-                    .ToList();
+                        .Where(s => s.Start.Date == day.Date)
+                        .OrderBy(s => s.Start)
+                        .ToList();
 
                     <div class="ps-schedule-column">
                         <div class="ps-schedule-column-header">
@@ -85,7 +84,11 @@
                                         <div class="ps-shift-accent"></div>
                                         <div class="ps-shift-body">
                                             <div class="ps-shift-employee">@ResolveEmployeeLabel(shift)</div>
-                                            <div class="ps-shift-time">@shift.Start.ToLocalTime().ToString("hh:mm tt", CultureInfo.InvariantCulture) – @shift.End.ToLocalTime().ToString("hh:mm tt", CultureInfo.InvariantCulture)</div>
+                                            <div class="ps-shift-time">
+                                                @shift.Start.ToString("hh:mm tt", CultureInfo.InvariantCulture)
+                                                –
+                                                @shift.End.ToString("hh:mm tt", CultureInfo.InvariantCulture)
+                                            </div>
                                             @if (!string.IsNullOrWhiteSpace(shift.GroupName))
                                             {
                                                 <div class="ps-shift-more">@shift.GroupName</div>
@@ -117,12 +120,6 @@
     private DateTime _selectedMonth;
 
     private string MonthInputValue => _selectedMonth.ToString("yyyy-MM", CultureInfo.InvariantCulture);
-
-    // NEW: navigation helper for Shift history tab
-    private void GoToShiftHistory()
-    {
-        Nav.NavigateTo("/schedules/history");
-    }
 
     protected override async Task OnInitializedAsync()
     {
@@ -286,4 +283,10 @@
             ? "My shift"
             : shift.EmployeeName;
     }
+
+    private void GoToHistory()
+    {
+        Nav.NavigateTo("/schedules/history");
+    }
+
 }

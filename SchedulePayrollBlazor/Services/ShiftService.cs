@@ -24,9 +24,13 @@ public class ShiftService : IShiftService
     {
         try
         {
+            // Normalize to date-only boundaries so we don't get bitten by time/Kind differences.
+            var startDate = weekStart.Date;
+            var endDate = weekEnd.Date;
+
             IQueryable<Shift> query = _db.Shifts
                 .AsNoTracking()
-                .Where(s => s.Start >= weekStart && s.Start < weekEnd);
+                .Where(s => s.Start.Date >= startDate && s.Start.Date < endDate);
 
             if (employeeId.HasValue)
             {
@@ -107,12 +111,15 @@ public class ShiftService : IShiftService
 
         try
         {
+            var startDate = startInclusive.Date;
+            var endDate = endExclusive.Date;
+
             return await _db.Shifts
                 .AsNoTracking()
                 .Where(s =>
                     s.EmployeeId == employeeId &&
-                    s.Start >= startInclusive &&
-                    s.Start < endExclusive)
+                    s.Start.Date >= startDate &&
+                    s.Start.Date < endDate)
                 .OrderBy(s => s.Start)
                 .ToListAsync();
         }
@@ -129,7 +136,8 @@ public class ShiftService : IShiftService
             return new List<Shift>();
         }
 
-        var upperBound = to ?? DateTime.UtcNow;
+        // Use local "now" instead of UTC since we treat all times as PH local
+        var upperBound = to ?? DateTime.Now;
         var lowerBound = from ?? upperBound.AddMonths(-3);
 
         try

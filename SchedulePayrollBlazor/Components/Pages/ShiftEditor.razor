@@ -365,14 +365,16 @@
 
         public Shift ToShift()
         {
-            var baseDate = Date.Date;
+            // Treat the shift date as PH local time explicitly
+            var baseDateLocal = DateTime.SpecifyKind(Date.Date, DateTimeKind.Local);
+
             return new Shift
             {
                 Id = Id ?? 0,
                 EmployeeId = EmployeeId,
                 EmployeeName = EmployeeName ?? string.Empty,
-                Start = baseDate.Add(StartTime),
-                End = baseDate.Add(EndTime),
+                Start = baseDateLocal.Add(StartTime),
+                End = baseDateLocal.Add(EndTime),
                 GroupName = string.IsNullOrWhiteSpace(GroupName) ? null : GroupName.Trim()
             };
         }

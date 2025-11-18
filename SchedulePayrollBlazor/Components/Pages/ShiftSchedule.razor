@@ -47,7 +47,9 @@
             </div>
             <div class="ps-filter-field">
                 <span class="ps-filter-label">Employee:</span>
-                @{ var employees = FilteredEmployees.ToList(); }
+                @{
+                    var employees = FilteredEmployees.ToList();
+                }
                 <InputSelect @bind-Value="_selectedEmployeeId" class="ps-filter-control" disabled="@(!_isAdmin && _currentEmployeeId.HasValue)">
                     <option value="">Employee</option>
                     @foreach (var employee in employees)
@@ -99,9 +101,9 @@
             @foreach (var day in GetWeekDays())
             {
                 var dayShifts = _shifts
-                    .Where(s => s.Start.Date == day.Date)
-                    .OrderBy(s => s.Start)
-                    .ToList();
+                .Where(s => s.Start.Date == day.Date)
+                .OrderBy(s => s.Start)
+                .ToList();
 
                 <div class="ps-schedule-column">
                     <div class="ps-schedule-column-header">
@@ -139,17 +141,16 @@
 
     @if (_isAdmin)
     {
-        <ShiftModal
-            IsOpen="_isModalOpen"
-            IsOpenChanged="OnModalOpenChanged"
-            Model="_editingShift"
-            Employees="_employees.Select(e => (e.Id, e.Name)).ToList()"
-            Title="@(_isNewShift ? "Create shift" : "Edit shift")"
-            OnSave="OnModalSave"
-            OnCancel="OnModalCancel"
-            OnDelete="OnModalDelete"
-            ErrorMessage="@_modalError"
-            IsBusy="_isModalBusy" />
+        <ShiftModal IsOpen="_isModalOpen"
+                    IsOpenChanged="OnModalOpenChanged"
+                    Model="_editingShift"
+                    Employees="_employees.Select(e => (e.Id, e.Name)).ToList()"
+                    Title="@(_isNewShift ? "Create shift" : "Edit shift")"
+                    OnSave="OnModalSave"
+                    OnCancel="OnModalCancel"
+                    OnDelete="OnModalDelete"
+                    ErrorMessage="@_modalError"
+                    IsBusy="_isModalBusy" />
     }
 </div>
 

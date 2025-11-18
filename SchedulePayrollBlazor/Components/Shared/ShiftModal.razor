@@ -1,5 +1,7 @@
 @using System.Globalization
+@using SchedulePayrollBlazor.Data
 @implements IDisposable
+@inject AppDbContext Db
 
 @if (IsOpen && _editContext is not null)
 {
@@ -68,9 +70,19 @@
 
                         <div class="form-group">
                             <label class="ps-label" for="shift-modal-group">Group</label>
-                            <InputText id="shift-modal-group"
-                                       class="ps-input"
-                                       @bind-Value="_formModel.GroupName" />
+                            @* Group dropdown fed from Employees.Department *@
+                            <InputSelect id="shift-modal-group"
+                                         class="ps-input"
+                                         @bind-Value="_formModel.GroupName">
+                                <option value="">Select group</option>
+                                @if (_groupOptions is not null)
+                                {
+                                    @foreach (var g in _groupOptions)
+                                    {
+                                        <option value="@g">@g</option>
+                                    }
+                                }
+                            </InputSelect>
                         </div>
                     </div>
 
@@ -98,6 +110,9 @@
     private EditContext? _editContext;
     private ValidationMessageStore? _validationMessages;
     private bool _isSubmitting;
+
+    // department / group list loaded from DB
+    private List<string> _groupOptions = new();
 
     [Parameter] public bool IsOpen { get; set; }
     [Parameter] public EventCallback<bool> IsOpenChanged { get; set; }
@@ -132,6 +147,24 @@
 
     private void InitializeEditContext()
     {
+        // Load group/department options once when modal first opens
+        if (_groupOptions.Count == 0)
+        {
+            try
+            {
+                _groupOptions = Db.Employees
+                    .Where(e => !string.IsNullOrWhiteSpace(e.Department))
+                    .Select(e => e.Department!)
+                    .Distinct()
+                    .OrderBy(d => d)
+                    .ToList();
+            }
+            catch
+            {
+                _groupOptions = new();
+            }
+        }
+
         var model = Model is not null
             ? ShiftEditorModel.FromShift(Model)
             : ShiftEditorModel.CreateDefault();
@@ -148,6 +181,12 @@
         else if (string.IsNullOrWhiteSpace(model.EmployeeName))
         {
             model.EmployeeName = ResolveEmployeeName(model.EmployeeId);
+        }
+
+        // If no group yet and we have options, default to the first one
+        if (string.IsNullOrWhiteSpace(model.GroupName) && _groupOptions.Any())
+        {
+            model.GroupName = _groupOptions[0];
         }
 
         ResetEditContext(model);
@@ -303,8 +342,9 @@
     private void OnStartChanged(ChangeEventArgs e)
     {
         var value = Convert.ToString(e.Value, CultureInfo.InvariantCulture);
+
         if (!string.IsNullOrWhiteSpace(value) &&
-            TimeSpan.TryParseExact(value, "HH\\:mm", CultureInfo.InvariantCulture, TimeSpanStyles.None, out var time))
+            TimeSpan.TryParse(value, CultureInfo.InvariantCulture, out var time))
         {
             _formModel.StartTime = time;
         }
@@ -315,8 +355,9 @@
     private void OnEndChanged(ChangeEventArgs e)
     {
         var value = Convert.ToString(e.Value, CultureInfo.InvariantCulture);
+
         if (!string.IsNullOrWhiteSpace(value) &&
-            TimeSpan.TryParseExact(value, "HH\\:mm", CultureInfo.InvariantCulture, TimeSpanStyles.None, out var time))
+            TimeSpan.TryParse(value, CultureInfo.InvariantCulture, out var time))
         {
             _formModel.EndTime = time;
         }
@@ -358,7 +399,6 @@
 
         public Shift ToShift()
         {
-            // Treat the date as local PH time explicitly
             var baseDateLocal = DateTime.SpecifyKind(Date.Date, DateTimeKind.Local);
 
             return new Shift
@@ -372,8 +412,11 @@
             };
         }
 
-        public string GetStartTimeText() => StartTime.ToString(@"HH\:mm");
-        public string GetEndTimeText() => EndTime.ToString(@"HH\:mm");
+        public string GetStartTimeText() =>
+            string.Format(CultureInfo.InvariantCulture, "{0:hh\\:mm}", StartTime);
+
+        public string GetEndTimeText() =>
+            string.Format(CultureInfo.InvariantCulture, "{0:hh\\:mm}", EndTime);
     }
 
     public void Dispose()

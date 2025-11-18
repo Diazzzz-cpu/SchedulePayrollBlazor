@@ -181,7 +181,7 @@ else
                                                 <span class="badge badge-secondary">N/A</span>
                                             }
                                         </td>
-                                        <td>@user.CreatedAt.ToLocalTime().ToString("MMM dd, yyyy")</td>
+                                        <td>@user.CreatedAt.ToString("MMM dd, yyyy")</td>
                                         <td class="table-actions">
                                             <button class="btn btn-link" @onclick="() => BeginEdit(user)">Edit</button>
                                             <button class="btn btn-link text-danger" @onclick="() => ConfirmDeleteAsync(user)">Delete</button>

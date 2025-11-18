@@ -344,28 +344,34 @@
 
         public static ShiftEditorModel FromShift(Shift shift)
         {
+            // Treat existing shift times as local (PH) time
+            var startLocal = DateTime.SpecifyKind(shift.Start, DateTimeKind.Local);
+            var endLocal = DateTime.SpecifyKind(shift.End, DateTimeKind.Local);
+
             return new ShiftEditorModel
             {
                 Id = shift.Id,
                 EmployeeId = shift.EmployeeId,
                 EmployeeName = shift.EmployeeName,
-                Date = shift.Start.Date,
-                StartTime = shift.Start.TimeOfDay,
-                EndTime = shift.End.TimeOfDay,
+                Date = startLocal.Date,
+                StartTime = startLocal.TimeOfDay,
+                EndTime = endLocal.TimeOfDay,
                 GroupName = shift.GroupName
             };
         }
 
         public Shift ToShift()
         {
-            var baseDate = Date.Date;
+            // Build Start/End as *local* DateTimes so nothing does extra conversion later
+            var baseDateLocal = DateTime.SpecifyKind(Date.Date, DateTimeKind.Local);
+
             return new Shift
             {
                 Id = Id ?? 0,
                 EmployeeId = EmployeeId,
                 EmployeeName = EmployeeName ?? string.Empty,
-                Start = baseDate.Add(StartTime),
-                End = baseDate.Add(EndTime),
+                Start = baseDateLocal.Add(StartTime),
+                End = baseDateLocal.Add(EndTime),
                 GroupName = string.IsNullOrWhiteSpace(GroupName) ? null : GroupName.Trim()
             };
         }

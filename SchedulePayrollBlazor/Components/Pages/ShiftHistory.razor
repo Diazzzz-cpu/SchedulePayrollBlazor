@@ -84,11 +84,11 @@
                         @foreach (var shift in _history)
                         {
                             <tr>
-                                <td>@shift.Start.ToLocalTime().ToString("MMM dd, yyyy", CultureInfo.InvariantCulture)</td>
+                                <td>@shift.Start.ToString("MMM dd, yyyy", CultureInfo.InvariantCulture)</td>
                                 <td>@ResolveEmployeeName(shift)</td>
                                 <td>@(string.IsNullOrWhiteSpace(shift.GroupName) ? "—" : shift.GroupName)</td>
-                                <td>@shift.Start.ToLocalTime().ToString("hh:mm tt", CultureInfo.InvariantCulture)</td>
-                                <td>@shift.End.ToLocalTime().ToString("hh:mm tt", CultureInfo.InvariantCulture)</td>
+                                <td>@shift.Start.ToString("hh:mm tt", CultureInfo.InvariantCulture)</td>
+                                <td>@shift.End.ToString("hh:mm tt", CultureInfo.InvariantCulture)</td>
                             </tr>
                         }
                     </tbody>

@@ -316,7 +316,7 @@
     {
         var value = Convert.ToString(e.Value, CultureInfo.InvariantCulture);
         if (!string.IsNullOrWhiteSpace(value) &&
-            TimeSpan.TryParseExact(value, "hh\\:mm", CultureInfo.InvariantCulture, TimeSpanStyles.None, out var start))
+            TimeSpan.TryParseExact(value, "HH\\:mm", CultureInfo.InvariantCulture, TimeSpanStyles.None, out var start))
         {
             _form.StartTime = start;
         }
@@ -324,17 +324,20 @@
         _editContext?.NotifyFieldChanged(new FieldIdentifier(_form, nameof(ShiftFormModel.StartTime)));
     }
 
+
     private void OnEndChanged(ChangeEventArgs e)
     {
         var value = Convert.ToString(e.Value, CultureInfo.InvariantCulture);
         if (!string.IsNullOrWhiteSpace(value) &&
-            TimeSpan.TryParseExact(value, "hh\\:mm", CultureInfo.InvariantCulture, TimeSpanStyles.None, out var end))
+            TimeSpan.TryParseExact(value, "HH\\:mm", CultureInfo.InvariantCulture, TimeSpanStyles.None, out var end))
         {
             _form.EndTime = end;
         }
 
         _editContext?.NotifyFieldChanged(new FieldIdentifier(_form, nameof(ShiftFormModel.EndTime)));
     }
+
+
 
     private void ResetFormForNext(EmployeeOption employee)
     {

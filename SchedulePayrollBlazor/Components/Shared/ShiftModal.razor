@@ -304,7 +304,7 @@
     {
         var value = Convert.ToString(e.Value, CultureInfo.InvariantCulture);
         if (!string.IsNullOrWhiteSpace(value) &&
-            TimeSpan.TryParseExact(value, "hh\\:mm", CultureInfo.InvariantCulture, TimeSpanStyles.None, out var time))
+            TimeSpan.TryParseExact(value, "HH\\:mm", CultureInfo.InvariantCulture, TimeSpanStyles.None, out var time))
         {
             _formModel.StartTime = time;
         }
@@ -316,7 +316,7 @@
     {
         var value = Convert.ToString(e.Value, CultureInfo.InvariantCulture);
         if (!string.IsNullOrWhiteSpace(value) &&
-            TimeSpan.TryParseExact(value, "hh\\:mm", CultureInfo.InvariantCulture, TimeSpanStyles.None, out var time))
+            TimeSpan.TryParseExact(value, "HH\\:mm", CultureInfo.InvariantCulture, TimeSpanStyles.None, out var time))
         {
             _formModel.EndTime = time;
         }
@@ -372,10 +372,9 @@
             };
         }
 
-        public string GetStartTimeText() => StartTime.ToString(@"hh\:mm");
-        public string GetEndTimeText() => EndTime.ToString(@"hh\:mm");
+        public string GetStartTimeText() => StartTime.ToString(@"HH\:mm");
+        public string GetEndTimeText() => EndTime.ToString(@"HH\:mm");
     }
-
 
     public void Dispose()
     {

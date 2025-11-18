@@ -324,7 +324,6 @@
         _editContext?.NotifyFieldChanged(new FieldIdentifier(_form, nameof(ShiftFormModel.StartTime)));
     }
 
-
     private void OnEndChanged(ChangeEventArgs e)
     {
         var value = Convert.ToString(e.Value, CultureInfo.InvariantCulture);
@@ -336,8 +335,6 @@
 
         _editContext?.NotifyFieldChanged(new FieldIdentifier(_form, nameof(ShiftFormModel.EndTime)));
     }
-
-
 
     private void ResetFormForNext(EmployeeOption employee)
     {
@@ -382,9 +379,8 @@
             };
         }
 
-        public string GetStartTimeText() => StartTime.ToString(@"hh\:mm");
-
-        public string GetEndTimeText() => EndTime.ToString(@"hh\:mm");
+        public string GetStartTimeText() => StartTime.ToString(@"HH\:mm");
+        public string GetEndTimeText() => EndTime.ToString(@"HH\:mm");
     }
 
     public void Dispose()

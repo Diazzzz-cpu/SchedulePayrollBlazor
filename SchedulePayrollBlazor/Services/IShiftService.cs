@@ -29,4 +29,6 @@ public interface IShiftService
     Task<Shift> UpdateShiftAsync(Shift shift);
 
     Task<bool> DeleteShiftAsync(int id);
+
+    Task<bool> HasOverlappingShiftAsync(int employeeId, DateTime start, DateTime end, int? shiftIdToExclude = null);
 }

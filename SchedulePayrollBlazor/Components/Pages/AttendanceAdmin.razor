@@ -13,7 +13,10 @@
         <div class="ps-filter-row">
             <div class="ps-filter-field">
                 <label class="ps-filter-label">Date</label>
-                <input type="date" class="ps-filter-control" @bind-value="_selectedDateString" @bind-value:event="oninput" />
+                <input type="date"
+                       class="ps-filter-control"
+                       @bind-value="_selectedDate"
+                       @bind-value:event="onchange" />
             </div>
             <div class="ps-filter-field">
                 <label class="ps-filter-label">Employee</label>
@@ -41,58 +44,73 @@
         }
         else
         {
-            <table class="ps-table">
-                <thead>
-                    <tr>
-                        <th>Employee</th>
-                        <th>First in</th>
-                        <th>Last out</th>
-                        <th>Total</th>
-                        <th>Status</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @foreach (var row in _view.Rows)
-                    {
+            if (_view.Rows == null || _view.Rows.Count == 0)
+            {
+                <div class="ps-empty-state">
+                    No scheduled employees found for this date.
+                </div>
+            }
+            else
+            {
+                <table class="ps-table">
+                    <thead>
                         <tr>
-                            <td>@row.EmployeeName</td>
-                            <td>@FormatTime(row.Attendance.FirstIn)</td>
-                            <td>@FormatTime(row.Attendance.LastOut)</td>
-                            <td>@FormatDuration(row.Attendance.TotalDuration)</td>
-                            <td>
-                                @if (!row.Attendance.HasLogs)
-                                {
-                                    <span class="ps-badge ps-badge-ghost">No logs</span>
-                                }
-                                else
-                                {
-                                    <span class="ps-badge">Present</span>
-                                    @if (row.Attendance.IsLate)
-                                    {
-                                        <span class="ps-badge ps-badge-warning">Late</span>
-                                    }
-                                    @if (row.Attendance.IsUndertime)
-                                    {
-                                        <span class="ps-badge ps-badge-warning">Undertime</span>
-                                    }
-                                }
-                            </td>
+                            <th>Employee</th>
+                            <th>First in</th>
+                            <th>Last out</th>
+                            <th>Total</th>
+                            <th>Status</th>
                         </tr>
-                    }
-                </tbody>
-            </table>
+                    </thead>
+                    <tbody>
+                        @foreach (var row in _view.Rows)
+                        {
+                            <tr>
+                                <td>@row.EmployeeName</td>
+                                <td>@FormatTime(row.Attendance.FirstIn)</td>
+                                <td>@FormatTime(row.Attendance.LastOut)</td>
+                                <td>@FormatDuration(row.Attendance.TotalDuration)</td>
+                                <td>
+                                    @if (!row.Attendance.HasLogs)
+                                    {
+                                        <span class="ps-badge ps-badge-ghost">No logs</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="ps-badge">Present</span>
+                                        @if (row.Attendance.IsLate)
+                                        {
+                                            <span class="ps-badge ps-badge-warning">Late</span>
+                                        }
+                                        @if (row.Attendance.IsUndertime)
+                                        {
+                                            <span class="ps-badge ps-badge-warning">Undertime</span>
+                                        }
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
         }
     </div>
 </div>
 
 @code {
     private readonly List<Data.Models.Employee> _employees = new();
-    private PaginatedAttendanceAdminView _view = new();
+    private PaginatedAttendanceAdminView _view = new PaginatedAttendanceAdminView
+    {
+        Rows = new List<AttendanceAdminRow>()
+    };
+
     private bool _isLoading;
     private string? _errorMessage;
     private int _page = 1;
     private const int PageSize = 20;
-    private string _selectedDateString = DateTime.Today.ToString("yyyy-MM-dd");
+
+    // Use DateTime for the date filter, bound to the <input type="date">
+    private DateTime _selectedDate = DateTime.Today;
     private string? _selectedEmployeeId;
 
     protected override async Task OnInitializedAsync()
@@ -111,16 +129,26 @@
     {
         _isLoading = true;
         _errorMessage = null;
+
         try
         {
-            var date = DateOnly.Parse(_selectedDateString);
+            var date = DateOnly.FromDateTime(_selectedDate);
+
             int? employeeId = null;
             if (int.TryParse(_selectedEmployeeId, out var parsed))
             {
                 employeeId = parsed;
             }
 
-            _view = await AttendanceService.GetAttendanceOverviewAsync(date, employeeId, _page, PageSize);
+            _view = await AttendanceService.GetAttendanceOverviewAsync(
+                date,
+                employeeId,
+                _page,
+                PageSize
+            );
+
+            // Safety: never let Rows be null
+            _view.Rows ??= new List<AttendanceAdminRow>();
         }
         catch (Exception ex)
         {

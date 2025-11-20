@@ -37,8 +37,17 @@
         </div>
 
         <div class="ps-actions">
-            <button class="ps-button" @onclick="ClockInAsync" disabled="_isBusy || _hasOpenLog">Clock in</button>
-            <button class="ps-button ps-button-danger" @onclick="ClockOutAsync" disabled="_isBusy || !_hasOpenLog">Clock out</button>
+            <button class="ps-button"
+                    @onclick="ClockInAsync"
+                    disabled="@(_isBusy || _hasOpenLog)">
+                Clock in
+            </button>
+
+            <button class="ps-button ps-button-secondary"
+                    @onclick="ClockOutAsync"
+                    disabled="@(_isBusy || !_hasOpenLog)">
+                Clock out
+            </button>
         </div>
     </div>
 </div>
@@ -137,6 +146,7 @@
         _errorMessage = null;
         _statusText = "Not clocked in";
         _hasOpenLog = false;
+
         if (_employeeId == 0)
         {
             _errorMessage = "Could not find your employee profile.";
@@ -165,6 +175,10 @@
         {
             _shiftLabel = $"{shift.Start:hh:mm tt} – {shift.End:hh:mm tt}";
         }
+        else
+        {
+            _shiftLabel = null;
+        }
     }
 
     private async Task LoadAttendanceAsync()
@@ -183,28 +197,60 @@
 
     private async Task ClockInAsync()
     {
-        _isBusy = true;
-        var result = await AttendanceService.ClockInAsync(_employeeId);
-        if (!result.Success)
+        if (_isBusy || _hasOpenLog) return;
+        if (_employeeId == 0)
         {
-            _errorMessage = result.Message;
+            _errorMessage = "Could not find your employee profile.";
+            return;
         }
-        await LoadTodayAsync();
-        await LoadAttendanceAsync();
-        _isBusy = false;
+
+        _isBusy = true;
+        _errorMessage = null;
+
+        try
+        {
+            var result = await AttendanceService.ClockInAsync(_employeeId);
+            if (!result.Success)
+            {
+                _errorMessage = result.Message;
+            }
+
+            await LoadTodayAsync();
+            await LoadAttendanceAsync();
+        }
+        finally
+        {
+            _isBusy = false;
+        }
     }
 
     private async Task ClockOutAsync()
     {
-        _isBusy = true;
-        var result = await AttendanceService.ClockOutAsync(_employeeId);
-        if (!result.Success)
+        if (_isBusy || !_hasOpenLog) return;
+        if (_employeeId == 0)
         {
-            _errorMessage = result.Message;
+            _errorMessage = "Could not find your employee profile.";
+            return;
         }
-        await LoadTodayAsync();
-        await LoadAttendanceAsync();
-        _isBusy = false;
+
+        _isBusy = true;
+        _errorMessage = null;
+
+        try
+        {
+            var result = await AttendanceService.ClockOutAsync(_employeeId);
+            if (!result.Success)
+            {
+                _errorMessage = result.Message;
+            }
+
+            await LoadTodayAsync();
+            await LoadAttendanceAsync();
+        }
+        finally
+        {
+            _isBusy = false;
+        }
     }
 
     private static string FormatTime(DateTime? value)

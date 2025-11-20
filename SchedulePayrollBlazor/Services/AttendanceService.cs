@@ -86,22 +86,41 @@ public class AttendanceService : IAttendanceService
 
     public async Task<PaginatedAttendanceAdminView> GetAttendanceOverviewAsync(DateOnly date, int? employeeIdFilter, int page, int pageSize)
     {
-        var query = _dbContext.Employees
+        var dateStart = date.ToDateTime(TimeOnly.MinValue);
+        var dateEnd = date.ToDateTime(TimeOnly.MaxValue);
+
+        var scheduledEmployeeIdsQuery = _dbContext.Shifts
             .AsNoTracking()
-            .Where(e => e.IsActive)
-            .OrderBy(e => e.FullName)
-            .AsQueryable();
+            .Where(s => s.Start >= dateStart && s.Start <= dateEnd)
+            .Select(s => s.EmployeeId)
+            .Distinct();
 
         if (employeeIdFilter.HasValue)
         {
-            query = query.Where(e => e.EmployeeId == employeeIdFilter.Value);
+            scheduledEmployeeIdsQuery = scheduledEmployeeIdsQuery.Where(id => id == employeeIdFilter.Value);
         }
 
-        var total = await query.CountAsync();
-        var employees = await query.Skip((page - 1) * pageSize).Take(pageSize).ToListAsync();
+        var scheduledEmployeeIds = await scheduledEmployeeIdsQuery.ToListAsync();
 
-        var dateStart = date.ToDateTime(TimeOnly.MinValue);
-        var dateEnd = date.ToDateTime(TimeOnly.MaxValue);
+        if (!scheduledEmployeeIds.Any())
+        {
+            return new PaginatedAttendanceAdminView
+            {
+                Page = page,
+                PageSize = pageSize,
+                TotalCount = 0,
+                Rows = new List<AttendanceAdminRow>()
+            };
+        }
+
+        var employeesQuery = _dbContext.Employees
+            .AsNoTracking()
+            .Where(e => e.IsActive && scheduledEmployeeIds.Contains(e.EmployeeId))
+            .OrderBy(e => e.FullName)
+            .AsQueryable();
+
+        var total = await employeesQuery.CountAsync();
+        var employees = await employeesQuery.Skip((page - 1) * pageSize).Take(pageSize).ToListAsync();
 
         var employeeIds = employees.Select(e => e.EmployeeId).ToList();
         var logs = await _dbContext.TimeLogs
@@ -109,10 +128,20 @@ public class AttendanceService : IAttendanceService
             .Where(t => employeeIds.Contains(t.EmployeeId) && t.ClockIn >= dateStart && t.ClockIn <= dateEnd)
             .ToListAsync();
 
+        var shifts = await _dbContext.Shifts
+            .AsNoTracking()
+            .Where(s => employeeIds.Contains(s.EmployeeId) && s.Start >= dateStart && s.Start <= dateEnd)
+            .ToListAsync();
+
+        var shiftLookup = shifts
+            .GroupBy(s => s.EmployeeId)
+            .ToDictionary(g => g.Key, g => g.OrderBy(s => s.Start).First());
+
         var rows = employees.Select(e =>
         {
             var employeeLogs = logs.Where(l => l.EmployeeId == e.EmployeeId).ToList();
-            var attendance = BuildDailyAttendance(date, employeeLogs, null);
+            shiftLookup.TryGetValue(e.EmployeeId, out var shift);
+            var attendance = BuildDailyAttendance(date, employeeLogs, shift);
             return new AttendanceAdminRow
             {
                 EmployeeId = e.EmployeeId,

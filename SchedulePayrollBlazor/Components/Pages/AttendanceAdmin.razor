@@ -1,0 +1,149 @@
+@page "/attendance"
+@attribute [Authorize(Roles = "Admin")]
+@using SchedulePayrollBlazor.Services
+@using SchedulePayrollBlazor.Services.Models
+@inject IAttendanceService AttendanceService
+@inject IEmployeeService EmployeeService
+
+<div class="ps-card">
+    <div class="ps-card-header">
+        <h1 class="ps-card-title">Attendance dashboard</h1>
+    </div>
+    <div class="ps-card-body">
+        <div class="ps-filter-row">
+            <div class="ps-filter-field">
+                <label class="ps-filter-label">Date</label>
+                <input type="date" class="ps-filter-control" @bind-value="_selectedDateString" @bind-value:event="oninput" />
+            </div>
+            <div class="ps-filter-field">
+                <label class="ps-filter-label">Employee</label>
+                <select class="ps-filter-control" @bind="_selectedEmployeeId">
+                    <option value="">All employees</option>
+                    @foreach (var emp in _employees)
+                    {
+                        <option value="@emp.EmployeeId">@emp.FullName</option>
+                    }
+                </select>
+            </div>
+            <div class="ps-filter-actions">
+                <button class="ps-button" @onclick="RefreshAsync" disabled="_isLoading">Refresh</button>
+            </div>
+        </div>
+
+        @if (!string.IsNullOrEmpty(_errorMessage))
+        {
+            <div class="ps-alert ps-alert-danger" role="alert">@_errorMessage</div>
+        }
+
+        @if (_isLoading)
+        {
+            <div class="ps-skeleton">Loading attendance...</div>
+        }
+        else
+        {
+            <table class="ps-table">
+                <thead>
+                    <tr>
+                        <th>Employee</th>
+                        <th>First in</th>
+                        <th>Last out</th>
+                        <th>Total</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var row in _view.Rows)
+                    {
+                        <tr>
+                            <td>@row.EmployeeName</td>
+                            <td>@FormatTime(row.Attendance.FirstIn)</td>
+                            <td>@FormatTime(row.Attendance.LastOut)</td>
+                            <td>@FormatDuration(row.Attendance.TotalDuration)</td>
+                            <td>
+                                @if (!row.Attendance.HasLogs)
+                                {
+                                    <span class="ps-badge ps-badge-ghost">No logs</span>
+                                }
+                                else
+                                {
+                                    <span class="ps-badge">Present</span>
+                                    @if (row.Attendance.IsLate)
+                                    {
+                                        <span class="ps-badge ps-badge-warning">Late</span>
+                                    }
+                                    @if (row.Attendance.IsUndertime)
+                                    {
+                                        <span class="ps-badge ps-badge-warning">Undertime</span>
+                                    }
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+    </div>
+</div>
+
+@code {
+    private readonly List<Data.Models.Employee> _employees = new();
+    private PaginatedAttendanceAdminView _view = new();
+    private bool _isLoading;
+    private string? _errorMessage;
+    private int _page = 1;
+    private const int PageSize = 20;
+    private string _selectedDateString = DateTime.Today.ToString("yyyy-MM-dd");
+    private string? _selectedEmployeeId;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadEmployeesAsync();
+        await RefreshAsync();
+    }
+
+    private async Task LoadEmployeesAsync()
+    {
+        _employees.Clear();
+        _employees.AddRange(await EmployeeService.GetAllAsync());
+    }
+
+    private async Task RefreshAsync()
+    {
+        _isLoading = true;
+        _errorMessage = null;
+        try
+        {
+            var date = DateOnly.Parse(_selectedDateString);
+            int? employeeId = null;
+            if (int.TryParse(_selectedEmployeeId, out var parsed))
+            {
+                employeeId = parsed;
+            }
+
+            _view = await AttendanceService.GetAttendanceOverviewAsync(date, employeeId, _page, PageSize);
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = ex.Message;
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private static string FormatTime(DateTime? value)
+    {
+        return value.HasValue ? value.Value.ToString("hh:mm tt") : "—";
+    }
+
+    private static string FormatDuration(TimeSpan duration)
+    {
+        if (duration <= TimeSpan.Zero)
+        {
+            return "0h";
+        }
+
+        return $"{Math.Floor(duration.TotalHours)}h {duration.Minutes}m";
+    }
+}

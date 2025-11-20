@@ -158,6 +158,18 @@ public class ShiftService : IShiftService
         }
     }
 
+    public async Task<Shift?> GetShiftForEmployeeOnAsync(int employeeId, DateTime day)
+    {
+        var start = day.Date;
+        var end = start.AddDays(1);
+
+        return await _db.Shifts
+            .AsNoTracking()
+            .Where(s => s.EmployeeId == employeeId && s.Start >= start && s.Start < end)
+            .OrderBy(s => s.Start)
+            .FirstOrDefaultAsync();
+    }
+
     public async Task<Shift> InsertShiftAsync(Shift shift)
     {
         ArgumentNullException.ThrowIfNull(shift);

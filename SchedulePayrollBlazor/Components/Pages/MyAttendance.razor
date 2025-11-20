@@ -1,0 +1,224 @@
+@page "/my-attendance"
+@attribute [Authorize]
+@using System.Security.Claims
+@using SchedulePayrollBlazor.Services
+@using SchedulePayrollBlazor.Services.Models
+@inject IAttendanceService AttendanceService
+@inject IShiftService ShiftService
+@inject AuthenticationStateProvider AuthStateProvider
+
+<div class="ps-card">
+    <div class="ps-card-header">
+        <div>
+            <div class="ps-card-eyebrow">Today</div>
+            <h1 class="ps-card-title">My attendance</h1>
+        </div>
+    </div>
+
+    @if (!string.IsNullOrEmpty(_errorMessage))
+    {
+        <div class="ps-alert ps-alert-danger" role="alert">@_errorMessage</div>
+    }
+
+    <div class="ps-card-body">
+        <div class="ps-stack ps-stack-horizontal ps-stack-gap">
+            <div class="ps-pill">@DateTime.Today.ToString("dddd, MMM dd")</div>
+            @if (!string.IsNullOrWhiteSpace(_shiftLabel))
+            {
+                <div class="ps-badge">Shift: @_shiftLabel</div>
+            }
+        </div>
+
+        <div class="ps-status-block">
+            <div class="ps-status-title">Current status</div>
+            <div class="ps-status-body">
+                @_statusText
+            </div>
+        </div>
+
+        <div class="ps-actions">
+            <button class="ps-button" @onclick="ClockInAsync" disabled="_isBusy || _hasOpenLog">Clock in</button>
+            <button class="ps-button ps-button-danger" @onclick="ClockOutAsync" disabled="_isBusy || !_hasOpenLog">Clock out</button>
+        </div>
+    </div>
+</div>
+
+<div class="ps-card">
+    <div class="ps-card-header">
+        <h2 class="ps-card-title">Recent attendance</h2>
+    </div>
+    <div class="ps-card-body">
+        @if (_attendance.Count == 0)
+        {
+            <div class="ps-empty-state">No attendance data yet.</div>
+        }
+        else
+        {
+            <table class="ps-table">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>First in</th>
+                        <th>Last out</th>
+                        <th>Total</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var day in _attendance)
+                    {
+                        <tr>
+                            <td>@day.Date.ToString("MMM dd")</td>
+                            <td>@FormatTime(day.FirstIn)</td>
+                            <td>@FormatTime(day.LastOut)</td>
+                            <td>@FormatDuration(day.TotalDuration)</td>
+                            <td>
+                                @if (!day.HasLogs)
+                                {
+                                    <span class="ps-badge ps-badge-ghost">No logs</span>
+                                }
+                                else
+                                {
+                                    <span class="ps-badge">Present</span>
+                                    @if (day.IsLate)
+                                    {
+                                        <span class="ps-badge ps-badge-warning">Late</span>
+                                    }
+                                    @if (day.IsUndertime)
+                                    {
+                                        <span class="ps-badge ps-badge-warning">Undertime</span>
+                                    }
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+    </div>
+</div>
+
+@code {
+    private int _employeeId;
+    private bool _hasOpenLog;
+    private bool _isBusy;
+    private string? _statusText;
+    private string? _errorMessage;
+    private string? _shiftLabel;
+    private readonly List<DailyAttendanceDto> _attendance = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await ResolveEmployeeAsync();
+        await LoadTodayAsync();
+        await LoadAttendanceAsync();
+    }
+
+    private async Task ResolveEmployeeAsync()
+    {
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+        var employeeClaim = user.FindFirst("EmployeeId")?.Value;
+        if (int.TryParse(employeeClaim, out var employeeId))
+        {
+            _employeeId = employeeId;
+        }
+        else
+        {
+            var idClaim = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            var email = user.FindFirst(ClaimTypes.Email)?.Value;
+            var resolved = await ShiftService.ResolveEmployeeIdForUserAsync(idClaim, email);
+            _employeeId = resolved ?? 0;
+        }
+    }
+
+    private async Task LoadTodayAsync()
+    {
+        _errorMessage = null;
+        _statusText = "Not clocked in";
+        _hasOpenLog = false;
+        if (_employeeId == 0)
+        {
+            _errorMessage = "Could not find your employee profile.";
+            return;
+        }
+
+        var today = DateOnly.FromDateTime(DateTime.Today);
+        var attendance = await AttendanceService.GetAttendanceForEmployeeAsync(_employeeId, today, today);
+        var todayRecord = attendance.FirstOrDefault();
+        if (todayRecord is not null)
+        {
+            _hasOpenLog = todayRecord.Logs.Any(l => l.ClockOut == null);
+            if (_hasOpenLog)
+            {
+                var open = todayRecord.Logs.First(l => l.ClockOut == null);
+                _statusText = $"Clocked in since {open.ClockIn:t}";
+            }
+            else if (todayRecord.LastOut.HasValue)
+            {
+                _statusText = $"Clocked out at {todayRecord.LastOut:t}, Total: {FormatDuration(todayRecord.TotalDuration)}";
+            }
+        }
+
+        var shift = await ShiftService.GetShiftForEmployeeOnAsync(_employeeId, DateTime.Today);
+        if (shift is not null)
+        {
+            _shiftLabel = $"{shift.Start:hh:mm tt} – {shift.End:hh:mm tt}";
+        }
+    }
+
+    private async Task LoadAttendanceAsync()
+    {
+        _attendance.Clear();
+        if (_employeeId == 0)
+        {
+            return;
+        }
+
+        var start = DateOnly.FromDateTime(DateTime.Today.AddDays(-14));
+        var end = DateOnly.FromDateTime(DateTime.Today);
+        var data = await AttendanceService.GetAttendanceForEmployeeAsync(_employeeId, start, end);
+        _attendance.AddRange(data);
+    }
+
+    private async Task ClockInAsync()
+    {
+        _isBusy = true;
+        var result = await AttendanceService.ClockInAsync(_employeeId);
+        if (!result.Success)
+        {
+            _errorMessage = result.Message;
+        }
+        await LoadTodayAsync();
+        await LoadAttendanceAsync();
+        _isBusy = false;
+    }
+
+    private async Task ClockOutAsync()
+    {
+        _isBusy = true;
+        var result = await AttendanceService.ClockOutAsync(_employeeId);
+        if (!result.Success)
+        {
+            _errorMessage = result.Message;
+        }
+        await LoadTodayAsync();
+        await LoadAttendanceAsync();
+        _isBusy = false;
+    }
+
+    private static string FormatTime(DateTime? value)
+    {
+        return value.HasValue ? value.Value.ToString("hh:mm tt") : "—";
+    }
+
+    private static string FormatDuration(TimeSpan duration)
+    {
+        if (duration <= TimeSpan.Zero)
+        {
+            return "0h";
+        }
+
+        return $"{Math.Floor(duration.TotalHours)}h {duration.Minutes}m";
+    }
+}

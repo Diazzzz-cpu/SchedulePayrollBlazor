@@ -215,15 +215,22 @@ public class AttendanceService : IAttendanceService
         }
 
         var hasShift = shifts.Any();
+        DateTime? shiftStart = null;
+        DateTime? shiftEnd = null;
+        decimal scheduledHours = 0m;
         var isLate = false;
         var isUndertime = false;
         var isOvertime = false;
         var isAbsent = false;
+        var lateMinutes = 0;
+        var undertimeMinutes = 0;
+        var overtimeMinutes = 0;
 
         if (hasShift)
         {
-            var shiftStart = shifts.Min(s => s.Start);
-            var shiftEnd = shifts.Max(s => s.End);
+            shiftStart = shifts.Min(s => s.Start);
+            shiftEnd = shifts.Max(s => s.End);
+            scheduledHours = (decimal)(shiftEnd - shiftStart).TotalHours;
 
             if (!hasLogs)
             {
@@ -233,13 +240,20 @@ public class AttendanceService : IAttendanceService
             {
                 if (firstIn.HasValue)
                 {
-                    isLate = firstIn.Value > shiftStart.AddMinutes(LateGraceMinutes);
+                    var difference = (firstIn.Value - shiftStart.Value).TotalMinutes - LateGraceMinutes;
+                    lateMinutes = (int)Math.Max(0, Math.Round(difference, MidpointRounding.AwayFromZero));
+                    isLate = lateMinutes > 0;
                 }
 
                 if (lastOut.HasValue)
                 {
-                    isUndertime = lastOut.Value < shiftEnd.AddMinutes(-UndertimeGraceMinutes);
-                    isOvertime = lastOut.Value > shiftEnd.AddMinutes(OvertimeThresholdMinutes);
+                    var undertimeDifference = (shiftEnd.Value - lastOut.Value).TotalMinutes - UndertimeGraceMinutes;
+                    undertimeMinutes = (int)Math.Max(0, Math.Round(undertimeDifference, MidpointRounding.AwayFromZero));
+                    isUndertime = undertimeMinutes > 0;
+
+                    var overtimeDifference = (lastOut.Value - shiftEnd.Value).TotalMinutes - OvertimeThresholdMinutes;
+                    overtimeMinutes = (int)Math.Max(0, Math.Round(overtimeDifference, MidpointRounding.AwayFromZero));
+                    isOvertime = overtimeMinutes > 0;
                 }
             }
         }
@@ -250,12 +264,18 @@ public class AttendanceService : IAttendanceService
             FirstIn = firstIn,
             LastOut = lastOut,
             TotalDuration = hasLogs ? total : TimeSpan.Zero,
+            ScheduledStart = shiftStart,
+            ScheduledEnd = shiftEnd,
             Logs = logs,
             HasLogs = hasLogs,
             IsLate = isLate,
             IsUndertime = isUndertime,
             IsOvertime = isOvertime,
-            IsAbsent = isAbsent
+            IsAbsent = isAbsent,
+            LateMinutes = lateMinutes,
+            UndertimeMinutes = undertimeMinutes,
+            OvertimeMinutes = overtimeMinutes,
+            ScheduledHours = scheduledHours
         };
     }
 }

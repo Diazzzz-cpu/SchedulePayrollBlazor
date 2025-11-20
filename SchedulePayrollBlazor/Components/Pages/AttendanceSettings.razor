@@ -1,0 +1,134 @@
+@page "/settings/attendance"
+@attribute [Authorize(Roles = "Admin")]
+@using System.ComponentModel.DataAnnotations
+@using SchedulePayrollBlazor.Data.Models
+
+@inject IAttendanceSettingsService AttendanceSettingsService
+
+<div class="ps-page">
+    <div class="ps-page-header">
+        <div>
+            <h2>Attendance penalties & bonuses</h2>
+            <p class="ps-subtitle">Configure automatic deductions and bonuses based on attendance.</p>
+        </div>
+    </div>
+
+    <section class="ps-card">
+        <EditForm Model="model" OnValidSubmit="SaveAsync">
+            <DataAnnotationsValidator />
+            <ValidationSummary />
+
+            @if (!string.IsNullOrEmpty(alertMessage))
+            {
+                <div class="alert @(alertIsError ? "alert-danger" : "alert-success")">@alertMessage</div>
+            }
+
+            <div class="row g-4">
+                <div class="col-md-6">
+                    <label class="form-label">Late penalty (per 30 minutes)</label>
+                    <InputNumber @bind-Value="model.LatePenaltyPerHalfHour" class="form-control" step="0.01" min="0" />
+                    <div class="form-text">Converted to a per-minute rate when saved.</div>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Undertime penalty (per hour)</label>
+                    <InputNumber @bind-Value="model.UndertimePenaltyPerHour" class="form-control" step="0.01" min="0" />
+                    <div class="form-text">Applied when an employee leaves early beyond grace minutes.</div>
+                </div>
+            </div>
+
+            <div class="row g-4 mt-1">
+                <div class="col-md-6">
+                    <label class="form-label">Absence multiplier (full day)</label>
+                    <InputNumber @bind-Value="model.AbsenceFullDayMultiplier" class="form-control" step="0.01" min="0" />
+                    <div class="form-text">Multiplier against daily base pay for scheduled hours.</div>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Overtime bonus (per hour)</label>
+                    <InputNumber @bind-Value="model.OvertimeBonusPerHour" class="form-control" step="0.01" min="0" />
+                    <div class="form-text">Reward for approved overtime beyond the threshold.</div>
+                </div>
+            </div>
+
+            <div class="d-flex gap-2 mt-4">
+                <button class="btn btn-primary" type="submit">Save changes</button>
+                <span class="text-muted align-self-center">Last updated: @lastUpdatedLabel</span>
+            </div>
+        </EditForm>
+    </section>
+</div>
+
+@code {
+    private AttendanceSettingsModel model = new();
+    private string? alertMessage;
+    private bool alertIsError;
+    private string lastUpdatedLabel = "—";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        try
+        {
+            var settings = await AttendanceSettingsService.GetOrCreateAsync();
+            model = new AttendanceSettingsModel
+            {
+                LatePenaltyPerHalfHour = Math.Round(settings.LatePenaltyPerMinute * 30m, 2, MidpointRounding.AwayFromZero),
+                UndertimePenaltyPerHour = Math.Round(settings.UndertimePenaltyPerMinute * 60m, 2, MidpointRounding.AwayFromZero),
+                AbsenceFullDayMultiplier = settings.AbsenceFullDayMultiplier,
+                OvertimeBonusPerHour = Math.Round(settings.OvertimeBonusPerMinute * 60m, 2, MidpointRounding.AwayFromZero)
+            };
+
+            lastUpdatedLabel = settings.UpdatedAt == default
+                ? "Not set"
+                : settings.UpdatedAt.ToLocalTime().ToString("MMM dd, yyyy HH:mm");
+        }
+        catch (Exception ex)
+        {
+            alertIsError = true;
+            alertMessage = $"Unable to load settings: {ex.Message}";
+        }
+    }
+
+    private async Task SaveAsync()
+    {
+        try
+        {
+            var settings = new AttendancePenaltySettings
+            {
+                LatePenaltyPerMinute = model.LatePenaltyPerHalfHour / 30m,
+                UndertimePenaltyPerMinute = model.UndertimePenaltyPerHour / 60m,
+                AbsenceFullDayMultiplier = model.AbsenceFullDayMultiplier,
+                OvertimeBonusPerMinute = model.OvertimeBonusPerHour / 60m
+            };
+
+            var updated = await AttendanceSettingsService.UpdateAsync(settings);
+
+            alertIsError = false;
+            alertMessage = "Attendance penalty settings updated.";
+            lastUpdatedLabel = updated.UpdatedAt.ToLocalTime().ToString("MMM dd, yyyy HH:mm");
+        }
+        catch (Exception ex)
+        {
+            alertIsError = true;
+            alertMessage = $"Unable to save settings: {ex.Message}";
+        }
+    }
+
+    private sealed class AttendanceSettingsModel
+    {
+        [Range(0, double.MaxValue)]
+        public decimal LatePenaltyPerHalfHour { get; set; }
+
+        [Range(0, double.MaxValue)]
+        public decimal UndertimePenaltyPerHour { get; set; }
+
+        [Range(0, double.MaxValue)]
+        public decimal AbsenceFullDayMultiplier { get; set; }
+
+        [Range(0, double.MaxValue)]
+        public decimal OvertimeBonusPerHour { get; set; }
+    }
+}

@@ -48,5 +48,19 @@ public static class DatabaseSeeder
             db.Users.Add(adminUser);
             await db.SaveChangesAsync();
         }
+
+        if (!await db.AttendancePenaltySettings.AnyAsync())
+        {
+            db.AttendancePenaltySettings.Add(new AttendancePenaltySettings
+            {
+                LatePenaltyPerMinute = 0m,
+                UndertimePenaltyPerMinute = 0m,
+                AbsenceFullDayMultiplier = 0m,
+                OvertimeBonusPerMinute = 0m,
+                UpdatedAt = DateTime.UtcNow
+            });
+
+            await db.SaveChangesAsync();
+        }
     }
 }

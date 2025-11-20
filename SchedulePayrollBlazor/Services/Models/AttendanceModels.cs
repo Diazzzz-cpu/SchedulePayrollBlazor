@@ -13,7 +13,9 @@ public class DailyAttendanceDto
     public DateTime? LastOut { get; set; }
     public bool IsLate { get; set; }
     public bool IsUndertime { get; set; }
-    public bool HasLogs => Logs.Count > 0;
+    public bool IsOvertime { get; set; }
+    public bool IsAbsent { get; set; }
+    public bool HasLogs { get; set; }
     public List<Data.Models.TimeLog> Logs { get; set; } = new();
 }
 

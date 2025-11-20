@@ -835,6 +835,11 @@ small {
     color: var(--ps-danger-text);
 }
 
+.ps-badge-large {
+    padding: 0.5rem 1rem;
+    font-size: 0.85rem;
+}
+
 .badge-secondary,
 .ps-badge-neutral,
 .ps-badge-secondary {
@@ -2072,8 +2077,8 @@ textarea {
 
 /* Table layout: fixed width and wrapping */
 
-/* Payroll summary table – tidy columns, no broken headers */
-/* Payroll summary table – straight columns, headers on one line */
+/* Payroll summary table Â– tidy columns, no broken headers */
+/* Payroll summary table Â– straight columns, headers on one line */
 .payroll-table {
     width: 100%;
     border-collapse: collapse;

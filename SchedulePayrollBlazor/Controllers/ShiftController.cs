@@ -102,8 +102,15 @@ public class ShiftController : ControllerBase
             GroupName = request.GroupName
         };
 
-        var created = await _shiftService.InsertShiftAsync(shift);
-        return CreatedAtAction(nameof(GetByIdAsync), new { id = created.Id }, created);
+        try
+        {
+            var created = await _shiftService.InsertShiftAsync(shift);
+            return CreatedAtAction(nameof(GetByIdAsync), new { id = created.Id }, created);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(ex.Message);
+        }
     }
 
     [HttpPut("{id:int}")]
@@ -134,6 +141,10 @@ public class ShiftController : ControllerBase
         catch (KeyNotFoundException)
         {
             return NotFound();
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(ex.Message);
         }
     }
 

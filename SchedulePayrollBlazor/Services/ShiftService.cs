@@ -10,6 +10,8 @@ public class ShiftService : IShiftService
 {
     private readonly AppDbContext _db;
 
+    private const string OverlapErrorMessage = "Schedule overlaps with the current set of schedules for this employee.";
+
     public ShiftService(AppDbContext db)
     {
         _db = db;
@@ -169,6 +171,11 @@ public class ShiftService : IShiftService
             ? shift.EmployeeName
             : shift.EmployeeName.Trim();
 
+        if (await HasOverlappingShiftAsync(shift.EmployeeId, shift.Start, shift.End))
+        {
+            throw new InvalidOperationException(OverlapErrorMessage);
+        }
+
         await ApplyEmployeeMetadataAsync(
             shift,
             preferExistingName: !string.IsNullOrWhiteSpace(shift.EmployeeName),
@@ -191,6 +198,11 @@ public class ShiftService : IShiftService
 
         var existing = await _db.Shifts.FirstOrDefaultAsync(s => s.Id == shift.Id)
             ?? throw new KeyNotFoundException($"Shift with id {shift.Id} was not found.");
+
+        if (await HasOverlappingShiftAsync(shift.EmployeeId, shift.Start, shift.End, shift.Id))
+        {
+            throw new InvalidOperationException(OverlapErrorMessage);
+        }
 
         existing.EmployeeId = shift.EmployeeId;
         existing.Start = shift.Start;
@@ -224,6 +236,20 @@ public class ShiftService : IShiftService
         _db.Shifts.Remove(entity);
         await _db.SaveChangesAsync();
         return true;
+    }
+
+    public Task<bool> HasOverlappingShiftAsync(int employeeId, DateTime start, DateTime end, int? shiftIdToExclude = null)
+    {
+        if (employeeId <= 0)
+        {
+            return Task.FromResult(false);
+        }
+
+        return _db.Shifts
+            .AsNoTracking()
+            .Where(s => s.EmployeeId == employeeId)
+            .Where(s => !shiftIdToExclude.HasValue || s.Id != shiftIdToExclude.Value)
+            .AnyAsync(s => start < s.End && end > s.Start);
     }
 
     private async Task ApplyEmployeeMetadataAsync(Shift shift, bool preferExistingName = false, bool preferExistingGroup = false)

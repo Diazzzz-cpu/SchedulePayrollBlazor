@@ -82,11 +82,11 @@
                             <td>@FormatTime(day.LastOut)</td>
                             <td>@FormatDuration(day.TotalDuration)</td>
                             <td>
-                                @if (!day.HasLogs)
+                                @if (day.IsAbsent)
                                 {
-                                    <span class="ps-badge ps-badge-ghost">No logs</span>
+                                    <span class="ps-badge ps-badge-danger ps-badge-large">Absent</span>
                                 }
-                                else
+                                else if (day.HasLogs)
                                 {
                                     <span class="ps-badge">Present</span>
                                     @if (day.IsLate)
@@ -97,6 +97,14 @@
                                     {
                                         <span class="ps-badge ps-badge-warning">Undertime</span>
                                     }
+                                    @if (day.IsOvertime)
+                                    {
+                                        <span class="ps-badge ps-badge-success">Overtime</span>
+                                    }
+                                }
+                                else
+                                {
+                                    <span class="ps-badge ps-badge-ghost">No logs</span>
                                 }
                             </td>
                         </tr>
@@ -158,15 +166,23 @@
         var todayRecord = attendance.FirstOrDefault();
         if (todayRecord is not null)
         {
-            _hasOpenLog = todayRecord.Logs.Any(l => l.ClockOut == null);
-            if (_hasOpenLog)
+            if (todayRecord.IsAbsent)
             {
-                var open = todayRecord.Logs.First(l => l.ClockOut == null);
-                _statusText = $"Clocked in since {open.ClockIn:t}";
+                _statusText = "Marked as absent for today's shift.";
+                _hasOpenLog = false;
             }
-            else if (todayRecord.LastOut.HasValue)
+            else
             {
-                _statusText = $"Clocked out at {todayRecord.LastOut:t}, Total: {FormatDuration(todayRecord.TotalDuration)}";
+                _hasOpenLog = todayRecord.Logs.Any(l => l.ClockOut == null);
+                if (_hasOpenLog)
+                {
+                    var open = todayRecord.Logs.First(l => l.ClockOut == null);
+                    _statusText = $"Clocked in since {open.ClockIn:t}";
+                }
+                else if (todayRecord.LastOut.HasValue)
+                {
+                    _statusText = $"Clocked out at {todayRecord.LastOut:t}, Total: {FormatDuration(todayRecord.TotalDuration)}";
+                }
             }
         }
 

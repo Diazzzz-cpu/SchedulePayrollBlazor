@@ -12,7 +12,9 @@ namespace SchedulePayrollBlazor.Services;
 public class AttendanceService : IAttendanceService
 {
     private readonly AppDbContext _dbContext;
-    private const int GraceMinutes = 10;
+    private const int LateGraceMinutes = 5;
+    private const int UndertimeGraceMinutes = 5;
+    private const int OvertimeThresholdMinutes = 5;
 
     public AttendanceService(AppDbContext dbContext)
     {
@@ -77,9 +79,38 @@ public class AttendanceService : IAttendanceService
             .OrderBy(t => t.ClockIn)
             .ToListAsync();
 
-        return logs
+        var shifts = await _dbContext.Shifts
+            .AsNoTracking()
+            .Where(s => s.EmployeeId == employeeId && s.Start >= startDate && s.Start <= endDate)
+            .OrderBy(s => s.Start)
+            .ToListAsync();
+
+        var logsByDate = logs
             .GroupBy(l => DateOnly.FromDateTime(l.ClockIn))
-            .Select(g => BuildDailyAttendance(g.Key, g.ToList(), null))
+            .ToDictionary(g => g.Key, g => g.ToList());
+
+        var shiftsByDate = shifts
+            .GroupBy(s => DateOnly.FromDateTime(s.Start))
+            .ToDictionary(g => g.Key, g => g.ToList());
+
+        var dates = new HashSet<DateOnly>();
+        foreach (var date in logsByDate.Keys)
+        {
+            dates.Add(date);
+        }
+
+        foreach (var date in shiftsByDate.Keys)
+        {
+            dates.Add(date);
+        }
+
+        return dates
+            .Select(date =>
+            {
+                var logsForDate = logsByDate.TryGetValue(date, out var logList) ? logList : new List<TimeLog>();
+                var shiftsForDate = shiftsByDate.TryGetValue(date, out var shiftList) ? shiftList : new List<Shift>();
+                return BuildDailyAttendance(date, logsForDate, shiftsForDate);
+            })
             .OrderByDescending(d => d.Date)
             .ToList();
     }
@@ -133,15 +164,20 @@ public class AttendanceService : IAttendanceService
             .Where(s => employeeIds.Contains(s.EmployeeId) && s.Start >= dateStart && s.Start <= dateEnd)
             .ToListAsync();
 
-        var shiftLookup = shifts
-            .GroupBy(s => s.EmployeeId)
-            .ToDictionary(g => g.Key, g => g.OrderBy(s => s.Start).First());
+        var logsByEmployee = logs
+            .GroupBy(l => (l.EmployeeId, DateOnly.FromDateTime(l.ClockIn)))
+            .ToDictionary(g => g.Key, g => g.ToList());
+
+        var shiftsByEmployee = shifts
+            .GroupBy(s => (s.EmployeeId, DateOnly.FromDateTime(s.Start)))
+            .ToDictionary(g => g.Key, g => g.ToList());
 
         var rows = employees.Select(e =>
         {
-            var employeeLogs = logs.Where(l => l.EmployeeId == e.EmployeeId).ToList();
-            shiftLookup.TryGetValue(e.EmployeeId, out var shift);
-            var attendance = BuildDailyAttendance(date, employeeLogs, shift);
+            var key = (e.EmployeeId, date);
+            var employeeLogs = logsByEmployee.TryGetValue(key, out var logList) ? logList : new List<TimeLog>();
+            var employeeShifts = shiftsByEmployee.TryGetValue(key, out var shiftList) ? shiftList : new List<Shift>();
+            var attendance = BuildDailyAttendance(date, employeeLogs, employeeShifts);
             return new AttendanceAdminRow
             {
                 EmployeeId = e.EmployeeId,
@@ -159,10 +195,15 @@ public class AttendanceService : IAttendanceService
         };
     }
 
-    private DailyAttendanceDto BuildDailyAttendance(DateOnly date, List<TimeLog> logs, Shift? shift)
+    private DailyAttendanceDto BuildDailyAttendance(DateOnly date, List<TimeLog> logs, List<Shift> shifts)
     {
+        var hasLogs = logs.Any();
+
         var firstIn = logs.OrderBy(l => l.ClockIn).FirstOrDefault()?.ClockIn;
-        var lastOut = logs.OrderByDescending(l => l.ClockOut ?? l.ClockIn).FirstOrDefault()?.ClockOut;
+        var lastOut = logs
+            .Where(l => l.ClockOut.HasValue)
+            .OrderByDescending(l => l.ClockOut)
+            .FirstOrDefault()?.ClockOut;
 
         var total = TimeSpan.Zero;
         foreach (var log in logs)
@@ -173,17 +214,34 @@ public class AttendanceService : IAttendanceService
             }
         }
 
-        bool isLate = false;
-        bool isUndertime = false;
+        var hasShift = shifts.Any();
+        var isLate = false;
+        var isUndertime = false;
+        var isOvertime = false;
+        var isAbsent = false;
 
-        if (shift is not null && firstIn.HasValue)
+        if (hasShift)
         {
-            isLate = firstIn.Value > shift.Start.AddMinutes(GraceMinutes);
-        }
+            var shiftStart = shifts.Min(s => s.Start);
+            var shiftEnd = shifts.Max(s => s.End);
 
-        if (shift is not null && lastOut.HasValue)
-        {
-            isUndertime = lastOut.Value < shift.End.AddMinutes(-GraceMinutes);
+            if (!hasLogs)
+            {
+                isAbsent = true;
+            }
+            else
+            {
+                if (firstIn.HasValue)
+                {
+                    isLate = firstIn.Value > shiftStart.AddMinutes(LateGraceMinutes);
+                }
+
+                if (lastOut.HasValue)
+                {
+                    isUndertime = lastOut.Value < shiftEnd.AddMinutes(-UndertimeGraceMinutes);
+                    isOvertime = lastOut.Value > shiftEnd.AddMinutes(OvertimeThresholdMinutes);
+                }
+            }
         }
 
         return new DailyAttendanceDto
@@ -191,10 +249,13 @@ public class AttendanceService : IAttendanceService
             Date = date,
             FirstIn = firstIn,
             LastOut = lastOut,
-            TotalDuration = total,
+            TotalDuration = hasLogs ? total : TimeSpan.Zero,
             Logs = logs,
+            HasLogs = hasLogs,
             IsLate = isLate,
-            IsUndertime = isUndertime
+            IsUndertime = isUndertime,
+            IsOvertime = isOvertime,
+            IsAbsent = isAbsent
         };
     }
 }

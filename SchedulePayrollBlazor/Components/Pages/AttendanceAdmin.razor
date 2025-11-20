@@ -71,11 +71,11 @@
                                 <td>@FormatTime(row.Attendance.LastOut)</td>
                                 <td>@FormatDuration(row.Attendance.TotalDuration)</td>
                                 <td>
-                                    @if (!row.Attendance.HasLogs)
+                                    @if (row.Attendance.IsAbsent)
                                     {
-                                        <span class="ps-badge ps-badge-ghost">No logs</span>
+                                        <span class="ps-badge ps-badge-danger ps-badge-large">Absent</span>
                                     }
-                                    else
+                                    else if (row.Attendance.HasLogs)
                                     {
                                         <span class="ps-badge">Present</span>
                                         @if (row.Attendance.IsLate)
@@ -86,6 +86,14 @@
                                         {
                                             <span class="ps-badge ps-badge-warning">Undertime</span>
                                         }
+                                        @if (row.Attendance.IsOvertime)
+                                        {
+                                            <span class="ps-badge ps-badge-success">Overtime</span>
+                                        }
+                                    }
+                                    else
+                                    {
+                                        <span class="ps-badge ps-badge-ghost">No logs</span>
                                     }
                                 </td>
                             </tr>

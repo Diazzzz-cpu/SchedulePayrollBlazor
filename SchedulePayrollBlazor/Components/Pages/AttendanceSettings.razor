@@ -8,7 +8,7 @@
 <div class="ps-page">
     <div class="ps-page-header">
         <div>
-            <h2>Attendance penalties & bonuses</h2>
+            <h2>Attendance penalties &amp; bonuses</h2>
             <p class="ps-subtitle">Configure automatic deductions and bonuses based on attendance.</p>
         </div>
     </div>
@@ -23,33 +23,68 @@
                 <div class="alert @(alertIsError ? "alert-danger" : "alert-success")">@alertMessage</div>
             }
 
-            <div class="row g-4">
-                <div class="col-md-6">
-                    <label class="form-label">Late penalty (per 30 minutes)</label>
-                    <InputNumber @bind-Value="model.LatePenaltyPerHalfHour" class="form-control" step="0.01" min="0" />
-                    <div class="form-text">Converted to a per-minute rate when saved.</div>
+            <div class="ps-form-grid">
+                <!-- Late Penalty -->
+                <div class="ps-form-row">
+                    <div class="ps-form-label">
+                        <label class="ps-label">Late penalty (per 30 minutes)</label>
+                        <p class="ps-help-text">Converted to a per-minute rate when saved.</p>
+                    </div>
+                    <div class="ps-form-control">
+                        <div class="ps-input-group">
+                            <span class="ps-input-prefix">₱</span>
+                            <InputNumber @bind-Value="model.LatePenaltyPerHalfHour" class="ps-input" step="0.01" min="0" />
+                            <span class="ps-input-suffix">per 30 min</span>
+                        </div>
+                    </div>
                 </div>
-                <div class="col-md-6">
-                    <label class="form-label">Undertime penalty (per hour)</label>
-                    <InputNumber @bind-Value="model.UndertimePenaltyPerHour" class="form-control" step="0.01" min="0" />
-                    <div class="form-text">Applied when an employee leaves early beyond grace minutes.</div>
+
+                <!-- Undertime Penalty -->
+                <div class="ps-form-row">
+                    <div class="ps-form-label">
+                        <label class="ps-label">Undertime penalty (per hour)</label>
+                        <p class="ps-help-text">Applied when an employee leaves early beyond grace minutes.</p>
+                    </div>
+                    <div class="ps-form-control">
+                        <div class="ps-input-group">
+                            <span class="ps-input-prefix">₱</span>
+                            <InputNumber @bind-Value="model.UndertimePenaltyPerHour" class="ps-input" step="0.01" min="0" />
+                            <span class="ps-input-suffix">per hour</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Absence -->
+                <div class="ps-form-row">
+                    <div class="ps-form-label">
+                        <label class="ps-label">Absence multiplier (full day)</label>
+                        <p class="ps-help-text">Multiplier against daily base pay for scheduled hours.</p>
+                    </div>
+                    <div class="ps-form-control">
+                        <div class="ps-input-group">
+                            <InputNumber @bind-Value="model.AbsenceFullDayMultiplier" class="ps-input" step="0.01" min="0" />
+                            <span class="ps-input-suffix">× daily pay</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Overtime -->
+                <div class="ps-form-row">
+                    <div class="ps-form-label">
+                        <label class="ps-label">Overtime bonus (per hour)</label>
+                        <p class="ps-help-text">Reward for approved overtime beyond the threshold.</p>
+                    </div>
+                    <div class="ps-form-control">
+                        <div class="ps-input-group">
+                            <span class="ps-input-prefix">₱</span>
+                            <InputNumber @bind-Value="model.OvertimeBonusPerHour" class="ps-input" step="0.01" min="0" />
+                            <span class="ps-input-suffix">per hour</span>
+                        </div>
+                    </div>
                 </div>
             </div>
 
-            <div class="row g-4 mt-1">
-                <div class="col-md-6">
-                    <label class="form-label">Absence multiplier (full day)</label>
-                    <InputNumber @bind-Value="model.AbsenceFullDayMultiplier" class="form-control" step="0.01" min="0" />
-                    <div class="form-text">Multiplier against daily base pay for scheduled hours.</div>
-                </div>
-                <div class="col-md-6">
-                    <label class="form-label">Overtime bonus (per hour)</label>
-                    <InputNumber @bind-Value="model.OvertimeBonusPerHour" class="form-control" step="0.01" min="0" />
-                    <div class="form-text">Reward for approved overtime beyond the threshold.</div>
-                </div>
-            </div>
-
-            <div class="d-flex gap-2 mt-4">
+            <div class="ps-form-footer">
                 <button class="btn btn-primary" type="submit">Save changes</button>
                 <span class="text-muted align-self-center">Last updated: @lastUpdatedLabel</span>
             </div>

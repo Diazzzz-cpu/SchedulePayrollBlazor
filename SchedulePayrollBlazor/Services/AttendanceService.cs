@@ -230,7 +230,7 @@ public class AttendanceService : IAttendanceService
         {
             shiftStart = shifts.Min(s => s.Start);
             shiftEnd = shifts.Max(s => s.End);
-            scheduledHours = (decimal)(shiftEnd - shiftStart).TotalHours;
+            scheduledHours = (decimal)(shiftEnd.Value - shiftStart.Value).TotalHours;
 
             if (!hasLogs)
             {

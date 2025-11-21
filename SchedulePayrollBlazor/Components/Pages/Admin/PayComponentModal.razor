@@ -1,0 +1,168 @@
+@using System.ComponentModel.DataAnnotations
+@inherits ComponentBase
+
+@if (IsOpen)
+{
+    <div class="ps-modal-backdrop" role="presentation">
+        <div class="ps-modal" role="dialog" aria-modal="true" @onclick:stopPropagation>
+            <div class="ps-modal-header">
+                <div>
+                    <h3>@Title</h3>
+                    <p class="ps-modal-subtitle">Define how this component should appear in payroll configuration.</p>
+                </div>
+                <button type="button" class="ps-modal-close" @onclick="OnCancelClicked" aria-label="Close">×</button>
+            </div>
+
+            <div class="ps-modal-body">
+                <EditForm EditContext="_editContext" OnValidSubmit="HandleValidSubmit">
+                    <DataAnnotationsValidator />
+                    <ValidationSummary />
+
+                    @if (!string.IsNullOrWhiteSpace(ErrorMessage))
+                    {
+                        <div class="ps-alert ps-alert-danger">@ErrorMessage</div>
+                    }
+
+                    <div class="ps-form-grid">
+                        <div class="form-group">
+                            <label class="ps-label" for="pc-name">Name</label>
+                            <InputText id="pc-name" class="ps-input" @bind-Value="_formModel.Name" />
+                            <ValidationMessage For="() => _formModel.Name" />
+                        </div>
+                        <div class="form-group">
+                            <label class="ps-label" for="pc-code">Code</label>
+                            <InputText id="pc-code" class="ps-input" @bind-Value="_formModel.Code" />
+                            <ValidationMessage For="() => _formModel.Code" />
+                        </div>
+                        <div class="form-group">
+                            <label class="ps-label" for="pc-type">Component type</label>
+                            <InputSelect id="pc-type" class="ps-input" @bind-Value="_formModel.ComponentType">
+                                <option value="Earning">Earning</option>
+                                <option value="Deduction">Deduction</option>
+                                <option value="Contribution">Contribution</option>
+                            </InputSelect>
+                        </div>
+                        <div class="form-group">
+                            <label class="ps-label" for="pc-calculation">Calculation type</label>
+                            <InputSelect id="pc-calculation" class="ps-input" @bind-Value="_formModel.CalculationType">
+                                <option value="FixedAmount">Fixed amount</option>
+                                <option value="PercentageOfBase">Percentage of base</option>
+                                <option value="PerHour">Per hour</option>
+                            </InputSelect>
+                        </div>
+                        <div class="form-group">
+                            <label class="ps-label" for="pc-default">Default amount</label>
+                            <InputNumber id="pc-default" class="ps-input" @bind-Value="_formModel.DefaultAmount" step="0.01" />
+                        </div>
+                        <div class="form-group">
+                            <label class="ps-label">Status</label>
+                            <label class="ps-checkbox">
+                                <input type="checkbox" @bind="_formModel.IsActive" />
+                                <span>Active</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="ps-modal-footer">
+                        <button type="button" class="ps-button ps-button-ghost" @onclick="OnCancelClicked" disabled="@IsBusy">Cancel</button>
+                        <button type="submit" class="ps-button ps-button-primary" disabled="@IsBusy">Save component</button>
+                    </div>
+                </EditForm>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private PayComponentEditModel _formModel = new();
+    private EditContext? _editContext;
+
+    [Parameter] public bool IsOpen { get; set; }
+    [Parameter] public EventCallback<bool> IsOpenChanged { get; set; }
+    [Parameter] public PayComponent? Model { get; set; }
+    [Parameter] public EventCallback<PayComponent> OnSave { get; set; }
+    [Parameter] public EventCallback OnCancel { get; set; }
+    [Parameter] public string Title { get; set; } = "Add component";
+    [Parameter] public string? ErrorMessage { get; set; }
+    [Parameter] public bool IsBusy { get; set; }
+
+    protected override void OnParametersSet()
+    {
+        if (!IsOpen)
+        {
+            return;
+        }
+
+        var source = Model ?? new PayComponent
+        {
+            ComponentType = "Earning",
+            CalculationType = "FixedAmount",
+            IsActive = true
+        };
+
+        _formModel = PayComponentEditModel.FromEntity(source);
+        _editContext = new EditContext(_formModel);
+    }
+
+    private async Task HandleValidSubmit()
+    {
+        if (_editContext is null)
+        {
+            return;
+        }
+
+        var entity = _formModel.ToEntity(Model?.PayComponentId ?? 0);
+        await OnSave.InvokeAsync(entity);
+    }
+
+    private async Task OnCancelClicked()
+    {
+        await OnCancel.InvokeAsync();
+        await IsOpenChanged.InvokeAsync(false);
+    }
+
+    private sealed class PayComponentEditModel
+    {
+        [Required]
+        public string Name { get; set; } = string.Empty;
+
+        [Required]
+        public string Code { get; set; } = string.Empty;
+
+        [Required]
+        public string ComponentType { get; set; } = "Earning";
+
+        public string CalculationType { get; set; } = "FixedAmount";
+
+        public decimal? DefaultAmount { get; set; }
+
+        public bool IsActive { get; set; } = true;
+
+        public static PayComponentEditModel FromEntity(PayComponent entity)
+        {
+            return new PayComponentEditModel
+            {
+                Name = entity.Name,
+                Code = entity.Code,
+                ComponentType = string.IsNullOrWhiteSpace(entity.ComponentType) ? "Earning" : entity.ComponentType,
+                CalculationType = string.IsNullOrWhiteSpace(entity.CalculationType) ? "FixedAmount" : entity.CalculationType,
+                DefaultAmount = entity.DefaultAmount,
+                IsActive = entity.IsActive
+            };
+        }
+
+        public PayComponent ToEntity(int id)
+        {
+            return new PayComponent
+            {
+                PayComponentId = id,
+                Name = Name,
+                Code = Code,
+                ComponentType = string.IsNullOrWhiteSpace(ComponentType) ? "Earning" : ComponentType,
+                CalculationType = string.IsNullOrWhiteSpace(CalculationType) ? "FixedAmount" : CalculationType,
+                DefaultAmount = DefaultAmount,
+                IsActive = IsActive
+            };
+        }
+    }
+}

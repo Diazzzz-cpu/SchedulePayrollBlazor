@@ -1,0 +1,281 @@
+@page "/settings/pay-components"
+@attribute [Authorize(Roles = "Admin")]
+
+@inject IPayComponentService PayComponentService
+
+<div class="ps-page">
+    <div class="ps-page-header">
+        <div>
+            <h2>Pay components</h2>
+            <p class="ps-subtitle">Catalog earnings, deductions, and contributions for future payroll configuration.</p>
+        </div>
+        <div class="ps-page-actions">
+            <button class="ps-button ps-button-primary" @onclick="StartCreate">Add component</button>
+        </div>
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(_alertMessage))
+    {
+        <div class="ps-alert @(_alertIsError ? "ps-alert-danger" : "ps-alert-success")">@_alertMessage</div>
+    }
+
+    @if (_deleteCandidate is not null)
+    {
+        <div class="ps-alert ps-alert-warning">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <strong>Delete component?</strong>
+                    <div>"@_deleteCandidate.Name" will be removed from the catalog.</div>
+                </div>
+                <div class="ps-alert-actions">
+                    <button class="ps-button ps-button-ghost" @onclick="CancelDelete" disabled="@_isDeleteBusy">Cancel</button>
+                    <button class="ps-button ps-button-danger" @onclick="ConfirmDeleteAsync" disabled="@_isDeleteBusy">Delete</button>
+                </div>
+            </div>
+        </div>
+    }
+
+    <section class="ps-card">
+        <div class="ps-card-header">
+            <h3>Component list</h3>
+            <p class="ps-subtitle">Manage the catalog that powers payroll setup.</p>
+        </div>
+
+        @if (_isLoading)
+        {
+            <div class="ps-table-container">Loading components…</div>
+        }
+        else if (_components.Count == 0)
+        {
+            <div class="ps-table-container">No pay components yet. Add your first entry to get started.</div>
+        }
+        else
+        {
+            <div class="ps-table-container">
+                <table class="ps-table">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Code</th>
+                            <th>Type</th>
+                            <th>Calculation</th>
+                            <th class="text-end">Default amount</th>
+                            <th>Status</th>
+                            <th class="text-end">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var component in _components)
+                        {
+                            <tr>
+                                <td>
+                                    <div class="fw-semibold">@component.Name</div>
+                                    <div class="text-muted">@component.ComponentType</div>
+                                </td>
+                                <td>@component.Code</td>
+                                <td>@component.ComponentType</td>
+                                <td>@FormatCalculation(component.CalculationType)</td>
+                                <td class="text-end">@FormatAmount(component.DefaultAmount)</td>
+                                <td>
+                                    @if (component.IsActive)
+                                    {
+                                        <span class="badge bg-success">Active</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge bg-secondary">Inactive</span>
+                                    }
+                                </td>
+                                <td class="ps-table-actions text-end">
+                                    <button class="ps-button ps-button-ghost" @onclick="() => StartEdit(component)">Edit</button>
+                                    <button class="ps-button ps-button-ghost text-danger" @onclick="() => RequestDelete(component)">Delete</button>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </section>
+</div>
+
+<PayComponentModal
+    IsOpen="_isModalOpen"
+    IsOpenChanged="OnModalOpenChanged"
+    Model="_editingModel"
+    Title="@(_isEdit ? "Edit component" : "Add component")"
+    ErrorMessage="@_modalError"
+    IsBusy="@_isModalBusy"
+    OnSave="SaveAsync"
+    OnCancel="CloseModal" />
+
+@code {
+    private readonly List<PayComponent> _components = new();
+    private PayComponent? _editingModel;
+    private PayComponent? _deleteCandidate;
+    private bool _isLoading;
+    private bool _isModalOpen;
+    private bool _isEdit;
+    private bool _isModalBusy;
+    private bool _isDeleteBusy;
+    private string? _alertMessage;
+    private bool _alertIsError;
+    private string? _modalError;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        try
+        {
+            _isLoading = true;
+            _components.Clear();
+            var items = await PayComponentService.GetAllAsync();
+            _components.AddRange(items);
+        }
+        catch (Exception ex)
+        {
+            _alertIsError = true;
+            _alertMessage = $"Unable to load components: {ex.Message}";
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private void StartCreate()
+    {
+        _isEdit = false;
+        _modalError = null;
+        _editingModel = new PayComponent
+        {
+            ComponentType = "Earning",
+            CalculationType = "FixedAmount",
+            IsActive = true
+        };
+        _isModalOpen = true;
+    }
+
+    private void StartEdit(PayComponent component)
+    {
+        _isEdit = true;
+        _modalError = null;
+        _editingModel = new PayComponent
+        {
+            PayComponentId = component.PayComponentId,
+            Name = component.Name,
+            Code = component.Code,
+            ComponentType = component.ComponentType,
+            CalculationType = component.CalculationType,
+            DefaultAmount = component.DefaultAmount,
+            IsActive = component.IsActive
+        };
+        _isModalOpen = true;
+    }
+
+    private async Task SaveAsync(PayComponent model)
+    {
+        try
+        {
+            _isModalBusy = true;
+            _modalError = null;
+
+            if (_isEdit)
+            {
+                await PayComponentService.UpdateAsync(model);
+                _alertMessage = "Pay component updated.";
+            }
+            else
+            {
+                await PayComponentService.CreateAsync(model);
+                _alertMessage = "Pay component added.";
+            }
+
+            _alertIsError = false;
+            await LoadAsync();
+            _isModalOpen = false;
+        }
+        catch (Exception ex)
+        {
+            _alertIsError = true;
+            _alertMessage = null;
+            _modalError = ex.Message;
+        }
+        finally
+        {
+            _isModalBusy = false;
+            StateHasChanged();
+        }
+    }
+
+    private void CloseModal()
+    {
+        _isModalOpen = false;
+        _modalError = null;
+    }
+
+    private void OnModalOpenChanged(bool isOpen)
+    {
+        _isModalOpen = isOpen;
+        if (!isOpen)
+        {
+            _modalError = null;
+        }
+    }
+
+    private void RequestDelete(PayComponent component)
+    {
+        _deleteCandidate = component;
+    }
+
+    private void CancelDelete()
+    {
+        _deleteCandidate = null;
+    }
+
+    private async Task ConfirmDeleteAsync()
+    {
+        if (_deleteCandidate is null)
+        {
+            return;
+        }
+
+        try
+        {
+            _isDeleteBusy = true;
+            await PayComponentService.DeleteAsync(_deleteCandidate.PayComponentId);
+            _alertIsError = false;
+            _alertMessage = "Pay component deleted.";
+            _deleteCandidate = null;
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            _alertIsError = true;
+            _alertMessage = ex.Message;
+        }
+        finally
+        {
+            _isDeleteBusy = false;
+        }
+    }
+
+    private static string FormatAmount(decimal? amount)
+    {
+        return amount.HasValue ? amount.Value.ToString("C2") : "—";
+    }
+
+    private static string FormatCalculation(string? calculation)
+    {
+        return calculation switch
+        {
+            "PercentageOfBase" => "Percentage of base",
+            "PerHour" => "Per hour",
+            _ => "Fixed amount"
+        };
+    }
+}

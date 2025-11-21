@@ -115,8 +115,10 @@ public class AppDbContext : DbContext
             entity.Property(pc => pc.PayComponentId).HasColumnName("pay_component_id");
             entity.Property(pc => pc.Code).HasColumnName("code").HasMaxLength(50).IsRequired();
             entity.Property(pc => pc.Name).HasColumnName("name").HasMaxLength(100).IsRequired();
-            entity.Property(pc => pc.Kind).HasColumnName("kind").HasMaxLength(50).IsRequired();
-            entity.Property(pc => pc.DefaultRate).HasColumnName("default_rate").HasColumnType("decimal(18,2)");
+            entity.Property(pc => pc.ComponentType).HasColumnName("kind").HasMaxLength(50).IsRequired();
+            entity.Property(pc => pc.CalculationType).HasColumnName("calculation_type").HasMaxLength(50);
+            entity.Property(pc => pc.DefaultAmount).HasColumnName("default_rate").HasColumnType("decimal(18,2)");
+            entity.Property(pc => pc.IsActive).HasColumnName("is_active");
         });
 
         // EMPLOYEE COMPONENTS

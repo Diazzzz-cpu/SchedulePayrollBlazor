@@ -11,12 +11,18 @@
         </div>
         <div class="ps-page-actions">
             <button class="ps-button ps-button-primary" @onclick="StartCreate">Add component</button>
+            <button class="ps-button ps-button-secondary" @onclick="OnAddPresetsAsync" disabled="@_isBusyPresets">Add presets</button>
         </div>
     </div>
 
     @if (!string.IsNullOrWhiteSpace(_alertMessage))
     {
         <div class="ps-alert @(_alertIsError ? "ps-alert-danger" : "ps-alert-success")">@_alertMessage</div>
+    }
+
+    @if (!string.IsNullOrWhiteSpace(_presetMessage))
+    {
+        <div class="ps-alert @(_presetIsError ? "ps-alert-danger" : "ps-alert-info")">@_presetMessage</div>
     }
 
     @if (_deleteCandidate is not null)
@@ -118,9 +124,12 @@
     private bool _isEdit;
     private bool _isModalBusy;
     private bool _isDeleteBusy;
+    private bool _isBusyPresets;
     private string? _alertMessage;
     private bool _alertIsError;
     private string? _modalError;
+    private string? _presetMessage;
+    private bool _presetIsError;
 
     protected override async Task OnInitializedAsync()
     {
@@ -175,6 +184,29 @@
             IsActive = component.IsActive
         };
         _isModalOpen = true;
+    }
+
+    private async Task OnAddPresetsAsync()
+    {
+        _isBusyPresets = true;
+        _presetMessage = null;
+        _presetIsError = false;
+
+        try
+        {
+            var presets = await PayComponentService.EnsurePresetsAsync();
+            _presetMessage = $"Presets added/verified: {presets.Count} components available.";
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            _presetIsError = true;
+            _presetMessage = $"Unable to add presets: {ex.Message}";
+        }
+        finally
+        {
+            _isBusyPresets = false;
+        }
     }
 
     private async Task SaveAsync(PayComponent model)

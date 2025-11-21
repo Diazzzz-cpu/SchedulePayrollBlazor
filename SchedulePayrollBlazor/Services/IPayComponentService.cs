@@ -9,4 +9,5 @@ public interface IPayComponentService
     Task<PayComponent> CreateAsync(PayComponent model);
     Task<PayComponent> UpdateAsync(PayComponent model);
     Task DeleteAsync(int id);
+    Task<List<PayComponent>> EnsurePresetsAsync(CancellationToken cancellationToken = default);
 }

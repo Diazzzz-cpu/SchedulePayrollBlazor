@@ -49,6 +49,10 @@
                                 <option value="PercentageOfBase">Percentage of base</option>
                                 <option value="PerHour">Per hour</option>
                             </InputSelect>
+                            @if (!string.IsNullOrWhiteSpace(CalculationHint))
+                            {
+                                <div class="ps-help-text">@CalculationHint</div>
+                            }
                         </div>
                         <div class="form-group">
                             <label class="ps-label" for="pc-default">Default amount</label>
@@ -120,6 +124,14 @@
         await OnCancel.InvokeAsync();
         await IsOpenChanged.InvokeAsync(false);
     }
+
+    private string CalculationHint => _formModel?.CalculationType switch
+    {
+        "FixedAmount" => "Formula: amount = default amount per payroll period.",
+        "PercentageOfBase" => "Formula: amount = base pay × default rate (e.g. 0.03 = 3%).",
+        "PerHour" => "Formula: amount = rendered hours × default rate per hour.",
+        _ => string.Empty
+    };
 
     private sealed class PayComponentEditModel
     {

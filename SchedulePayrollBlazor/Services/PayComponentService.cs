@@ -72,6 +72,94 @@ public class PayComponentService : IPayComponentService
         await _dbContext.SaveChangesAsync();
     }
 
+    public async Task<List<PayComponent>> EnsurePresetsAsync(CancellationToken cancellationToken = default)
+    {
+        var presetDefinitions = new List<PayComponent>
+        {
+            new()
+            {
+                Code = "SSS",
+                Name = "SSS contribution",
+                ComponentType = "Deduction",
+                CalculationType = "PercentageOfBase",
+                DefaultAmount = 0.045m,
+                IsActive = true
+            },
+            new()
+            {
+                Code = "PHIC",
+                Name = "PhilHealth",
+                ComponentType = "Deduction",
+                CalculationType = "PercentageOfBase",
+                DefaultAmount = 0.03m,
+                IsActive = true
+            },
+            new()
+            {
+                Code = "HDMF",
+                Name = "Pag-IBIG",
+                ComponentType = "Deduction",
+                CalculationType = "PercentageOfBase",
+                DefaultAmount = 0.01m,
+                IsActive = true
+            },
+            new()
+            {
+                Code = "TAX",
+                Name = "Withholding tax",
+                ComponentType = "Deduction",
+                CalculationType = "PercentageOfBase",
+                DefaultAmount = 0.10m,
+                IsActive = true
+            },
+            new()
+            {
+                Code = "ND",
+                Name = "Night differential",
+                ComponentType = "Earning",
+                CalculationType = "PerHour",
+                DefaultAmount = 20m,
+                IsActive = true
+            }
+        };
+
+        var results = new List<PayComponent>();
+        var added = false;
+
+        foreach (var preset in presetDefinitions)
+        {
+            var normalizedCode = preset.Code.Trim().ToLower();
+            var existing = await _dbContext.PayComponents
+                .AsNoTracking()
+                .FirstOrDefaultAsync(pc => pc.Code.ToLower() == normalizedCode, cancellationToken);
+
+            if (existing is not null)
+            {
+                results.Add(existing);
+                continue;
+            }
+
+            ValidateModel(preset);
+            await EnsureUniqueAsync(preset);
+
+            preset.Name = preset.Name.Trim();
+            preset.Code = preset.Code.Trim();
+            preset.ComponentType = string.IsNullOrWhiteSpace(preset.ComponentType) ? "Earning" : preset.ComponentType.Trim();
+            preset.CalculationType = string.IsNullOrWhiteSpace(preset.CalculationType) ? "FixedAmount" : preset.CalculationType.Trim();
+
+            _dbContext.PayComponents.Add(preset);
+            results.Add(preset);
+            added = true;
+        }
+
+        if (added)
+        {
+            await _dbContext.SaveChangesAsync(cancellationToken);
+        }
+
+        return results;
+    }
+
     private static void ValidateModel(PayComponent model)
     {
         if (string.IsNullOrWhiteSpace(model.Name))

@@ -1,0 +1,222 @@
+@using SchedulePayrollBlazor.Services.Models
+@inject IPayComponentService PayComponentService
+@inject IEmployeeComponentService EmployeeComponentService
+
+@if (IsOpen)
+{
+    <div class="ps-modal-backdrop" role="presentation">
+        <div class="ps-modal" role="dialog" aria-modal="true" aria-labelledby="bulkAssignTitle">
+            <div class="ps-modal-header">
+                <div>
+                    <h3 id="bulkAssignTitle">Bulk assign pay components</h3>
+                    <p class="ps-subtitle">Apply multiple pay components to the selected employees at once.</p>
+                </div>
+                <button type="button" class="ps-modal-close" @onclick="CloseAsync" aria-label="Close bulk assign modal">&times;</button>
+            </div>
+
+            <div class="ps-modal-body">
+                @if (loadError is not null)
+                {
+                    <div class="ps-alert ps-alert-danger" role="alert">@loadError</div>
+                }
+                else if (isLoading)
+                {
+                    <div class="loading">Loading pay components…</div>
+                }
+                else if (componentRows.Count == 0)
+                {
+                    <div class="text-muted">No active pay components are available.</div>
+                }
+                else
+                {
+                    <div class="ps-table-container">
+                        <table class="ps-table">
+                            <thead>
+                                <tr>
+                                    <th scope="col" style="width: 48px;">Select</th>
+                                    <th scope="col">Name</th>
+                                    <th scope="col">Code</th>
+                                    <th scope="col">Kind</th>
+                                    <th scope="col">Calculation</th>
+                                    <th scope="col" style="width: 140px;">Custom rate</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var row in componentRows)
+                                {
+                                    <tr>
+                                        <td>
+                                            <input type="checkbox" checked="@row.IsSelected" @onchange="(e) => ToggleComponentSelection(row, e.Value is bool b && b)" />
+                                        </td>
+                                        <td>@row.Name</td>
+                                        <td>@row.Code</td>
+                                        <td>@row.Kind</td>
+                                        <td>@row.CalculationType</td>
+                                        <td>
+                                            <InputNumber @bind-Value="row.CustomRate" class="form-control" step="0.01" />
+                                            <div class="ps-muted" style="font-size: 0.85em;">Leave blank to use default</div>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+
+                @if (!string.IsNullOrWhiteSpace(selectionWarning))
+                {
+                    <div class="ps-alert ps-alert-warning" role="alert">@selectionWarning</div>
+                }
+                @if (!string.IsNullOrWhiteSpace(submitError))
+                {
+                    <div class="ps-alert ps-alert-danger" role="alert">@submitError</div>
+                }
+            </div>
+
+            <div class="ps-modal-footer">
+                <button class="ps-button ps-button-primary" type="button" disabled="@isSubmitting || componentRows.Count == 0" @onclick="AssignSelectedAsync">
+                    @(isSubmitting ? "Assigning…" : "Assign components")
+                </button>
+                <button class="ps-button ps-button-secondary" type="button" disabled="@isSubmitting" @onclick="CloseAsync">Cancel</button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter]
+    public bool IsOpen { get; set; }
+
+    [Parameter]
+    public IReadOnlyCollection<int> SelectedEmployeeIds { get; set; } = Array.Empty<int>();
+
+    [Parameter]
+    public EventCallback OnClosed { get; set; }
+
+    [Parameter]
+    public EventCallback<BulkAssignResult> OnCompleted { get; set; }
+
+    private bool isLoading;
+    private bool isSubmitting;
+    private string? loadError;
+    private string? submitError;
+    private string? selectionWarning;
+    private bool shouldReload = true;
+    private List<BulkComponentRow> componentRows = new();
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (IsOpen && shouldReload)
+        {
+            await LoadComponentsAsync();
+            shouldReload = false;
+        }
+        else if (!IsOpen && !shouldReload)
+        {
+            // Reset state when the modal closes
+            submitError = null;
+            selectionWarning = null;
+            isSubmitting = false;
+            shouldReload = true;
+        }
+    }
+
+    private async Task LoadComponentsAsync()
+    {
+        isLoading = true;
+        loadError = null;
+        submitError = null;
+        selectionWarning = null;
+        componentRows.Clear();
+
+        try
+        {
+            var payComponents = await PayComponentService.GetAllAsync();
+            componentRows = payComponents
+                .Where(pc => pc.IsActive)
+                .OrderBy(pc => pc.Name)
+                .Select(pc => new BulkComponentRow
+                {
+                    PayComponentId = pc.PayComponentId,
+                    Name = pc.Name,
+                    Code = pc.Code,
+                    Kind = pc.ComponentType,
+                    CalculationType = pc.CalculationType,
+                    CustomRate = null,
+                    IsSelected = false
+                })
+                .ToList();
+        }
+        catch
+        {
+            loadError = "We couldn't load pay components right now. Please try again.";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void ToggleComponentSelection(BulkComponentRow row, bool isSelected)
+    {
+        row.IsSelected = isSelected;
+    }
+
+    private async Task AssignSelectedAsync()
+    {
+        if (isSubmitting || SelectedEmployeeIds.Count == 0)
+        {
+            return;
+        }
+
+        submitError = null;
+        selectionWarning = null;
+
+        var selectedRows = componentRows.Where(r => r.IsSelected).ToList();
+        if (selectedRows.Count == 0)
+        {
+            selectionWarning = "Select at least one pay component to assign.";
+            return;
+        }
+
+        isSubmitting = true;
+
+        try
+        {
+            var requests = selectedRows
+                .Select(r => new BulkAssignComponentRequest
+                {
+                    PayComponentId = r.PayComponentId,
+                    CustomRate = r.CustomRate
+                })
+                .ToList();
+
+            var result = await EmployeeComponentService.BulkAssignAsync(SelectedEmployeeIds, requests);
+            await OnCompleted.InvokeAsync(result);
+            await CloseAsync();
+        }
+        catch
+        {
+            submitError = "We couldn't assign the components right now. Please try again.";
+        }
+
+        isSubmitting = false;
+    }
+
+    private async Task CloseAsync()
+    {
+        shouldReload = true;
+        await OnClosed.InvokeAsync();
+    }
+
+    public class BulkComponentRow
+    {
+        public int PayComponentId { get; set; }
+        public string Name { get; set; } = string.Empty;
+        public string Code { get; set; } = string.Empty;
+        public string Kind { get; set; } = string.Empty;
+        public string CalculationType { get; set; } = string.Empty;
+        public decimal? CustomRate { get; set; }
+        public bool IsSelected { get; set; }
+    }
+}

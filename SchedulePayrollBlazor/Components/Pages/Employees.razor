@@ -16,6 +16,12 @@
             <p class="ps-subtitle">Manage employee records and workforce details.</p>
         </div>
         <div class="ps-page-actions">
+            @if (_isAdmin)
+            {
+                <button class="ps-button ps-button-secondary" type="button" @onclick="OpenBulkAssignModal" disabled="@(!selectedEmployeeIds.Any())">
+                    Bulk assign pay components
+                </button>
+            }
             <button class="btn btn-primary" type="button" @onclick="OpenAddEmployeeDialog">Add employee</button>
         </div>
     </div>
@@ -76,77 +82,89 @@
             }
             else
             {
-                <div class="ps-table-container">
-                    <table class="ps-table">
-                        <thead>
-                            <tr>
-                                <th scope="col">Name</th>
-                                <th scope="col">Email</th>
-                                <th scope="col">Department</th>
-                                <th scope="col">Job title</th>
-                                <th scope="col">Employment type</th>
-                                <th scope="col">Start date</th>
-
-                                @* 🔹 NEW: profile fields from employee_profiles *@
-                                <th scope="col">Phone</th>
-                                <th scope="col">Birthdate</th>
-                                <th scope="col">Address</th>
-
-                                <th scope="col">Status</th>
-                                @if (_isAdmin)
-                                {
-                                    <th scope="col" class="text-end">Actions</th>
-                                }
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @foreach (var employee in activeEmployees)
-                            {
-                                // Get profile row (may be null if user never saved profile)
-                                profilesByEmployeeId.TryGetValue(employee.EmployeeId, out var profile);
-
+                    <div class="ps-table-container">
+                        <table class="ps-table">
+                            <thead>
                                 <tr>
-                                    <td>@employee.FullName</td>
-                                    <td>@employee.User?.Email</td>
-                                    <td>@(string.IsNullOrWhiteSpace(employee.Department) ? "-" : employee.Department)</td>
-                                    <td>@(string.IsNullOrWhiteSpace(employee.JobTitle) ? "-" : employee.JobTitle)</td>
-                                    <td>@FormatEmploymentType(employee.EmploymentType)</td>
-                                    <td>
-                                        @(
+                                    @if (_isAdmin)
+                                    {
+                                        <th scope="col" style="width: 48px;">
+                                            <input type="checkbox" checked="@AreAllSelected(activeEmployees)" @onchange="(e) => ToggleSelectAll(activeEmployees, e.Value is bool b && b)" />
+                                        </th>
+                                    }
+                                    <th scope="col">Name</th>
+                                    <th scope="col">Email</th>
+                                    <th scope="col">Department</th>
+                                    <th scope="col">Job title</th>
+                                    <th scope="col">Employment type</th>
+                                    <th scope="col">Start date</th>
+
+                                    @* 🔹 NEW: profile fields from employee_profiles *@
+                                    <th scope="col">Phone</th>
+                                    <th scope="col">Birthdate</th>
+                                    <th scope="col">Address</th>
+
+                                    <th scope="col">Status</th>
+                                    @if (_isAdmin)
+                                    {
+                                        <th scope="col" class="text-end">Actions</th>
+                                    }
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var employee in activeEmployees)
+                                {
+                                    // Get profile row (may be null if user never saved profile)
+                                    profilesByEmployeeId.TryGetValue(employee.EmployeeId, out var profile);
+
+                                    <tr>
+                                        @if (_isAdmin)
+                                        {
+                                            <td>
+                                                <input type="checkbox" checked="@IsEmployeeSelected(employee.EmployeeId)" @onchange="(e) => ToggleEmployeeSelection(employee.EmployeeId, e.Value is bool b && b)" />
+                                            </td>
+                                        }
+                                        <td>@employee.FullName</td>
+                                        <td>@employee.User?.Email</td>
+                                        <td>@(string.IsNullOrWhiteSpace(employee.Department) ? "-" : employee.Department)</td>
+                                        <td>@(string.IsNullOrWhiteSpace(employee.JobTitle) ? "-" : employee.JobTitle)</td>
+                                        <td>@FormatEmploymentType(employee.EmploymentType)</td>
+                                        <td>
+                                            @(
                                                                     employee.StartDate.HasValue
                                                                     ? employee.StartDate.Value.ToString("MMM dd, yyyy")
                                                                     : "-"
                                                                     )
-                                    </td>
+                                        </td>
 
-                                    <!-- NEW: profile data -->
-                                    <td>@(string.IsNullOrWhiteSpace(profile?.Phone) ? "-" : profile!.Phone)</td>
-                                    <td>
-                                        @(
+                                        <!-- NEW: profile data -->
+                                        <td>@(string.IsNullOrWhiteSpace(profile?.Phone) ? "-" : profile!.Phone)</td>
+                                        <td>
+                                            @(
                                                                     profile?.BirthDate.HasValue == true
                                                                     ? profile.BirthDate!.Value.ToString("MMM dd, yyyy")
                                                                     : "-"
                                                                     )
-                                </td>
-                                <td>@(string.IsNullOrWhiteSpace(profile?.Address) ? "-" : profile!.Address)</td>
-
-                                    <td>
-                                        <span class="badge badge-success">Active</span>
-                                    </td>
-                        @if (_isAdmin)
-                                    {
-                                        <td class="ps-table-actions">
-                                            <button class="ps-button ps-button-ghost" type="button" @onclick="() => BeginEditAsync(employee.EmployeeId)">
-                                                Edit
-                                            </button>
                                         </td>
-                                    }
-                                </tr>
-                            }
-                        </tbody>
+                                        <td>@(string.IsNullOrWhiteSpace(profile?.Address) ? "-" : profile!.Address)</td>
 
-                    </table>
-                </div>
+                                        <td>
+                                            <span class="badge badge-success">Active</span>
+                                        </td>
+                                        @if (_isAdmin)
+                                        {
+                                            <td class="ps-table-actions">
+                                                <button class="ps-button ps-button-ghost" type="button" @onclick="() => BeginEditAsync(employee.EmployeeId)">
+                                                    Edit
+                                                </button>
+                                            </td>
+                                        }
+                                    </tr>
+                                }
+                            </tbody>
+
+                        </table>
+                    </div>
             }
         </section>
 
@@ -167,6 +185,12 @@
                     <table class="ps-table">
                         <thead>
                             <tr>
+                                @if (_isAdmin)
+                                {
+                                    <th scope="col" style="width: 48px;">
+                                        <input type="checkbox" checked="@AreAllSelected(inactiveEmployees)" @onchange="(e) => ToggleSelectAll(inactiveEmployees, e.Value is bool b && b)" />
+                                    </th>
+                                }
                                 <th scope="col">Name</th>
                                 <th scope="col">Email</th>
                                 <th scope="col">Department</th>
@@ -193,6 +217,12 @@
                                 profilesByEmployeeId.TryGetValue(employee.EmployeeId, out var profile);
 
                                 <tr>
+                                    @if (_isAdmin)
+                                    {
+                                        <td>
+                                            <input type="checkbox" checked="@IsEmployeeSelected(employee.EmployeeId)" @onchange="(e) => ToggleEmployeeSelection(employee.EmployeeId, e.Value is bool b && b)" />
+                                        </td>
+                                    }
                                     <td>@employee.FullName</td>
                                     <td>@employee.User?.Email</td>
                                     <td>@(string.IsNullOrWhiteSpace(employee.Department) ? "-" : employee.Department)</td>
@@ -214,13 +244,13 @@
                                                                     ? profile.BirthDate!.Value.ToString("MMM dd, yyyy")
                                                                     : "-"
                                                                     )
-                                </td>
-                                <td>@(string.IsNullOrWhiteSpace(profile?.Address) ? "-" : profile!.Address)</td>
+                                    </td>
+                                    <td>@(string.IsNullOrWhiteSpace(profile?.Address) ? "-" : profile!.Address)</td>
 
                                     <td>
                                         <span class="badge badge-secondary">Inactive (Archived)</span>
                                     </td>
-                        @if (_isAdmin)
+                                    @if (_isAdmin)
                                     {
                                         <td class="ps-table-actions">
                                             <button class="ps-button ps-button-ghost" type="button" @onclick="() => BeginEditAsync(employee.EmployeeId)">
@@ -237,10 +267,11 @@
         </section>
     }
 
-    @if (showEditDialog && editModel is not null)
-{
-  
-}
+    <BulkAssignComponentsModal
+        IsOpen="showBulkAssignModal"
+        SelectedEmployeeIds="selectedEmployeeIds"
+        OnClosed="CloseBulkAssignModalAsync"
+        OnCompleted="HandleBulkAssignCompleted" />
 
     @if (showAddEmployeeDialog)
     {
@@ -484,6 +515,8 @@
 
     // 🔹 NEW: cache of employee_profiles keyed by EmployeeId
     private Dictionary<int, EmployeeProfile> profilesByEmployeeId = new();
+    private HashSet<int> selectedEmployeeIds = new();
+    private bool showBulkAssignModal;
 
     private string CreatePasswordInputType => createPasswordVisible ? "text" : "password";
     private string EditPasswordInputType => editPasswordVisible ? "text" : "password";
@@ -548,6 +581,13 @@
                 profilesByEmployeeId = profileList
                     .GroupBy(p => p.EmployeeId)
                     .ToDictionary(g => g.Key, g => g.First());
+
+                var idSet = ids.ToHashSet();
+                selectedEmployeeIds.RemoveWhere(id => !idSet.Contains(id));
+            }
+            else
+            {
+                selectedEmployeeIds.Clear();
             }
         }
         catch
@@ -558,7 +598,73 @@
         }
     }
 
-    // 🔻 everything below this stays exactly the same as your original file
+    private bool IsEmployeeSelected(int employeeId) => selectedEmployeeIds.Contains(employeeId);
+
+    private bool AreAllSelected(IEnumerable<Employee> employeesOnPage)
+    {
+        var list = employeesOnPage.ToList();
+        if (list.Count == 0)
+        {
+            return false;
+        }
+
+        return list.All(e => selectedEmployeeIds.Contains(e.EmployeeId));
+    }
+
+    private void ToggleEmployeeSelection(int employeeId, bool isSelected)
+    {
+        if (isSelected)
+        {
+            selectedEmployeeIds.Add(employeeId);
+        }
+        else
+        {
+            selectedEmployeeIds.Remove(employeeId);
+        }
+    }
+
+    private void ToggleSelectAll(IEnumerable<Employee> employeesOnPage, bool isSelected)
+    {
+        foreach (var employee in employeesOnPage)
+        {
+            if (isSelected)
+            {
+                selectedEmployeeIds.Add(employee.EmployeeId);
+            }
+            else
+            {
+                selectedEmployeeIds.Remove(employee.EmployeeId);
+            }
+        }
+    }
+
+    private void OpenBulkAssignModal()
+    {
+        if (!_isAdmin || !selectedEmployeeIds.Any())
+        {
+            return;
+        }
+
+        showBulkAssignModal = true;
+    }
+
+    private Task CloseBulkAssignModalAsync()
+    {
+        showBulkAssignModal = false;
+        return Task.CompletedTask;
+    }
+
+    private async Task HandleBulkAssignCompleted(BulkAssignResult result)
+    {
+        showBulkAssignModal = false;
+        selectedEmployeeIds.Clear();
+
+        pageSuccessMessage = $"Bulk assign complete: {result.AssignmentsCreated} new assignments, {result.AssignmentsSkippedExisting} already existed.";
+        pageErrorMessage = null;
+
+        await LoadEmployeesAsync();
+    }
+
     private void OpenAddEmployeeDialog()
     {
         ResetCreateForm();

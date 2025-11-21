@@ -13,10 +13,12 @@ namespace SchedulePayrollBlazor.Services;
 public class AdminUserService
 {
     private readonly AppDbContext _dbContext;
+    private readonly IRolePayComponentService _rolePayComponentService;
 
-    public AdminUserService(AppDbContext dbContext)
+    public AdminUserService(AppDbContext dbContext, IRolePayComponentService rolePayComponentService)
     {
         _dbContext = dbContext;
+        _rolePayComponentService = rolePayComponentService;
     }
 
     public async Task<List<AdminUserSummary>> GetUsersAsync()
@@ -105,6 +107,8 @@ public class AdminUserService
 
                 await _dbContext.Employees.AddAsync(employee);
                 await _dbContext.SaveChangesAsync();
+
+                await _rolePayComponentService.ApplyDefaultsToEmployeeAsync(employee.EmployeeId);
             }
 
             await transaction.CommitAsync();

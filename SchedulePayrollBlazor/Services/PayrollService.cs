@@ -141,6 +141,15 @@ public class PayrollService : IPayrollService
 
         var settings = await _attendanceSettingsService.GetOrCreateAsync();
 
+        var employeeComponents = await _db.EmployeeComponents
+            .Include(ec => ec.PayComponent)
+            .Where(ec => employeesWithActivity.Contains(ec.EmployeeId) && ec.Active)
+            .ToListAsync();
+
+        var componentsByEmployee = employeeComponents
+            .GroupBy(ec => ec.EmployeeId)
+            .ToDictionary(g => g.Key, g => g.ToList());
+
         var entriesWithoutShifts = existingEntries
             .Where(pe => !employeesWithActivity.Contains(pe.EmployeeId))
             .ToList();
@@ -156,20 +165,25 @@ public class PayrollService : IPayrollService
 
             var existingEntry = existingEntries.FirstOrDefault(pe => pe.EmployeeId == employeeId);
 
-            var attendance = await _attendanceService.GetAttendanceForEmployeeAsync(
+            var attendanceSummary = await _attendanceService.GetSummaryForEmployeeAsync(
                 employeeId,
                 DateOnly.FromDateTime(period.StartDate),
                 DateOnly.FromDateTime(period.EndDate));
 
-            var attendanceSummary = SummarizeAttendance(attendance);
-            var totalHours = Math.Round((decimal)attendanceSummary.TotalWorkedHours, 2, MidpointRounding.AwayFromZero);
+            var totalHours = Math.Round(attendanceSummary.TotalRenderedHours, 2, MidpointRounding.AwayFromZero);
+            var hourlyRate = CalculateHourlyRate(employee.Compensation);
+            var basePay = Math.Round(hourlyRate * totalHours, 2, MidpointRounding.AwayFromZero);
 
-            if (totalHours <= 0 && attendanceSummary.TotalAbsentDays == 0 && attendanceSummary.TotalOvertimeMinutes == 0 && attendanceSummary.TotalLateMinutes == 0 && attendanceSummary.TotalUndertimeMinutes == 0)
+            var hasAttendanceImpact = totalHours > 0
+                || attendanceSummary.FullDayAbsences > 0
+                || attendanceSummary.TotalOvertimeMinutes > 0
+                || attendanceSummary.TotalLateMinutes > 0
+                || attendanceSummary.TotalUndertimeMinutes > 0;
+
+            if (!hasAttendanceImpact && !componentsByEmployee.ContainsKey(employeeId))
             {
                 continue;
             }
-
-            var basePay = CalculateBasePay(employee.Compensation, totalHours, includeFixedComponent: false);
 
             var entry = existingEntry;
 
@@ -197,7 +211,8 @@ public class PayrollService : IPayrollService
                 entry.CalculatedAt = DateTime.UtcNow;
             }
 
-            await ApplyAttendanceAdjustmentsAsync(entry, employee, attendance, settings);
+            await ApplyAttendanceAdjustmentsAsync(entry, attendanceSummary, settings, hourlyRate);
+            ApplyComponentAdjustments(entry, basePay, totalHours, componentsByEmployee.TryGetValue(employeeId, out var employeeComponentList) ? employeeComponentList : new List<EmployeeComponent>());
             RecalculateEntryTotals(entry);
         }
 
@@ -326,65 +341,113 @@ public class PayrollService : IPayrollService
         await _db.SaveChangesAsync();
     }
 
-    private async Task ApplyAttendanceAdjustmentsAsync(
+    private Task ApplyAttendanceAdjustmentsAsync(
         PayrollEntry entry,
-        Employee employee,
-        IEnumerable<DailyAttendanceDto> attendance,
-        AttendancePenaltySettings settings)
+        AttendancePeriodSummary summary,
+        AttendancePenaltySettings settings,
+        decimal hourlyRate)
     {
         entry.Adjustments ??= new List<PayrollAdjustment>();
 
-        var hourlyRate = CalculateHourlyRate(employee.Compensation);
-
-        foreach (var day in attendance)
+        if (summary.TotalLateMinutes > 0 && settings.LatePenaltyPerMinute > 0)
         {
-            if (day.IsLate && day.LateMinutes > 0 && settings.LatePenaltyPerMinute > 0)
+            var amount = Math.Round(summary.TotalLateMinutes * settings.LatePenaltyPerMinute, 2, MidpointRounding.AwayFromZero);
+            entry.Adjustments.Add(CreateAutoAdjustment(
+                entry.Id,
+                DeductionType,
+                LateSource,
+                $"Late penalties for period",
+                amount));
+        }
+
+        if (summary.TotalUndertimeMinutes > 0 && settings.UndertimePenaltyPerMinute > 0)
+        {
+            var amount = Math.Round(summary.TotalUndertimeMinutes * settings.UndertimePenaltyPerMinute, 2, MidpointRounding.AwayFromZero);
+            entry.Adjustments.Add(CreateAutoAdjustment(
+                entry.Id,
+                DeductionType,
+                UndertimeSource,
+                $"Undertime penalties for period",
+                amount));
+        }
+
+        if (summary.FullDayAbsences > 0 && settings.AbsenceFullDayMultiplier > 0 && hourlyRate > 0)
+        {
+            var absentHours = summary.Days
+                .Where(d => d.IsAbsent && d.ScheduledHours > 0)
+                .Sum(d => d.ScheduledHours);
+
+            if (absentHours > 0)
             {
-                var amount = day.LateMinutes * settings.LatePenaltyPerMinute;
+                var amount = Math.Round(absentHours * hourlyRate * settings.AbsenceFullDayMultiplier, 2, MidpointRounding.AwayFromZero);
                 entry.Adjustments.Add(CreateAutoAdjustment(
                     entry.Id,
                     DeductionType,
-                    LateSource,
-                    $"Late penalty {day.Date:yyyy-MM-dd} ({day.LateMinutes} mins)",
+                    AbsenceSource,
+                    $"Absence penalties for period",
                     amount));
             }
+        }
 
-            if (day.IsUndertime && day.UndertimeMinutes > 0 && settings.UndertimePenaltyPerMinute > 0)
+        if (summary.TotalOvertimeMinutes > 0 && settings.OvertimeBonusPerMinute > 0)
+        {
+            var amount = Math.Round(summary.TotalOvertimeMinutes * settings.OvertimeBonusPerMinute, 2, MidpointRounding.AwayFromZero);
+            entry.Adjustments.Add(CreateAutoAdjustment(
+                entry.Id,
+                BonusType,
+                OvertimeSource,
+                $"Overtime bonus for period",
+                amount));
+        }
+
+        return Task.CompletedTask;
+    }
+
+    private static void ApplyComponentAdjustments(
+        PayrollEntry entry,
+        decimal basePay,
+        decimal totalHours,
+        List<EmployeeComponent> components)
+    {
+        entry.Adjustments ??= new List<PayrollAdjustment>();
+
+        foreach (var component in components)
+        {
+            if (component.PayComponent is null)
             {
-                var amount = day.UndertimeMinutes * settings.UndertimePenaltyPerMinute;
-                entry.Adjustments.Add(CreateAutoAdjustment(
-                    entry.Id,
-                    DeductionType,
-                    UndertimeSource,
-                    $"Undertime {day.Date:yyyy-MM-dd} ({day.UndertimeMinutes} mins)",
-                    amount));
+                continue;
             }
 
-            if (day.IsAbsent && day.ScheduledHours > 0 && settings.AbsenceFullDayMultiplier > 0)
+            var payComponent = component.PayComponent;
+            var rate = component.Amount > 0 ? component.Amount : payComponent.DefaultAmount ?? 0m;
+
+            decimal amount = payComponent.CalculationType switch
             {
-                // Use an approximate hourly rate when only monthly salary is available.
-                if (hourlyRate > 0)
-                {
-                    var amount = settings.AbsenceFullDayMultiplier * hourlyRate * day.ScheduledHours;
-                    entry.Adjustments.Add(CreateAutoAdjustment(
-                        entry.Id,
-                        DeductionType,
-                        AbsenceSource,
-                        $"Absence {day.Date:yyyy-MM-dd} ({day.ScheduledHours:N2} hrs)",
-                        amount));
-                }
+                "FixedAmount" => rate,
+                "PercentageOfBase" => Math.Round(basePay * rate, 2, MidpointRounding.AwayFromZero),
+                "PerHour" => Math.Round(totalHours * rate, 2, MidpointRounding.AwayFromZero),
+                _ => 0m
+            };
+
+            if (amount <= 0)
+            {
+                continue;
             }
 
-            if (day.IsOvertime && day.OvertimeMinutes > 0 && settings.OvertimeBonusPerMinute > 0)
-            {
-                var amount = day.OvertimeMinutes * settings.OvertimeBonusPerMinute;
-                entry.Adjustments.Add(CreateAutoAdjustment(
-                    entry.Id,
-                    BonusType,
-                    OvertimeSource,
-                    $"Overtime bonus {day.Date:yyyy-MM-dd} ({day.OvertimeMinutes} mins)",
-                    amount));
-            }
+            var type = string.Equals(payComponent.ComponentType, DeductionType, StringComparison.OrdinalIgnoreCase)
+                ? DeductionType
+                : BonusType;
+
+            var label = string.IsNullOrWhiteSpace(payComponent.Name)
+                ? payComponent.Code
+                : payComponent.Name;
+
+            entry.Adjustments.Add(CreateAutoAdjustment(
+                entry.Id,
+                type,
+                payComponent.Code,
+                label,
+                amount));
         }
     }
 
@@ -444,40 +507,6 @@ public class PayrollService : IPayrollService
         return Math.Round(basePay, 2, MidpointRounding.AwayFromZero);
     }
 
-    private static AttendanceSummary SummarizeAttendance(IEnumerable<DailyAttendanceDto> attendance)
-    {
-        var workedHours = attendance
-            .Where(d => d.HasLogs)
-            .Sum(d => d.TotalDuration.TotalHours);
-
-        var lateMinutes = attendance
-            .Where(d => d.HasLogs && d.IsLate && d.LateMinutes > 0)
-            .Sum(d => d.LateMinutes);
-
-        var undertimeMinutes = attendance
-            .Where(d => d.HasLogs && d.IsUndertime && d.UndertimeMinutes > 0)
-            .Sum(d => d.UndertimeMinutes);
-
-        var overtimeMinutes = attendance
-            .Where(d => d.HasLogs && d.IsOvertime && d.OvertimeMinutes > 0)
-            .Sum(d => d.OvertimeMinutes);
-
-        var absentDays = attendance.Count(d => d.IsAbsent);
-        var absentScheduledHours = attendance
-            .Where(d => d.IsAbsent && d.ScheduledHours > 0)
-            .Sum(d => d.ScheduledHours);
-
-        return new AttendanceSummary
-        {
-            TotalWorkedHours = workedHours,
-            TotalLateMinutes = lateMinutes,
-            TotalUndertimeMinutes = undertimeMinutes,
-            TotalOvertimeMinutes = overtimeMinutes,
-            TotalAbsentDays = absentDays,
-            TotalScheduledHoursForAbsences = absentScheduledHours
-        };
-    }
-
     private static string NormalizeAdjustmentType(string type)
     {
         return string.Equals(type, DeductionType, StringComparison.OrdinalIgnoreCase)
@@ -502,19 +531,4 @@ public class PayrollService : IPayrollService
         entry.NetPay = Math.Round(entry.BasePay - entry.TotalDeductions + entry.TotalBonuses, 2, MidpointRounding.AwayFromZero);
         entry.CalculatedAt = DateTime.UtcNow;
     }
-}
-
-internal sealed class AttendanceSummary
-{
-    public double TotalWorkedHours { get; init; }
-
-    public int TotalLateMinutes { get; init; }
-
-    public int TotalUndertimeMinutes { get; init; }
-
-    public int TotalOvertimeMinutes { get; init; }
-
-    public int TotalAbsentDays { get; init; }
-
-    public decimal TotalScheduledHoursForAbsences { get; init; }
 }

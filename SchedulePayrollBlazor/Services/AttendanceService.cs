@@ -115,6 +115,36 @@ public class AttendanceService : IAttendanceService
             .ToList();
     }
 
+    public async Task<AttendancePeriodSummary> GetSummaryForEmployeeAsync(int employeeId, DateOnly start, DateOnly end)
+    {
+        var attendance = await GetAttendanceForEmployeeAsync(employeeId, start, end);
+
+        var summary = new AttendancePeriodSummary
+        {
+            EmployeeId = employeeId,
+            Days = attendance
+        };
+
+        foreach (var day in attendance)
+        {
+            summary.TotalRenderedTime += day.TotalDuration;
+            summary.TotalLateMinutes += day.LateMinutes;
+            summary.TotalUndertimeMinutes += day.UndertimeMinutes;
+            summary.TotalOvertimeMinutes += day.OvertimeMinutes;
+
+            if (day.ScheduledHours > 0)
+            {
+                summary.DaysWithShift++;
+                if (day.IsAbsent)
+                {
+                    summary.FullDayAbsences++;
+                }
+            }
+        }
+
+        return summary;
+    }
+
     public async Task<PaginatedAttendanceAdminView> GetAttendanceOverviewAsync(DateOnly date, int? employeeIdFilter, int page, int pageSize)
     {
         var dateStart = date.ToDateTime(TimeOnly.MinValue);

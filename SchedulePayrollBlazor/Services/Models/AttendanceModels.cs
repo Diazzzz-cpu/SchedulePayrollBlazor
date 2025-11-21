@@ -25,6 +25,21 @@ public class DailyAttendanceDto
     public List<Data.Models.TimeLog> Logs { get; set; } = new();
 }
 
+public sealed class AttendancePeriodSummary
+{
+    public int EmployeeId { get; set; }
+    public TimeSpan TotalRenderedTime { get; set; }
+    public decimal TotalRenderedHours => (decimal)TotalRenderedTime.TotalHours;
+
+    public int TotalLateMinutes { get; set; }
+    public int TotalUndertimeMinutes { get; set; }
+    public int TotalOvertimeMinutes { get; set; }
+
+    public int DaysWithShift { get; set; }
+    public int FullDayAbsences { get; set; }
+    public List<DailyAttendanceDto> Days { get; set; } = new();
+}
+
 public class AttendanceAdminRow
 {
     public int EmployeeId { get; set; }

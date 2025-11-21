@@ -5,6 +5,7 @@ using SchedulePayrollBlazor.Services.Models;
 using System;
 using System.Linq;
 using System.Collections.Generic;
+using System.Threading;
 
 namespace SchedulePayrollBlazor.Services;
 
@@ -266,65 +267,71 @@ public class ShiftService : IShiftService
             .AnyAsync(s => start < s.End && end > s.Start);
     }
 
-    public async Task<ShiftOperationResult> CopyWeekAsync(DateOnly sourceWeekStart, int? numberOfWeeks, DateOnly? endDateInclusive)
+    public async Task<WeekCopyResult> CopyWeekAsync(
+        DateOnly sourceWeekStart,
+        int numberOfWeeksToCopy,
+        CancellationToken cancellationToken = default)
     {
-        var weekStart = sourceWeekStart.ToDateTime(TimeOnly.MinValue);
-        var sourceWeekEnd = weekStart.AddDays(7);
+        if (numberOfWeeksToCopy <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(numberOfWeeksToCopy));
+        }
+
+        var sourceStart = sourceWeekStart.ToDateTime(TimeOnly.MinValue);
+        var sourceEnd = sourceStart.AddDays(7);
 
         List<Shift> sourceShifts;
         try
         {
             sourceShifts = await _db.Shifts
                 .AsNoTracking()
-                .Where(s => s.Start.Date >= weekStart.Date && s.Start.Date < sourceWeekEnd.Date)
+                .Where(s => s.Start >= sourceStart && s.Start < sourceEnd)
                 .OrderBy(s => s.Start)
-                .ToListAsync();
+                .ToListAsync(cancellationToken);
         }
         catch
         {
-            return ShiftOperationResult.Empty;
+            return WeekCopyResult.Empty;
         }
+
+        var result = new WeekCopyResult
+        {
+            TotalShiftsConsidered = sourceShifts.Count * numberOfWeeksToCopy
+        };
 
         if (sourceShifts.Count == 0)
         {
-            return ShiftOperationResult.Empty;
+            return result;
         }
 
-        var offsets = CalculateWeekOffsets(numberOfWeeks);
-        var result = new ShiftOperationResult();
         var newShifts = new List<Shift>();
 
-        foreach (var shift in sourceShifts)
+        for (var offset = 1; offset <= numberOfWeeksToCopy; offset++)
         {
-            foreach (var weekOffset in offsets)
+            var offsetDays = 7 * offset;
+
+            foreach (var shift in sourceShifts)
             {
-                var targetStart = shift.Start.AddDays(weekOffset * 7);
-                var targetEnd = shift.End.AddDays(weekOffset * 7);
-
-                if (endDateInclusive.HasValue && DateOnly.FromDateTime(targetStart.Date) > endDateInclusive.Value)
-                {
-                    continue;
-                }
-
-                result.Total++;
+                var targetStart = shift.Start.AddDays(offsetDays);
+                var targetEnd = shift.End.AddDays(offsetDays);
 
                 if (await HasOverlappingShiftAsync(shift.EmployeeId, targetStart, targetEnd))
                 {
-                    result.SkippedConflicts++;
+                    result.SkippedConflictsCount++;
                     continue;
                 }
 
                 var clone = CloneShift(shift, targetStart, targetEnd);
                 await ApplyEmployeeMetadataAsync(clone, preferExistingName: true, preferExistingGroup: true);
                 newShifts.Add(clone);
-                result.Created++;
+                result.CreatedCount++;
             }
         }
 
         if (newShifts.Count > 0)
         {
-            await _db.Shifts.AddRangeAsync(newShifts);
-            await _db.SaveChangesAsync();
+            await _db.Shifts.AddRangeAsync(newShifts, cancellationToken);
+            await _db.SaveChangesAsync(cancellationToken);
         }
 
         return result;
@@ -446,21 +453,6 @@ public class ShiftService : IShiftService
             Start = targetStart,
             End = targetEnd
         };
-    }
-
-    private static List<int> CalculateWeekOffsets(int? numberOfWeeks)
-    {
-        if (!numberOfWeeks.HasValue)
-        {
-            return new List<int> { 1 };
-        }
-
-        if (numberOfWeeks.Value <= 0)
-        {
-            return new List<int>();
-        }
-
-        return Enumerable.Range(1, numberOfWeeks.Value).ToList();
     }
 
     private static IEnumerable<DateOnly> GenerateRepeatDates(DateOnly baseDate, DateOnly until, ShiftRepeatRequest request)

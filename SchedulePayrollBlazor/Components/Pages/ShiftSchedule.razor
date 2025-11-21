@@ -685,38 +685,22 @@
 
         _copyModalError = null;
 
-        int? numberOfWeeks = null;
-        DateOnly? endDate = null;
+        int weeksToCopy;
 
-        switch (_copyMode)
+        try
         {
-            case CopyWeekMode.NextWeek:
-                numberOfWeeks = 1;
-                break;
-            case CopyWeekMode.NextNWeeks:
-                if (_copyWeeksCount <= 0)
-                {
-                    _copyModalError = "Enter a week count greater than 0.";
-                    return;
-                }
-
-                numberOfWeeks = _copyWeeksCount;
-                break;
-            case CopyWeekMode.UntilDate:
-                if (!_copyUntilDate.HasValue)
-                {
-                    _copyModalError = "Select a target end date.";
-                    return;
-                }
-
-                endDate = DateOnly.FromDateTime(_copyUntilDate.Value.Date);
-                break;
+            weeksToCopy = CalculateWeeksToCopy();
+        }
+        catch (Exception ex)
+        {
+            _copyModalError = ex.Message;
+            return;
         }
 
         _isCopyBusy = true;
         try
         {
-            var result = await ShiftService.CopyWeekAsync(DateOnly.FromDateTime(_weekStart), numberOfWeeks, endDate);
+            var result = await ShiftService.CopyWeekAsync(DateOnly.FromDateTime(_weekStart), weeksToCopy);
 
             _copyResultMessage = BuildCopySummary(result);
             _isCopyModalOpen = false;
@@ -733,14 +717,38 @@
         }
     }
 
-    private string BuildCopySummary(ShiftOperationResult result)
+    private string BuildCopySummary(WeekCopyResult result)
     {
-        if (result.Total == 0)
+        if (result.TotalShiftsConsidered == 0)
         {
             return "No shifts were available to copy for this week.";
         }
 
-        return $"Copied {result.Total} shifts ({result.Created} created, {result.SkippedConflicts} skipped due to conflicts).";
+        return $"Copy complete: {result.TotalShiftsConsidered} candidate shifts, {result.CreatedCount} created, {result.SkippedConflictsCount} skipped due to conflicts.";
+    }
+
+    private int CalculateWeeksToCopy()
+    {
+        return _copyMode switch
+        {
+            CopyWeekMode.NextWeek => 1,
+            CopyWeekMode.NextNWeeks when _copyWeeksCount > 0 => _copyWeeksCount,
+            CopyWeekMode.NextNWeeks => throw new InvalidOperationException("Enter a week count greater than 0."),
+            CopyWeekMode.UntilDate when _copyUntilDate.HasValue => CalculateWeeksUntil(_copyUntilDate.Value),
+            CopyWeekMode.UntilDate => throw new InvalidOperationException("Select a target end date."),
+            _ => 1
+        };
+    }
+
+    private int CalculateWeeksUntil(DateTime targetDate)
+    {
+        var difference = targetDate.Date - _weekStart.Date;
+        if (difference.TotalDays <= 0)
+        {
+            throw new InvalidOperationException("Target date must be after the current week.");
+        }
+
+        return (int)Math.Ceiling(difference.TotalDays / 7d);
     }
 
     private string BuildRepeatSummary(ShiftOperationResult result)

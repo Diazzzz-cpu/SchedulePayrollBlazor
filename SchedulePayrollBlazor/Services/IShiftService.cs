@@ -36,6 +36,8 @@ public interface IShiftService
 
     Task<bool> HasOverlappingShiftAsync(int employeeId, DateTime start, DateTime end, int? shiftIdToExclude = null);
 
+    Task<WeekCopyResult> CopyWeekToNextAsync(DateOnly sourceWeekStart, CancellationToken cancellationToken = default);
+
     Task<WeekCopyResult> CopyWeekAsync(
         DateOnly sourceWeekStart,
         int numberOfWeeksToCopy,

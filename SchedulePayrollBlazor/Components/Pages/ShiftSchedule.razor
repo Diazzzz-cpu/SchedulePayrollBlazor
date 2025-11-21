@@ -5,7 +5,6 @@
 @using System.Linq
 @using System.Security.Claims
 @using Microsoft.AspNetCore.Components
-@using Microsoft.AspNetCore.Components.Rendering
 @using Microsoft.EntityFrameworkCore
 @using SchedulePayrollBlazor.Services.Models
 @inject IShiftService ShiftService
@@ -23,7 +22,7 @@
             @* Removed UTC badge per instructions *@
             <AuthorizeView Roles="Admin">
                 <Authorized>
-                    <button type="button" class="ps-button" @onclick="OpenCopyModal">
+                    <button type="button" class="ps-button" @onclick="OnCopyThisWeekAsync" disabled="@_isCopyBusy">
                         Copy this week
                     </button>
                     <button type="button" class="ps-button ps-button-primary" @onclick="CreateShift">
@@ -163,7 +162,6 @@
                     ErrorMessage="@_modalError"
                     SuccessMessage="@_modalSuccess"
                     IsBusy="_isModalBusy" />
-        <CopyWeekModal />
     }
 </div>
 
@@ -186,11 +184,6 @@
     private string? _modalSuccess;
     private bool _isModalBusy;
     private string? _copyResultMessage;
-    private bool _isCopyModalOpen;
-    private CopyWeekMode _copyMode = CopyWeekMode.NextWeek;
-    private int _copyWeeksCount = 1;
-    private DateTime? _copyUntilDate;
-    private string? _copyModalError;
     private bool _isCopyBusy;
 
     private string? SelectedGroup
@@ -661,94 +654,37 @@
         return employee == default || string.IsNullOrWhiteSpace(employee.Group) ? null : employee.Group;
     }
 
-    private void OpenCopyModal()
+    private async Task OnCopyThisWeekAsync()
     {
-        _copyModalError = null;
-        _copyMode = CopyWeekMode.NextWeek;
-        _copyWeeksCount = 1;
-        _copyUntilDate = null;
-        _isCopyModalOpen = true;
-    }
-
-    private Task CloseCopyModal()
-    {
-        _isCopyModalOpen = false;
-        return Task.CompletedTask;
-    }
-
-    private async Task ConfirmCopyAsync()
-    {
-        if (_isCopyBusy)
+        if (!_isAdmin || _isCopyBusy)
         {
             return;
         }
 
-        _copyModalError = null;
-
-        int weeksToCopy;
-
-        try
-        {
-            weeksToCopy = CalculateWeeksToCopy();
-        }
-        catch (Exception ex)
-        {
-            _copyModalError = ex.Message;
-            return;
-        }
-
+        _copyResultMessage = null;
         _isCopyBusy = true;
+
         try
         {
-            var result = await ShiftService.CopyWeekAsync(DateOnly.FromDateTime(_weekStart), weeksToCopy);
+            var result = await ShiftService.CopyWeekToNextAsync(DateOnly.FromDateTime(_weekStart));
 
-            _copyResultMessage = BuildCopySummary(result);
-            _isCopyModalOpen = false;
+            _copyResultMessage = result.TotalShiftsConsidered == 0
+                ? "No shifts found in this week to copy."
+                : $"Copy complete: {result.CreatedCount} created, {result.SkippedConflictsCount} skipped due to conflicts.";
+
+            _weekStart = _weekStart.AddDays(7);
+            _selectedMonth = new DateTime(_weekStart.Year, _weekStart.Month, 1);
             await LoadShiftsAsync();
         }
         catch (Exception ex)
         {
-            _copyModalError = ex.Message;
+            _copyResultMessage = $"Copy failed: {ex.Message}";
         }
         finally
         {
             _isCopyBusy = false;
             await InvokeAsync(StateHasChanged);
         }
-    }
-
-    private string BuildCopySummary(WeekCopyResult result)
-    {
-        if (result.TotalShiftsConsidered == 0)
-        {
-            return "No shifts were available to copy for this week.";
-        }
-
-        return $"Copy complete: {result.TotalShiftsConsidered} candidate shifts, {result.CreatedCount} created, {result.SkippedConflictsCount} skipped due to conflicts.";
-    }
-
-    private int CalculateWeeksToCopy()
-    {
-        return _copyMode switch
-        {
-            CopyWeekMode.NextWeek => 1,
-            CopyWeekMode.NextNWeeks when _copyWeeksCount > 0 => _copyWeeksCount,
-            CopyWeekMode.NextNWeeks => throw new InvalidOperationException("Enter a week count greater than 0."),
-            CopyWeekMode.UntilDate when _copyUntilDate.HasValue => CalculateWeeksUntil(_copyUntilDate.Value),
-            CopyWeekMode.UntilDate => throw new InvalidOperationException("Select a target end date."),
-            _ => 1
-        };
-    }
-
-    private int CalculateWeeksUntil(DateTime targetDate)
-    {
-        var difference = targetDate.Date - _weekStart.Date;
-        if (difference.TotalDays <= 0)
-        {
-            throw new InvalidOperationException("Target date must be after the current week.");
-        }
-
-        return (int)Math.Ceiling(difference.TotalDays / 7d);
     }
 
     private string BuildRepeatSummary(ShiftOperationResult result)
@@ -759,144 +695,5 @@
         }
 
         return $"Created 1 base shift + {result.Created} repeated, {result.SkippedConflicts} skipped.";
-    }
-
-    private RenderFragment CopyWeekModal() => builder =>
-    {
-        if (!_isCopyModalOpen)
-        {
-            return;
-        }
-
-        builder.OpenElement(0, "div");
-        builder.AddAttribute(1, "class", "ps-modal-backdrop");
-        builder.OpenElement(2, "div");
-        builder.AddAttribute(3, "class", "ps-modal ps-modal-small");
-
-        builder.OpenElement(4, "div");
-        builder.AddAttribute(5, "class", "ps-modal-header");
-        builder.OpenElement(6, "h3");
-        builder.AddContent(7, "Copy this week");
-        builder.CloseElement();
-        builder.OpenElement(8, "button");
-        builder.AddAttribute(9, "type", "button");
-        builder.AddAttribute(10, "class", "ps-modal-close");
-        builder.AddAttribute(11, "onclick", EventCallback.Factory.Create(this, CloseCopyModal));
-        builder.AddContent(12, "×");
-        builder.CloseElement();
-        builder.CloseElement();
-
-        builder.OpenElement(13, "div");
-        builder.AddAttribute(14, "class", "ps-modal-body");
-
-        if (!string.IsNullOrWhiteSpace(_copyModalError))
-        {
-            builder.OpenElement(15, "div");
-            builder.AddAttribute(16, "class", "ps-alert ps-alert-danger");
-            builder.AddContent(17, _copyModalError);
-            builder.CloseElement();
-        }
-
-        builder.OpenElement(18, "div");
-        builder.AddAttribute(19, "class", "ps-form-grid");
-
-        BuildCopyOption(builder, CopyWeekMode.NextWeek, "Copy to next week");
-        BuildCopyOption(builder, CopyWeekMode.NextNWeeks, "Copy to next N weeks", includeInput: true);
-        BuildCopyOption(builder, CopyWeekMode.UntilDate, "Copy until a target date", includeDate: true);
-
-        builder.CloseElement();
-
-        builder.OpenElement(20, "div");
-        builder.AddAttribute(21, "class", "shift-modal-footer");
-        builder.OpenElement(22, "div");
-        builder.AddAttribute(23, "class", "shift-modal-footer-actions");
-        builder.OpenElement(24, "button");
-        builder.AddAttribute(25, "type", "button");
-        builder.AddAttribute(26, "class", "ps-button ps-button-ghost");
-        builder.AddAttribute(27, "onclick", EventCallback.Factory.Create(this, CloseCopyModal));
-        builder.AddContent(28, "Cancel");
-        builder.CloseElement();
-        builder.OpenElement(29, "button");
-        builder.AddAttribute(30, "type", "button");
-        builder.AddAttribute(31, "class", "ps-button ps-button-primary");
-        builder.AddAttribute(32, "disabled", _isCopyBusy);
-        builder.AddAttribute(33, "onclick", EventCallback.Factory.Create(this, ConfirmCopyAsync));
-        builder.AddContent(34, _isCopyBusy ? "Copying…" : "Copy shifts");
-        builder.CloseElement();
-        builder.CloseElement();
-        builder.CloseElement();
-
-        builder.CloseElement();
-        builder.CloseElement();
-    };
-
-    private void BuildCopyOption(RenderTreeBuilder builder, CopyWeekMode mode, string label, bool includeInput = false, bool includeDate = false)
-    {
-        var seq = 100 + (int)mode * 10;
-        builder.OpenElement(seq++, "div");
-        builder.AddAttribute(seq++, "class", "form-group");
-
-        builder.OpenElement(seq++, "label");
-        builder.AddAttribute(seq++, "class", "ps-radio");
-        builder.OpenElement(seq++, "input");
-        builder.AddAttribute(seq++, "type", "radio");
-        builder.AddAttribute(seq++, "name", "copy-week-mode");
-        builder.AddAttribute(seq++, "checked", _copyMode == mode);
-        builder.AddAttribute(seq++, "onchange", EventCallback.Factory.Create(this, () => _copyMode = mode));
-        builder.CloseElement();
-        builder.AddContent(seq++, label);
-        builder.CloseElement();
-
-        if (includeInput)
-        {
-            builder.OpenElement(seq++, "div");
-            builder.AddAttribute(seq++, "class", "ps-copy-input");
-            builder.OpenElement(seq++, "label");
-            builder.AddAttribute(seq++, "class", "ps-label");
-            builder.AddContent(seq++, "Weeks");
-            builder.CloseElement();
-            builder.OpenElement(seq++, "input");
-            builder.AddAttribute(seq++, "type", "number");
-            builder.AddAttribute(seq++, "class", "ps-input");
-            builder.AddAttribute(seq++, "min", "1");
-            builder.AddAttribute(seq++, "value", BindConverter.FormatValue(_copyWeeksCount));
-            builder.AddAttribute(seq++, "onchange", EventCallback.Factory.CreateBinder<int>(this, value =>
-            {
-                _copyWeeksCount = value;
-                _copyMode = mode;
-            }, _copyWeeksCount));
-            builder.CloseElement();
-            builder.CloseElement();
-        }
-
-        if (includeDate)
-        {
-            builder.OpenElement(seq++, "div");
-            builder.AddAttribute(seq++, "class", "ps-copy-input");
-            builder.OpenElement(seq++, "label");
-            builder.AddAttribute(seq++, "class", "ps-label");
-            builder.AddContent(seq++, "Target date");
-            builder.CloseElement();
-            builder.OpenElement(seq++, "input");
-            builder.AddAttribute(seq++, "type", "date");
-            builder.AddAttribute(seq++, "class", "ps-input");
-            builder.AddAttribute(seq++, "value", BindConverter.FormatValue(_copyUntilDate, "yyyy-MM-dd", CultureInfo.InvariantCulture));
-            builder.AddAttribute(seq++, "onchange", EventCallback.Factory.CreateBinder<DateTime?>(this, value =>
-            {
-                _copyUntilDate = value;
-                _copyMode = mode;
-            }, _copyUntilDate));
-            builder.CloseElement();
-            builder.CloseElement();
-        }
-
-        builder.CloseElement();
-    }
-
-    private enum CopyWeekMode
-    {
-        NextWeek,
-        NextNWeeks,
-        UntilDate
     }
 }

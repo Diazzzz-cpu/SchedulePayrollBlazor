@@ -267,6 +267,69 @@ public class ShiftService : IShiftService
             .AnyAsync(s => start < s.End && end > s.Start);
     }
 
+    public async Task<WeekCopyResult> CopyWeekToNextAsync(DateOnly sourceWeekStart, CancellationToken cancellationToken = default)
+    {
+        var sourceStart = sourceWeekStart.ToDateTime(TimeOnly.MinValue);
+        var sourceEnd = sourceStart.AddDays(7);
+        const int WeekOffsetDays = 7;
+
+        var sourceShifts = await _db.Shifts
+            .AsNoTracking()
+            .Where(s => s.Start >= sourceStart && s.Start < sourceEnd)
+            .ToListAsync(cancellationToken);
+
+        var result = new WeekCopyResult
+        {
+            TotalShiftsConsidered = sourceShifts.Count,
+            CreatedCount = 0,
+            SkippedConflictsCount = 0
+        };
+
+        if (sourceShifts.Count == 0)
+        {
+            return result;
+        }
+
+        var newShifts = new List<Shift>();
+
+        foreach (var shift in sourceShifts)
+        {
+            var newStart = shift.Start.AddDays(WeekOffsetDays);
+            var newEnd = shift.End.AddDays(WeekOffsetDays);
+
+            if (await HasConflictAsync(shift.EmployeeId, newStart, newEnd, null, cancellationToken))
+            {
+                result.SkippedConflictsCount++;
+                continue;
+            }
+
+            var clone = CloneShift(shift, newStart, newEnd);
+            await ApplyEmployeeMetadataAsync(clone, preferExistingName: true, preferExistingGroup: true);
+            newShifts.Add(clone);
+            result.CreatedCount++;
+        }
+
+        if (newShifts.Count > 0)
+        {
+            await _db.Shifts.AddRangeAsync(newShifts, cancellationToken);
+            await _db.SaveChangesAsync(cancellationToken);
+        }
+
+        return result;
+    }
+
+    private Task<bool> HasConflictAsync(int employeeId, DateTime start, DateTime end, int? excludeShiftId, CancellationToken cancellationToken)
+    {
+        return _db.Shifts
+            .AsNoTracking()
+            .AnyAsync(s =>
+                s.EmployeeId == employeeId &&
+                (!excludeShiftId.HasValue || s.Id != excludeShiftId.Value) &&
+                s.Start < end &&
+                s.End > start,
+                cancellationToken);
+    }
+
     public async Task<WeekCopyResult> CopyWeekAsync(
         DateOnly sourceWeekStart,
         int numberOfWeeksToCopy,

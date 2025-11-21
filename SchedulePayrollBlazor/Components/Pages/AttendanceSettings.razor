@@ -23,14 +23,16 @@
                 <div class="alert @(alertIsError ? "alert-danger" : "alert-success")">@alertMessage</div>
             }
 
-            <div class="ps-form-grid">
+            <!-- 🌟 SCOPE THESE TO THIS PAGE ONLY -->
+            <div class="ps-attendance-form-grid">
+
                 <!-- Late Penalty -->
-                <div class="ps-form-row">
-                    <div class="ps-form-label">
+                <div class="ps-attendance-form-row">
+                    <div class="ps-attendance-form-label">
                         <label class="ps-label">Late penalty (per 30 minutes)</label>
                         <p class="ps-help-text">Converted to a per-minute rate when saved.</p>
                     </div>
-                    <div class="ps-form-control">
+                    <div class="ps-attendance-form-control">
                         <div class="ps-input-group">
                             <span class="ps-input-prefix">₱</span>
                             <InputNumber @bind-Value="model.LatePenaltyPerHalfHour" class="ps-input" step="0.01" min="0" />
@@ -39,13 +41,13 @@
                     </div>
                 </div>
 
-                <!-- Undertime Penalty -->
-                <div class="ps-form-row">
-                    <div class="ps-form-label">
+                <!-- Undertime -->
+                <div class="ps-attendance-form-row">
+                    <div class="ps-attendance-form-label">
                         <label class="ps-label">Undertime penalty (per hour)</label>
                         <p class="ps-help-text">Applied when an employee leaves early beyond grace minutes.</p>
                     </div>
-                    <div class="ps-form-control">
+                    <div class="ps-attendance-form-control">
                         <div class="ps-input-group">
                             <span class="ps-input-prefix">₱</span>
                             <InputNumber @bind-Value="model.UndertimePenaltyPerHour" class="ps-input" step="0.01" min="0" />
@@ -55,12 +57,12 @@
                 </div>
 
                 <!-- Absence -->
-                <div class="ps-form-row">
-                    <div class="ps-form-label">
+                <div class="ps-attendance-form-row">
+                    <div class="ps-attendance-form-label">
                         <label class="ps-label">Absence multiplier (full day)</label>
                         <p class="ps-help-text">Multiplier against daily base pay for scheduled hours.</p>
                     </div>
-                    <div class="ps-form-control">
+                    <div class="ps-attendance-form-control">
                         <div class="ps-input-group">
                             <InputNumber @bind-Value="model.AbsenceFullDayMultiplier" class="ps-input" step="0.01" min="0" />
                             <span class="ps-input-suffix">× daily pay</span>
@@ -69,12 +71,12 @@
                 </div>
 
                 <!-- Overtime -->
-                <div class="ps-form-row">
-                    <div class="ps-form-label">
+                <div class="ps-attendance-form-row">
+                    <div class="ps-attendance-form-label">
                         <label class="ps-label">Overtime bonus (per hour)</label>
                         <p class="ps-help-text">Reward for approved overtime beyond the threshold.</p>
                     </div>
-                    <div class="ps-form-control">
+                    <div class="ps-attendance-form-control">
                         <div class="ps-input-group">
                             <span class="ps-input-prefix">₱</span>
                             <InputNumber @bind-Value="model.OvertimeBonusPerHour" class="ps-input" step="0.01" min="0" />
@@ -84,7 +86,7 @@
                 </div>
             </div>
 
-            <div class="ps-form-footer">
+            <div class="ps-attendance-form-footer">
                 <button class="btn btn-primary" type="submit">Save changes</button>
                 <span class="text-muted align-self-center">Last updated: @lastUpdatedLabel</span>
             </div>
@@ -98,10 +100,7 @@
     private bool alertIsError;
     private string lastUpdatedLabel = "—";
 
-    protected override async Task OnInitializedAsync()
-    {
-        await LoadAsync();
-    }
+    protected override async Task OnInitializedAsync() => await LoadAsync();
 
     private async Task LoadAsync()
     {
@@ -110,12 +109,11 @@
             var settings = await AttendanceSettingsService.GetOrCreateAsync();
             model = new AttendanceSettingsModel
             {
-                LatePenaltyPerHalfHour = Math.Round(settings.LatePenaltyPerMinute * 30m, 2, MidpointRounding.AwayFromZero),
-                UndertimePenaltyPerHour = Math.Round(settings.UndertimePenaltyPerMinute * 60m, 2, MidpointRounding.AwayFromZero),
+                LatePenaltyPerHalfHour = Math.Round(settings.LatePenaltyPerMinute * 30m, 2),
+                UndertimePenaltyPerHour = Math.Round(settings.UndertimePenaltyPerMinute * 60m, 2),
                 AbsenceFullDayMultiplier = settings.AbsenceFullDayMultiplier,
-                OvertimeBonusPerHour = Math.Round(settings.OvertimeBonusPerMinute * 60m, 2, MidpointRounding.AwayFromZero)
+                OvertimeBonusPerHour = Math.Round(settings.OvertimeBonusPerMinute * 60m, 2)
             };
-
             lastUpdatedLabel = settings.UpdatedAt == default
                 ? "Not set"
                 : settings.UpdatedAt.ToLocalTime().ToString("MMM dd, yyyy HH:mm");
@@ -138,9 +136,7 @@
                 AbsenceFullDayMultiplier = model.AbsenceFullDayMultiplier,
                 OvertimeBonusPerMinute = model.OvertimeBonusPerHour / 60m
             };
-
             var updated = await AttendanceSettingsService.UpdateAsync(settings);
-
             alertIsError = false;
             alertMessage = "Attendance penalty settings updated.";
             lastUpdatedLabel = updated.UpdatedAt.ToLocalTime().ToString("MMM dd, yyyy HH:mm");
@@ -156,13 +152,10 @@
     {
         [Range(0, double.MaxValue)]
         public decimal LatePenaltyPerHalfHour { get; set; }
-
         [Range(0, double.MaxValue)]
         public decimal UndertimePenaltyPerHour { get; set; }
-
         [Range(0, double.MaxValue)]
         public decimal AbsenceFullDayMultiplier { get; set; }
-
         [Range(0, double.MaxValue)]
         public decimal OvertimeBonusPerHour { get; set; }
     }

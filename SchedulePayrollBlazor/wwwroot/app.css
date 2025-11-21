@@ -2194,58 +2194,44 @@ textarea {
     color: rgba(148, 163, 184, 0.9);
 }
 
-.ps-form-grid {
+.ps-attendance-form-grid {
     display: flex;
     flex-direction: column;
-    gap: 1.5rem;
+    gap: 1.75rem;
 }
 
-.ps-form-row {
+.ps-attendance-form-row {
     display: grid;
-    grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
-    gap: 1.5rem;
+    grid-template-columns: 1.4fr 2fr;
+    gap: 1.75rem;
     align-items: flex-start;
 }
 
-.ps-form-label .ps-label {
+.ps-attendance-form-label .ps-label {
     font-weight: 600;
 }
 
 .ps-help-text {
-    margin-top: 0.25rem;
     font-size: 0.85rem;
-    color: rgba(148, 163, 184, 0.9);
+    color: rgba(148,163,184,0.85);
+    margin-top: 3px;
 }
 
-.ps-form-control .ps-input-group {
+.ps-input-group {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
-}
-
-.ps-input {
-    flex: 1 1 auto;
-    padding: 0.55rem 0.75rem;
-    border-radius: 0.5rem;
-    border: 1px solid rgba(148, 163, 184, 0.45);
-    background-color: rgba(15, 23, 42, 0.9);
-    color: #e5e7eb;
+    gap: 0.35rem;
 }
 
 .ps-input-prefix,
 .ps-input-suffix {
-    font-size: 0.9rem;
-    color: rgba(148, 163, 184, 0.9);
-}
-
-.ps-form-footer {
-    margin-top: 2rem;
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-}
-
-.ps-muted-text {
     font-size: 0.85rem;
-    color: rgba(148, 163, 184, 0.9);
+    color: rgba(148,163,184,0.9);
+}
+
+.ps-attendance-form-footer {
+    margin-top: 2.25rem;
+    display: flex;
+    gap: 1rem;
+    align-items: center;
 }

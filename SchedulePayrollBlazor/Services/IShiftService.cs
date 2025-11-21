@@ -38,6 +38,11 @@ public interface IShiftService
 
     Task<WeekCopyResult> CopyWeekToNextAsync(DateOnly sourceWeekStart, CancellationToken cancellationToken = default);
 
+    Task<WeekCopyResult> CopyWeekToAsync(
+        DateOnly sourceWeekStart,
+        DateOnly targetWeekStart,
+        CancellationToken cancellationToken = default);
+
     Task<WeekCopyResult> CopyWeekAsync(
         DateOnly sourceWeekStart,
         int numberOfWeeksToCopy,

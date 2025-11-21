@@ -25,6 +25,9 @@
                     <button type="button" class="ps-button" @onclick="OnCopyThisWeekAsync" disabled="@_isCopyBusy">
                         Copy this week
                     </button>
+                    <button type="button" class="ps-button ps-button-secondary" @onclick="PasteCopiedWeekAsync" disabled="@(!HasCopiedWeek || _isCopyBusy)">
+                        Paste copied week
+                    </button>
                     <button type="button" class="ps-button ps-button-primary" @onclick="CreateShift">
                         Create shift(s)
                     </button>
@@ -185,6 +188,10 @@
     private bool _isModalBusy;
     private string? _copyResultMessage;
     private bool _isCopyBusy;
+    private DateOnly? _copiedWeekStart;
+    private DateOnly? _copiedWeekEnd;
+
+    private bool HasCopiedWeek => _copiedWeekStart.HasValue;
 
     private string? SelectedGroup
     {
@@ -666,14 +673,40 @@
 
         try
         {
-            var result = await ShiftService.CopyWeekToNextAsync(DateOnly.FromDateTime(_weekStart));
+            _copiedWeekStart = DateOnly.FromDateTime(_weekStart);
+            _copiedWeekEnd = _copiedWeekStart.Value.AddDays(6);
+            _copyResultMessage = "Week copied. Navigate to another week and click 'Paste copied week' to apply.";
+        }
+        catch (Exception ex)
+        {
+            _copyResultMessage = $"Copy failed: {ex.Message}";
+        }
+        finally
+        {
+            _isCopyBusy = false;
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private async Task PasteCopiedWeekAsync()
+    {
+        if (!_isAdmin || _isCopyBusy || !_copiedWeekStart.HasValue)
+        {
+            return;
+        }
+
+        _copyResultMessage = null;
+        _isCopyBusy = true;
+
+        try
+        {
+            var targetWeekStart = DateOnly.FromDateTime(_weekStart);
+            var result = await ShiftService.CopyWeekToAsync(_copiedWeekStart.Value, targetWeekStart);
 
             _copyResultMessage = result.TotalShiftsConsidered == 0
-                ? "No shifts found in this week to copy."
+                ? "No shifts found in the copied week to paste."
                 : $"Copy complete: {result.CreatedCount} created, {result.SkippedConflictsCount} skipped due to conflicts.";
 
-            _weekStart = _weekStart.AddDays(7);
-            _selectedMonth = new DateTime(_weekStart.Year, _weekStart.Month, 1);
             await LoadShiftsAsync();
         }
         catch (Exception ex)

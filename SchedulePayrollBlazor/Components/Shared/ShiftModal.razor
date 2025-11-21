@@ -1,5 +1,6 @@
 @using System.Globalization
 @using SchedulePayrollBlazor.Data
+@using SchedulePayrollBlazor.Services.Models
 @implements IDisposable
 @inject AppDbContext Db
 
@@ -24,6 +25,11 @@
                     @if (!string.IsNullOrWhiteSpace(ErrorMessage))
                     {
                         <div class="ps-alert ps-alert-danger">@ErrorMessage</div>
+                    }
+
+                    @if (!string.IsNullOrWhiteSpace(SuccessMessage))
+                    {
+                        <div class="ps-alert ps-alert-success">@SuccessMessage</div>
                     }
 
                     <div class="ps-form-grid">
@@ -86,6 +92,47 @@
                         </div>
                     </div>
 
+                    <div class="ps-form-grid">
+                        <div class="form-group">
+                            <label class="ps-label" for="shift-modal-repeat-mode">Repeat</label>
+                            <InputSelect id="shift-modal-repeat-mode"
+                                         class="ps-input"
+                                         @bind-Value="_formModel.RepeatMode">
+                                <option value="@ShiftRepeatMode.None">Do not repeat</option>
+                                <option value="@ShiftRepeatMode.Weekly">Weekly</option>
+                                <option value="@ShiftRepeatMode.Weekdays">Weekdays (Mon–Fri)</option>
+                                <option value="@ShiftRepeatMode.CustomDays">Custom days</option>
+                            </InputSelect>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="ps-label" for="shift-modal-repeat-until">Repeat until</label>
+                            <InputDate @bind-Value="_formModel.RepeatUntil"
+                                       id="shift-modal-repeat-until"
+                                       class="ps-input"
+                                       disabled="@(_formModel.RepeatMode == ShiftRepeatMode.None)" />
+                        </div>
+                    </div>
+
+                    @if (_formModel.RepeatMode == ShiftRepeatMode.CustomDays)
+                    {
+                        <div class="form-group">
+                            <label class="ps-label">Repeat on</label>
+                            <div class="ps-checkbox-row">
+                                @foreach (var day in _orderedDays)
+                                {
+                                    var isChecked = _formModel.RepeatDays.Contains(day);
+                                    <label class="ps-checkbox">
+                                        <input type="checkbox"
+                                               checked="@isChecked"
+                                               @onchange="args => ToggleRepeatDay(day, args)" />
+                                        <span>@day.ToString().Substring(0, 3)</span>
+                                    </label>
+                                }
+                            </div>
+                        </div>
+                    }
+
                     <div class="shift-modal-footer">
                         @if (OnDelete.HasDelegate && _formModel.Id.HasValue)
                         {
@@ -110,6 +157,16 @@
     private EditContext? _editContext;
     private ValidationMessageStore? _validationMessages;
     private bool _isSubmitting;
+    private readonly DayOfWeek[] _orderedDays = new[]
+    {
+        DayOfWeek.Sunday,
+        DayOfWeek.Monday,
+        DayOfWeek.Tuesday,
+        DayOfWeek.Wednesday,
+        DayOfWeek.Thursday,
+        DayOfWeek.Friday,
+        DayOfWeek.Saturday
+    };
 
     // department / group list loaded from DB
     private List<string> _groupOptions = new();
@@ -118,11 +175,12 @@
     [Parameter] public EventCallback<bool> IsOpenChanged { get; set; }
     [Parameter] public Shift? Model { get; set; }
     [Parameter] public IEnumerable<(int Id, string Name)> Employees { get; set; } = Enumerable.Empty<(int, string)>();
-    [Parameter] public EventCallback<Shift> OnSave { get; set; }
+    [Parameter] public EventCallback<ShiftSaveRequest> OnSave { get; set; }
     [Parameter] public EventCallback OnCancel { get; set; }
     [Parameter] public EventCallback<int> OnDelete { get; set; }
     [Parameter] public string Title { get; set; } = "Create shift";
     [Parameter] public string? ErrorMessage { get; set; }
+    [Parameter] public string? SuccessMessage { get; set; }
     [Parameter] public bool IsBusy { get; set; }
 
     protected override void OnParametersSet()
@@ -225,8 +283,8 @@
         _isSubmitting = true;
         try
         {
-            var shift = _formModel.ToShift();
-            await OnSave.InvokeAsync(shift);
+            var saveRequest = _formModel.ToSaveRequest();
+            await OnSave.InvokeAsync(saveRequest);
         }
         finally
         {
@@ -288,6 +346,8 @@
         var dateField = new FieldIdentifier(_formModel, nameof(ShiftEditorModel.Date));
         var startField = new FieldIdentifier(_formModel, nameof(ShiftEditorModel.StartTime));
         var endField = new FieldIdentifier(_formModel, nameof(ShiftEditorModel.EndTime));
+        var repeatModeField = new FieldIdentifier(_formModel, nameof(ShiftEditorModel.RepeatMode));
+        var repeatUntilField = new FieldIdentifier(_formModel, nameof(ShiftEditorModel.RepeatUntil));
 
         if (_formModel.EmployeeId <= 0 || !Employees.Any(e => e.Id == _formModel.EmployeeId))
         {
@@ -302,6 +362,23 @@
         if (_formModel.EndTime <= _formModel.StartTime)
         {
             _validationMessages.Add(endField, "End time must be after the start time.");
+        }
+
+        if (_formModel.RepeatMode != ShiftRepeatMode.None)
+        {
+            if (!_formModel.RepeatUntil.HasValue)
+            {
+                _validationMessages.Add(repeatUntilField, "Set an end date for repeating.");
+            }
+            else if (_formModel.RepeatUntil.Value.Date < _formModel.Date.Date)
+            {
+                _validationMessages.Add(repeatUntilField, "Repeat until date must be on or after the start date.");
+            }
+
+            if (_formModel.RepeatMode == ShiftRepeatMode.CustomDays && _formModel.RepeatDays.Count == 0)
+            {
+                _validationMessages.Add(repeatModeField, "Select at least one day for custom repeat.");
+            }
         }
 
         _editContext.NotifyValidationStateChanged();
@@ -365,6 +442,21 @@
         _editContext?.NotifyFieldChanged(new FieldIdentifier(_formModel, nameof(ShiftEditorModel.EndTime)));
     }
 
+    private void ToggleRepeatDay(DayOfWeek day, ChangeEventArgs e)
+    {
+        var isChecked = e?.Value is bool boolean && boolean;
+        if (isChecked)
+        {
+            _formModel.RepeatDays.Add(day);
+        }
+        else
+        {
+            _formModel.RepeatDays.Remove(day);
+        }
+
+        _editContext?.NotifyFieldChanged(new FieldIdentifier(_formModel, nameof(ShiftEditorModel.RepeatDays)));
+    }
+
     private string? ResolveEmployeeName(int employeeId)
     {
         var match = Employees.FirstOrDefault(e => e.Id == employeeId);
@@ -380,6 +472,9 @@
         public TimeSpan StartTime { get; set; } = TimeSpan.FromHours(9);
         public TimeSpan EndTime { get; set; } = TimeSpan.FromHours(17);
         public string? GroupName { get; set; }
+        public ShiftRepeatMode RepeatMode { get; set; }
+        public DateTime? RepeatUntil { get; set; }
+        public HashSet<DayOfWeek> RepeatDays { get; } = new();
 
         public static ShiftEditorModel CreateDefault() => new();
 
@@ -397,11 +492,11 @@
             };
         }
 
-        public Shift ToShift()
+        public ShiftSaveRequest ToSaveRequest()
         {
             var baseDateLocal = DateTime.SpecifyKind(Date.Date, DateTimeKind.Local);
 
-            return new Shift
+            var shift = new Shift
             {
                 Id = Id ?? 0,
                 EmployeeId = EmployeeId,
@@ -409,6 +504,23 @@
                 Start = baseDateLocal.Add(StartTime),
                 End = baseDateLocal.Add(EndTime),
                 GroupName = string.IsNullOrWhiteSpace(GroupName) ? null : GroupName.Trim()
+            };
+
+            var repeatRequest = new ShiftRepeatRequest
+            {
+                RepeatMode = RepeatMode,
+                RepeatUntil = RepeatUntil.HasValue
+                    ? DateOnly.FromDateTime(RepeatUntil.Value.Date)
+                    : null,
+                RepeatDays = RepeatMode == ShiftRepeatMode.CustomDays
+                    ? new List<DayOfWeek>(RepeatDays)
+                    : Array.Empty<DayOfWeek>()
+            };
+
+            return new ShiftSaveRequest
+            {
+                Shift = shift,
+                RepeatRequest = repeatRequest
             };
         }
 

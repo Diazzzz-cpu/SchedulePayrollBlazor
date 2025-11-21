@@ -1,8 +1,10 @@
 using Microsoft.EntityFrameworkCore;
 using SchedulePayrollBlazor.Data;
 using SchedulePayrollBlazor.Data.Models;
+using SchedulePayrollBlazor.Services.Models;
 using System;
 using System.Linq;
+using System.Collections.Generic;
 
 namespace SchedulePayrollBlazor.Services;
 
@@ -264,6 +266,128 @@ public class ShiftService : IShiftService
             .AnyAsync(s => start < s.End && end > s.Start);
     }
 
+    public async Task<ShiftOperationResult> CopyWeekAsync(DateOnly sourceWeekStart, int? numberOfWeeks, DateOnly? endDateInclusive)
+    {
+        var weekStart = sourceWeekStart.ToDateTime(TimeOnly.MinValue);
+        var sourceWeekEnd = weekStart.AddDays(7);
+
+        List<Shift> sourceShifts;
+        try
+        {
+            sourceShifts = await _db.Shifts
+                .AsNoTracking()
+                .Where(s => s.Start.Date >= weekStart.Date && s.Start.Date < sourceWeekEnd.Date)
+                .OrderBy(s => s.Start)
+                .ToListAsync();
+        }
+        catch
+        {
+            return ShiftOperationResult.Empty;
+        }
+
+        if (sourceShifts.Count == 0)
+        {
+            return ShiftOperationResult.Empty;
+        }
+
+        var offsets = CalculateWeekOffsets(numberOfWeeks);
+        var result = new ShiftOperationResult();
+        var newShifts = new List<Shift>();
+
+        foreach (var shift in sourceShifts)
+        {
+            foreach (var weekOffset in offsets)
+            {
+                var targetStart = shift.Start.AddDays(weekOffset * 7);
+                var targetEnd = shift.End.AddDays(weekOffset * 7);
+
+                if (endDateInclusive.HasValue && DateOnly.FromDateTime(targetStart.Date) > endDateInclusive.Value)
+                {
+                    continue;
+                }
+
+                result.Total++;
+
+                if (await HasOverlappingShiftAsync(shift.EmployeeId, targetStart, targetEnd))
+                {
+                    result.SkippedConflicts++;
+                    continue;
+                }
+
+                var clone = CloneShift(shift, targetStart, targetEnd);
+                await ApplyEmployeeMetadataAsync(clone, preferExistingName: true, preferExistingGroup: true);
+                newShifts.Add(clone);
+                result.Created++;
+            }
+        }
+
+        if (newShifts.Count > 0)
+        {
+            await _db.Shifts.AddRangeAsync(newShifts);
+            await _db.SaveChangesAsync();
+        }
+
+        return result;
+    }
+
+    public async Task<ShiftOperationResult> CreateRepeatedShiftsAsync(Shift baseShift, ShiftRepeatRequest repeatRequest)
+    {
+        ArgumentNullException.ThrowIfNull(baseShift);
+        ArgumentNullException.ThrowIfNull(repeatRequest);
+
+        if (repeatRequest.RepeatMode == ShiftRepeatMode.None || !repeatRequest.RepeatUntil.HasValue)
+        {
+            return ShiftOperationResult.Empty;
+        }
+
+        var untilDate = repeatRequest.RepeatUntil.Value;
+        var baseDate = DateOnly.FromDateTime(baseShift.Start.Date);
+        if (untilDate < baseDate)
+        {
+            return ShiftOperationResult.Empty;
+        }
+
+        var candidates = GenerateRepeatDates(baseDate, untilDate, repeatRequest);
+        var duration = baseShift.End - baseShift.Start;
+        var result = new ShiftOperationResult();
+        var newShifts = new List<Shift>();
+
+        foreach (var date in candidates)
+        {
+            var targetStart = date.ToDateTime(TimeOnly.FromTimeSpan(baseShift.Start.TimeOfDay));
+            var targetEnd = targetStart.Add(duration);
+
+            result.Total++;
+
+            if (await HasOverlappingShiftAsync(baseShift.EmployeeId, targetStart, targetEnd))
+            {
+                result.SkippedConflicts++;
+                continue;
+            }
+
+            var clone = new Shift
+            {
+                EmployeeId = baseShift.EmployeeId,
+                EmployeeName = baseShift.EmployeeName,
+                GroupName = baseShift.GroupName,
+                Start = targetStart,
+                End = targetEnd
+            };
+
+            await ApplyEmployeeMetadataAsync(clone, preferExistingName: true, preferExistingGroup: true);
+            newShifts.Add(clone);
+            result.Created++;
+        }
+
+        if (newShifts.Count > 0)
+        {
+            await _db.Shifts.AddRangeAsync(newShifts);
+            await _db.SaveChangesAsync();
+        }
+
+        return result;
+    }
+
     private async Task ApplyEmployeeMetadataAsync(Shift shift, bool preferExistingName = false, bool preferExistingGroup = false)
     {
         var normalizedGroup = NormalizeGroup(shift.GroupName);
@@ -310,5 +434,76 @@ public class ShiftService : IShiftService
         }
 
         return group.Trim();
+    }
+
+    private static Shift CloneShift(Shift source, DateTime targetStart, DateTime targetEnd)
+    {
+        return new Shift
+        {
+            EmployeeId = source.EmployeeId,
+            EmployeeName = source.EmployeeName,
+            GroupName = source.GroupName,
+            Start = targetStart,
+            End = targetEnd
+        };
+    }
+
+    private static List<int> CalculateWeekOffsets(int? numberOfWeeks)
+    {
+        if (!numberOfWeeks.HasValue)
+        {
+            return new List<int> { 1 };
+        }
+
+        if (numberOfWeeks.Value <= 0)
+        {
+            return new List<int>();
+        }
+
+        return Enumerable.Range(1, numberOfWeeks.Value).ToList();
+    }
+
+    private static IEnumerable<DateOnly> GenerateRepeatDates(DateOnly baseDate, DateOnly until, ShiftRepeatRequest request)
+    {
+        var start = baseDate.AddDays(1);
+
+        switch (request.RepeatMode)
+        {
+            case ShiftRepeatMode.Weekly:
+                for (var date = baseDate.AddDays(7); date <= until; date = date.AddDays(7))
+                {
+                    yield return date;
+                }
+
+                yield break;
+
+            case ShiftRepeatMode.Weekdays:
+                for (var date = start; date <= until; date = date.AddDays(1))
+                {
+                    if (date.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday)
+                    {
+                        continue;
+                    }
+
+                    yield return date;
+                }
+
+                yield break;
+
+            case ShiftRepeatMode.CustomDays:
+                var daySet = new HashSet<DayOfWeek>(request.RepeatDays ?? Array.Empty<DayOfWeek>());
+
+                for (var date = start; date <= until; date = date.AddDays(1))
+                {
+                    if (daySet.Contains(date.DayOfWeek))
+                    {
+                        yield return date;
+                    }
+                }
+
+                yield break;
+            default:
+                yield break;
+        }
     }
 }

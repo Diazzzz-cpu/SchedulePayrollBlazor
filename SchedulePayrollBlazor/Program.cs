@@ -58,6 +58,7 @@ builder.Services.AddScoped<IShiftService, ShiftService>();
 builder.Services.AddScoped<IPayrollService, PayrollService>();
 builder.Services.AddScoped<IAttendanceService, AttendanceService>();
 builder.Services.AddScoped<IAttendanceSettingsService, AttendanceSettingsService>();
+builder.Services.AddScoped<IPayComponentService, PayComponentService>();
 
 // --------------------------------
 // Build + pipeline

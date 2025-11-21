@@ -1,4 +1,5 @@
 using SchedulePayrollBlazor.Data.Models;
+using SchedulePayrollBlazor.Services.Models;
 using System;
 using System.Collections.Generic;
 
@@ -33,4 +34,8 @@ public interface IShiftService
     Task<bool> DeleteShiftAsync(int id);
 
     Task<bool> HasOverlappingShiftAsync(int employeeId, DateTime start, DateTime end, int? shiftIdToExclude = null);
+
+    Task<ShiftOperationResult> CopyWeekAsync(DateOnly sourceWeekStart, int? numberOfWeeks, DateOnly? endDateInclusive);
+
+    Task<ShiftOperationResult> CreateRepeatedShiftsAsync(Shift baseShift, ShiftRepeatRequest repeatRequest);
 }

@@ -55,81 +55,104 @@
                 <h3>Payroll history</h3>
                 <p class="ps-subtitle">Detailed breakdown per period.</p>
             </div>
-            <div class="ps-table-container">
-                <table class="ps-table">
-                    <thead>
-                        <tr>
-                            <th>Payroll period</th>
-                            <th>Total hours</th>
-                            <th>Base pay</th>
-                            <th>Deductions</th>
-                            <th>Bonuses</th>
-                            <th>Net pay</th>
-                            <th>Processed</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @foreach (var entry in entries)
-                        {
-                            <tr>
-                                <td class="payroll-period-cell">
-                                    <div class="payroll-period-title">
-                                        @(entry.PayrollPeriod?.Name ?? "Payroll period")
-                                    </div>
-                                    <div class="payroll-period-dates">
-                                        @if (entry.PayrollPeriod is not null)
-                                        {
-                                            @entry.PayrollPeriod.StartDate.ToString("MMM dd, yyyy")
-                                            <span class="payroll-period-separator">–</span>
-                                            @entry.PayrollPeriod.EndDate.ToString("MMM dd, yyyy")
-                                        }
-                                        else
-                                        {
-                                            <span>—</span>
-                                        }
-                                    </div>
-                                </td>
-                                <td>@string.Format("{0:N2} hrs", entry.TotalHoursWorked)</td>
-                                <td>₱@entry.BasePay.ToString("N2")</td>
-                                <td class="text-danger">₱@entry.TotalDeductions.ToString("N2")</td>
-                                <td class="text-success">₱@entry.TotalBonuses.ToString("N2")</td>
-                                <td><strong>₱@entry.NetPay.ToString("N2")</strong></td>
-                                <td class="payroll-processed-cell">
-                                    <div class="processed-wrapper">
-                                        <span class="processed-date">
-                                            @entry.CalculatedAt.ToString("MMM dd, yyyy")
-                                        </span>
-                                        <span class="processed-time">
-                                            @entry.CalculatedAt.ToString("HH:mm")
-                                        </span>
-                                    </div>
-                                </td>
-                            </tr>
-                            @if (entry.Adjustments is not null && entry.Adjustments.Count > 0)
-                            {
-                                <tr class="ps-table-row-detail">
-                                    <td colspan="7">
-                                        <strong>Adjustments applied:</strong>
-                                        <ul class="adjustment-list">
-                                            @foreach (var adjustment in entry.Adjustments.OrderByDescending(a => a.Type))
+            <div class="payroll-card-grid">
+                @foreach (var entry in entries)
+                {
+                    var earningLines = GetEarningLines(entry).ToList();
+                    var deductionLines = GetDeductionLines(entry).ToList();
+                    var totalEarnings = earningLines.Sum(l => l.Amount);
+                    var totalDeductions = deductionLines.Sum(l => l.Amount);
+                    <div class="ps-card payroll-entry-card">
+                        <div class="payroll-entry-header">
+                            <div>
+                                <div class="payroll-period-title">@GetPeriodName(entry)</div>
+                                <div class="payroll-period-dates">@GetPeriodRange(entry)</div>
+                            </div>
+                            <div class="payroll-entry-meta">
+                                <span class="ps-badge">@entry.PayrollPeriod?.Name</span>
+                                <span class="text-muted">Processed @entry.CalculatedAt.ToString("MMM dd, yyyy HH:mm")</span>
+                            </div>
+                        </div>
+
+                        <div class="payroll-entry-body">
+                            <div class="payroll-lines-grid">
+                                <div class="payroll-lines-section">
+                                    <h5 class="payroll-lines-title">Earnings</h5>
+                                    <table class="ps-table ps-table-compact">
+                                        <thead>
+                                            <tr>
+                                                <th>Code</th>
+                                                <th>Description</th>
+                                                <th>Quantity</th>
+                                                <th>Rate</th>
+                                                <th class="text-end">Amount</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            @if (earningLines.Count == 0)
                                             {
-                                            <li>
-                                                <span class="badge @(IsBonus(adjustment) ? "badge-success" : "badge-danger")">@adjustment.Type</span>
-                                                <span class="adjustment-label">@adjustment.Label</span>
-                                                @if (adjustment.IsAutoGenerated)
-                                                {
-                                                    <span class="badge bg-secondary ms-1">Auto</span>
-                                                }
-                                                <span class="adjustment-amount">₱@adjustment.Amount.ToString("N2")</span>
-                                            </li>
+                                                <tr><td colspan="5" class="text-muted">No earnings recorded.</td></tr>
                                             }
-                                        </ul>
-                                    </td>
-                                </tr>
-                            }
-                        }
-                    </tbody>
-                </table>
+                                            else
+                                            {
+                                                @foreach (var line in earningLines)
+                                                {
+                                                    <tr>
+                                                        <td><span class="ps-badge">@line.Code</span></td>
+                                                        <td>@GetDisplayLabel(line)</td>
+                                                        <td>@FormatQuantity(line)</td>
+                                                        <td>@FormatRate(line)</td>
+                                                        <td class="text-end">@FormatAmount(line.Amount)</td>
+                                                    </tr>
+                                                }
+                                            }
+                                        </tbody>
+                                    </table>
+                                </div>
+                                <div class="payroll-lines-section">
+                                    <h5 class="payroll-lines-title">Deductions</h5>
+                                    <table class="ps-table ps-table-compact">
+                                        <thead>
+                                            <tr>
+                                                <th>Code</th>
+                                                <th>Description</th>
+                                                <th>Quantity</th>
+                                                <th>Rate</th>
+                                                <th class="text-end">Amount</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            @if (deductionLines.Count == 0)
+                                            {
+                                                <tr><td colspan="5" class="text-muted">No deductions recorded.</td></tr>
+                                            }
+                                            else
+                                            {
+                                                @foreach (var line in deductionLines)
+                                                {
+                                                    <tr>
+                                                        <td><span class="ps-badge">@line.Code</span></td>
+                                                        <td>@GetDisplayLabel(line)</td>
+                                                        <td>@FormatQuantity(line)</td>
+                                                        <td>@FormatRate(line)</td>
+                                                        <td class="text-end">@FormatAmount(line.Amount)</td>
+                                                    </tr>
+                                                }
+                                            }
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+
+                            <div class="payroll-breakdown-summary">
+                                <div>Total hours: <strong>@string.Format("{0:N2} hrs", entry.TotalHoursWorked)</strong></div>
+                                <div>Subtotal earnings: <strong>@FormatAmount(totalEarnings)</strong></div>
+                                <div>Subtotal deductions: <strong class="text-danger">@FormatAmount(totalDeductions)</strong></div>
+                                <div>Net pay: <strong>@FormatAmount(totalEarnings - totalDeductions)</strong></div>
+                            </div>
+                        </div>
+                    </div>
+                }
             </div>
         </section>
     }
@@ -162,7 +185,8 @@
 
         entries = await Db.PayrollEntries
             .Include(e => e.PayrollPeriod)
-            .Include(e => e.Adjustments)
+            .Include(e => e.PayrollLines)
+                .ThenInclude(l => l.PayComponent)
             .Where(e => e.EmployeeId == employeeId)
             .OrderByDescending(e => e.PayrollPeriod.EndDate)
             .ThenByDescending(e => e.CalculatedAt)
@@ -173,6 +197,74 @@
         averageNet = entries.Count == 0 ? 0m : entries.Average(e => e.NetPay);
     }
 
-    private static bool IsBonus(PayrollAdjustment adjustment)
-        => string.Equals(adjustment.Type, "Bonus", StringComparison.OrdinalIgnoreCase);
+    private static IEnumerable<PayrollLine> GetEarningLines(PayrollEntry entry)
+        => entry.PayrollLines?.Where(l => string.Equals(l.Kind, "Earning", StringComparison.OrdinalIgnoreCase))
+        ?? Enumerable.Empty<PayrollLine>();
+
+    private static IEnumerable<PayrollLine> GetDeductionLines(PayrollEntry entry)
+        => entry.PayrollLines?.Where(l => string.Equals(l.Kind, "Deduction", StringComparison.OrdinalIgnoreCase))
+        ?? Enumerable.Empty<PayrollLine>();
+
+    private static string GetPeriodName(PayrollEntry entry)
+        => entry.PayrollPeriod?.Name ?? "Payroll period";
+
+    private static string GetPeriodRange(PayrollEntry entry)
+        => entry.PayrollPeriod is null
+            ? "—"
+            : $"{entry.PayrollPeriod.StartDate:MMM dd, yyyy} – {entry.PayrollPeriod.EndDate:MMM dd, yyyy}";
+
+    private string GetDisplayLabel(PayrollLine line)
+    {
+        var code = line.Code.ToUpperInvariant();
+
+        return code switch
+        {
+            "BASE" => "Base pay (rendered hours)",
+            "OT" => "Overtime bonus",
+            "LATE" => "Late penalty",
+            "UNDERTIME" => "Undertime penalty",
+            "ABSENCE" => "Absence deduction",
+            "SSS" => "SSS contribution",
+            "PHIC" => "PhilHealth contribution",
+            "HDMF" => "Pag-IBIG contribution",
+            "TAX" => "Withholding tax",
+            "ND" => "Night differential",
+            _ => string.IsNullOrWhiteSpace(line.Description) ? code : line.Description
+        };
+    }
+
+    private string FormatAmount(decimal amount) => $"₱{amount:N2}";
+
+    private string FormatQuantity(PayrollLine line)
+    {
+        var code = line.Code.ToUpperInvariant();
+
+        if (code == "LATE" || code == "UNDERTIME" || code == "OT")
+        {
+            return $"{line.Quantity:N2} mins";
+        }
+
+        if (code == "ABSENCE" || code == "BASE")
+        {
+            return $"{line.Quantity:N2} hrs";
+        }
+
+        return line.Quantity == 0 ? "—" : line.Quantity.ToString("N2");
+    }
+
+    private string FormatRate(PayrollLine line)
+    {
+        if (line.Rate == 0)
+        {
+            return "—";
+        }
+
+        var calculationType = line.PayComponent?.CalculationType ?? string.Empty;
+        if (string.Equals(calculationType, "PercentageOfBase", StringComparison.OrdinalIgnoreCase) && line.Rate <= 1)
+        {
+            return line.Rate.ToString("P2");
+        }
+
+        return FormatAmount(line.Rate);
+    }
 }

@@ -267,11 +267,20 @@ public class ShiftService : IShiftService
             .AnyAsync(s => start < s.End && end > s.Start);
     }
 
-    public async Task<WeekCopyResult> CopyWeekToNextAsync(DateOnly sourceWeekStart, CancellationToken cancellationToken = default)
+    public Task<WeekCopyResult> CopyWeekToNextAsync(DateOnly sourceWeekStart, CancellationToken cancellationToken = default)
+    {
+        return CopyWeekToAsync(sourceWeekStart, sourceWeekStart.AddDays(7), cancellationToken);
+    }
+
+    public async Task<WeekCopyResult> CopyWeekToAsync(
+        DateOnly sourceWeekStart,
+        DateOnly targetWeekStart,
+        CancellationToken cancellationToken = default)
     {
         var sourceStart = sourceWeekStart.ToDateTime(TimeOnly.MinValue);
         var sourceEnd = sourceStart.AddDays(7);
-        const int WeekOffsetDays = 7;
+        var targetStart = targetWeekStart.ToDateTime(TimeOnly.MinValue);
+        var offsetDays = (targetStart - sourceStart).TotalDays;
 
         var sourceShifts = await _db.Shifts
             .AsNoTracking()
@@ -294,8 +303,8 @@ public class ShiftService : IShiftService
 
         foreach (var shift in sourceShifts)
         {
-            var newStart = shift.Start.AddDays(WeekOffsetDays);
-            var newEnd = shift.End.AddDays(WeekOffsetDays);
+            var newStart = shift.Start.AddDays(offsetDays);
+            var newEnd = shift.End.AddDays(offsetDays);
 
             if (await HasConflictAsync(shift.EmployeeId, newStart, newEnd, null, cancellationToken))
             {

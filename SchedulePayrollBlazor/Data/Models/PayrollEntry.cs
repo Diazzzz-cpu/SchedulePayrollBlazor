@@ -40,5 +40,6 @@ public class PayrollEntry
     [Column("calculated_at")]
     public DateTime CalculatedAt { get; set; } = DateTime.UtcNow;
 
+    public ICollection<PayrollLine> PayrollLines { get; set; } = new List<PayrollLine>();
     public ICollection<PayrollAdjustment> Adjustments { get; set; } = new List<PayrollAdjustment>();
 }

@@ -27,6 +27,7 @@ public class AppDbContext : DbContext
     public DbSet<Schedule> Schedules => Set<Schedule>();
     public DbSet<TimeLog> TimeLogs => Set<TimeLog>();
     public DbSet<Shift> Shifts => Set<Shift>();
+    public DbSet<RolePayComponent> RolePayComponents => Set<RolePayComponent>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -119,6 +120,29 @@ public class AppDbContext : DbContext
             entity.Property(pc => pc.CalculationType).HasColumnName("calculation_type").HasMaxLength(50);
             entity.Property(pc => pc.DefaultAmount).HasColumnName("default_rate").HasColumnType("decimal(18,2)");
             entity.Property(pc => pc.IsActive).HasColumnName("is_active");
+        });
+
+        // ROLE PAY COMPONENTS
+        modelBuilder.Entity<RolePayComponent>(entity =>
+        {
+            entity.ToTable("role_pay_components");
+            entity.HasKey(rp => rp.RolePayComponentId);
+
+            entity.Property(rp => rp.RolePayComponentId).HasColumnName("role_pay_component_id");
+            entity.Property(rp => rp.RoleId).HasColumnName("role_id");
+            entity.Property(rp => rp.PayComponentId).HasColumnName("pay_component_id");
+            entity.Property(rp => rp.DefaultRateOverride).HasColumnName("default_rate_override").HasColumnType("decimal(18,2)");
+            entity.Property(rp => rp.IsActive).HasColumnName("is_active");
+
+            entity.HasOne(rp => rp.Role)
+                .WithMany()
+                .HasForeignKey(rp => rp.RoleId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(rp => rp.PayComponent)
+                .WithMany()
+                .HasForeignKey(rp => rp.PayComponentId)
+                .OnDelete(DeleteBehavior.Restrict);
         });
 
         // EMPLOYEE COMPONENTS

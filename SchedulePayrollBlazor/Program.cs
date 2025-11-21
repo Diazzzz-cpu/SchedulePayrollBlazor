@@ -59,6 +59,8 @@ builder.Services.AddScoped<IPayrollService, PayrollService>();
 builder.Services.AddScoped<IAttendanceService, AttendanceService>();
 builder.Services.AddScoped<IAttendanceSettingsService, AttendanceSettingsService>();
 builder.Services.AddScoped<IPayComponentService, PayComponentService>();
+builder.Services.AddScoped<IRolePayComponentService, RolePayComponentService>();
+builder.Services.AddScoped<IEmployeeComponentService, EmployeeComponentService>();
 
 // --------------------------------
 // Build + pipeline

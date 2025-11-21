@@ -19,15 +19,23 @@ public class EmployeeComponentService : IEmployeeComponentService
         IReadOnlyCollection<BulkAssignComponentRequest> components,
         CancellationToken cancellationToken = default)
     {
-        if (employeeIds.Count == 0 || components.Count == 0)
+        var distinctEmployees = employeeIds.Distinct().ToList();
+        var distinctComponents = components
+            .GroupBy(c => c.PayComponentId)
+            .Select(g => g.Last())
+            .ToList();
+
+        if (distinctEmployees.Count == 0 || distinctComponents.Count == 0)
         {
             return new BulkAssignResult();
         }
 
-        var payComponentIds = components.Select(c => c.PayComponentId).ToList();
+        var payComponentIds = distinctComponents.Select(c => c.PayComponentId).ToList();
 
         var existingAssignments = await _dbContext.EmployeeComponents
-            .Where(ec => employeeIds.Contains(ec.EmployeeId) && payComponentIds.Contains(ec.PayComponentId) && ec.Active)
+            .Where(ec => distinctEmployees.Contains(ec.EmployeeId)
+                         && payComponentIds.Contains(ec.PayComponentId)
+                         && ec.Active)
             .ToListAsync(cancellationToken);
 
         var existingLookup = existingAssignments
@@ -40,12 +48,12 @@ public class EmployeeComponentService : IEmployeeComponentService
 
         var result = new BulkAssignResult
         {
-            EmployeesConsidered = employeeIds.Count
+            EmployeesConsidered = distinctEmployees.Count
         };
 
-        foreach (var employeeId in employeeIds)
+        foreach (var employeeId in distinctEmployees)
         {
-            foreach (var component in components)
+            foreach (var component in distinctComponents)
             {
                 var key = (employeeId, component.PayComponentId);
                 if (existingLookup.ContainsKey(key))
@@ -64,6 +72,11 @@ public class EmployeeComponentService : IEmployeeComponentService
                     Active = true
                 });
 
+                existingLookup[key] = new EmployeeComponent
+                {
+                    EmployeeId = employeeId,
+                    PayComponentId = component.PayComponentId
+                };
                 result.AssignmentsCreated++;
             }
         }

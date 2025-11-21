@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using SchedulePayrollBlazor.Data;
 using SchedulePayrollBlazor.Data.Models;
+using SchedulePayrollBlazor.Services.Models;
 using SchedulePayrollBlazor.Utilities;
 
 namespace SchedulePayrollBlazor.Services;
@@ -88,7 +89,14 @@ public class PayrollService : IPayrollService
             .FirstOrDefaultAsync(pp => pp.Id == payrollPeriodId)
             ?? throw new InvalidOperationException("Unable to locate payroll period.");
 
-        var periodEndExclusive = period.EndDate.AddDays(1);
+        var periodStartDate = period.StartDate.Date;
+        var periodEndExclusive = period.EndDate.Date.AddDays(1);
+
+        var relevantLogsEmployeeIds = await _db.TimeLogs
+            .Where(t => t.ClockIn >= periodStartDate && t.ClockIn < periodEndExclusive)
+            .Select(t => t.EmployeeId)
+            .Distinct()
+            .ToListAsync();
 
         var relevantShifts = await _db.Shifts
             .Where(s => s.Start < periodEndExclusive && s.End > period.StartDate)
@@ -97,7 +105,12 @@ public class PayrollService : IPayrollService
         var shiftsByEmployee = relevantShifts
             .GroupBy(s => s.EmployeeId)
             .ToDictionary(group => group.Key, group => group.ToList());
+
         var employeesWithActivity = new HashSet<int>(shiftsByEmployee.Keys);
+        foreach (var employeeId in relevantLogsEmployeeIds)
+        {
+            employeesWithActivity.Add(employeeId);
+        }
 
         var employees = await _db.Employees
             .Include(e => e.User)
@@ -141,24 +154,19 @@ public class PayrollService : IPayrollService
         {
             var employeeId = employee.EmployeeId;
 
-            if (!shiftsByEmployee.TryGetValue(employeeId, out var employeeShifts) || employeeShifts.Count == 0)
-            {
-                continue;
-            }
-
             var existingEntry = existingEntries.FirstOrDefault(pe => pe.EmployeeId == employeeId);
 
-            decimal totalHours = 0m;
+            var attendance = await _attendanceService.GetAttendanceForEmployeeAsync(
+                employeeId,
+                DateOnly.FromDateTime(period.StartDate),
+                DateOnly.FromDateTime(period.EndDate));
 
-            foreach (var shift in employeeShifts)
+            var attendanceSummary = SummarizeAttendance(attendance);
+            var totalHours = Math.Round((decimal)attendanceSummary.TotalWorkedHours, 2, MidpointRounding.AwayFromZero);
+
+            if (totalHours <= 0 && attendanceSummary.TotalAbsentDays == 0 && attendanceSummary.TotalOvertimeMinutes == 0 && attendanceSummary.TotalLateMinutes == 0 && attendanceSummary.TotalUndertimeMinutes == 0)
             {
-                if (shift.End <= shift.Start)
-                {
-                    continue;
-                }
-
-                var duration = (decimal)(shift.End - shift.Start).TotalHours;
-                totalHours += Math.Round(duration, 2, MidpointRounding.AwayFromZero);
+                continue;
             }
 
             var basePay = CalculateBasePay(employee.Compensation, totalHours, includeFixedComponent: false);
@@ -189,7 +197,7 @@ public class PayrollService : IPayrollService
                 entry.CalculatedAt = DateTime.UtcNow;
             }
 
-            await ApplyAttendanceAdjustmentsAsync(entry, employee, period, settings);
+            await ApplyAttendanceAdjustmentsAsync(entry, employee, attendance, settings);
             RecalculateEntryTotals(entry);
         }
 
@@ -321,15 +329,10 @@ public class PayrollService : IPayrollService
     private async Task ApplyAttendanceAdjustmentsAsync(
         PayrollEntry entry,
         Employee employee,
-        PayrollPeriod period,
+        IEnumerable<DailyAttendanceDto> attendance,
         AttendancePenaltySettings settings)
     {
         entry.Adjustments ??= new List<PayrollAdjustment>();
-
-        var attendance = await _attendanceService.GetAttendanceForEmployeeAsync(
-            employee.EmployeeId,
-            DateOnly.FromDateTime(period.StartDate),
-            DateOnly.FromDateTime(period.EndDate));
 
         var hourlyRate = CalculateHourlyRate(employee.Compensation);
 
@@ -441,6 +444,40 @@ public class PayrollService : IPayrollService
         return Math.Round(basePay, 2, MidpointRounding.AwayFromZero);
     }
 
+    private static AttendanceSummary SummarizeAttendance(IEnumerable<DailyAttendanceDto> attendance)
+    {
+        var workedHours = attendance
+            .Where(d => d.HasLogs)
+            .Sum(d => d.TotalDuration.TotalHours);
+
+        var lateMinutes = attendance
+            .Where(d => d.HasLogs && d.IsLate && d.LateMinutes > 0)
+            .Sum(d => d.LateMinutes);
+
+        var undertimeMinutes = attendance
+            .Where(d => d.HasLogs && d.IsUndertime && d.UndertimeMinutes > 0)
+            .Sum(d => d.UndertimeMinutes);
+
+        var overtimeMinutes = attendance
+            .Where(d => d.HasLogs && d.IsOvertime && d.OvertimeMinutes > 0)
+            .Sum(d => d.OvertimeMinutes);
+
+        var absentDays = attendance.Count(d => d.IsAbsent);
+        var absentScheduledHours = attendance
+            .Where(d => d.IsAbsent && d.ScheduledHours > 0)
+            .Sum(d => d.ScheduledHours);
+
+        return new AttendanceSummary
+        {
+            TotalWorkedHours = workedHours,
+            TotalLateMinutes = lateMinutes,
+            TotalUndertimeMinutes = undertimeMinutes,
+            TotalOvertimeMinutes = overtimeMinutes,
+            TotalAbsentDays = absentDays,
+            TotalScheduledHoursForAbsences = absentScheduledHours
+        };
+    }
+
     private static string NormalizeAdjustmentType(string type)
     {
         return string.Equals(type, DeductionType, StringComparison.OrdinalIgnoreCase)
@@ -465,4 +502,19 @@ public class PayrollService : IPayrollService
         entry.NetPay = Math.Round(entry.BasePay - entry.TotalDeductions + entry.TotalBonuses, 2, MidpointRounding.AwayFromZero);
         entry.CalculatedAt = DateTime.UtcNow;
     }
+}
+
+internal sealed class AttendanceSummary
+{
+    public double TotalWorkedHours { get; init; }
+
+    public int TotalLateMinutes { get; init; }
+
+    public int TotalUndertimeMinutes { get; init; }
+
+    public int TotalOvertimeMinutes { get; init; }
+
+    public int TotalAbsentDays { get; init; }
+
+    public decimal TotalScheduledHoursForAbsences { get; init; }
 }
